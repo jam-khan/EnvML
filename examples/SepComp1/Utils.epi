@@ -1,5 +1,0 @@
-interface @pure Utils
-
-require Lib;
-
-val apply : Int -> Int

@@ -1,3 +1,0 @@
-interface @resource Main
-
-val y : Int

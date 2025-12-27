@@ -1,1 +1,0 @@
-module IntegrationSpec where

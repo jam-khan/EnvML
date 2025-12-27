@@ -1,9 +1,0 @@
-@resource module Area
-
-type Shape  = Circle Int
-            | Rectangle Int Int;
-
-let object = {Circle 10} as Shape;
-let area   = match object of
-                case (Circle r)         => { (22 / 7) * r * r }
-                case (Rectangle w h)    => { w * h }

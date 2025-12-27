@@ -1,7 +1,0 @@
-
-
-val y : {y: Int, inc: Int};
-
-val k : Int;
-
-val z : Int

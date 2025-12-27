@@ -1,5 +1,0 @@
-@resource
-
-import B System;
-
-val result = B(System)

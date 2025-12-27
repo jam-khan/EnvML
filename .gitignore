@@ -28,3 +28,4 @@ proofs/Makefile.conf
 proofs/Makefile
 src/ENVCAP/Parser/Happy.info
 .vscode/*
+.vscode

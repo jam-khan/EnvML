@@ -1,5 +1,0 @@
-@pure interface D
-
-require (A, B, C);
-
-Int

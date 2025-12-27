@@ -1,3 +1,0 @@
-@resource interface Lib
-
-val inc : Int -> Int

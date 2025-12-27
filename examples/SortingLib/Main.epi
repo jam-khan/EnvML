@@ -1,6 +1,0 @@
-@resource interface main
-
-val example : [Int];
-val sortedM : [Int];
-val sortedI : [Int];
-val sortedQ : [Int]
