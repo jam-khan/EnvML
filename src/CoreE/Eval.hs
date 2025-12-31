@@ -1,5 +1,5 @@
-module ENVCAP.Core.Evaluator where
-import ENVCAP.Syntax
+module CoreE.Eval where
+import Syntax
 import Control.Monad (guard)
 
 eval :: Value -> CoreTm -> Maybe Value

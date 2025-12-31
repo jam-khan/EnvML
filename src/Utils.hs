@@ -1,7 +1,6 @@
 module Utils where
 
 import Control.Exception (IOException, try)
-import Syntax
 import System.Directory (doesFileExist)
 
 
