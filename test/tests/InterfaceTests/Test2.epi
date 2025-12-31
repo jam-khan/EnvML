@@ -1,4 +1,0 @@
-@pure interface Name
-
-val inc : Int -> Int -> Int;
-val f   : Sig[Int, Int -> Int]
