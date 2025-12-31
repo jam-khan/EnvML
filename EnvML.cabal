@@ -1,0 +1,63 @@
+cabal-version:      2.4
+name:               EnvML
+version:            0.1.0.0
+
+author:             jam-khan
+maintainer:         jamkhan@connect.hku.hk
+
+extra-source-files: CHANGELOG.md
+
+library
+    exposed-modules:    Utils 
+                        Syntax
+                        EnvML.Desugar 
+                        EnvML.Errors
+                        EnvML.LocallyNameless
+                        EnvML.TypeExpansion
+                        EnvML.Elaboration
+                        CoreE.Print
+                        CoreE.Eval
+                        CoreE.Check
+                        CoreForAll.Eval
+                        CoreForAll.Check
+                        CoreForAll.Syntax
+
+    build-depends:    base ^>=4.17.2.0,
+                      QuickCheck,
+                      parsec,
+                      megaparsec,
+                      parser-combinators >=1.3.0,
+                      array,
+                      containers,
+                      text,
+                      haskeline >= 0.8,
+                      filepath,
+                      directory,
+                      configurator,
+                      bytestring,
+                      binary,
+                      mtl
+    hs-source-dirs:   src, test, examples
+    ghc-options:      -Wall
+    default-language: Haskell2010
+
+executable EnvML
+    main-is:          Main.hs
+    build-depends:
+        base ^>=4.17.2.0,
+        EnvML
+
+    hs-source-dirs:   app
+    default-language: Haskell2010
+
+
+test-suite tests
+    type: exitcode-stdio-1.0
+    main-is: Spec.hs
+    hs-source-dirs: test
+    build-depends:  base >= 4.7 && <5,
+                    hspec,
+                    filepath,
+                    EnvML,
+                    QuickCheck
+    default-language: Haskell2010

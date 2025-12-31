@@ -1,3 +1,0 @@
-@resource interface Name
-
-val inc : Int -> Int -> Int
