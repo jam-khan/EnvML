@@ -1,0 +1,9 @@
+
+module type Database = sig
+    val name : string;;
+    val execute  : string -> string
+end;;
+
+val postgres_connect : string -> string -> (module Database);;
+
+val mysql_connect : string -> string -> (module Database);;
