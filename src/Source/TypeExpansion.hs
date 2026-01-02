@@ -1,8 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 
-module EnvML.TypeExpansion where
+module Source.TypeExpansion where
 
-import EnvML.Errors
+import Source.Errors
 import Syntax
 
 {- | Finds a `SurfaceTyp` by its alias (`label`) in a nested `STAnd` / `STRecord` type context.

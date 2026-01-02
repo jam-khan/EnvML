@@ -10,11 +10,14 @@ extra-source-files: CHANGELOG.md
 library
     exposed-modules:    Utils 
                         Syntax
-                        EnvML.Desugar 
-                        EnvML.Errors
-                        EnvML.LocallyNameless
-                        EnvML.TypeExpansion
-                        EnvML.Elaboration
+                        EnvML.Elab
+                        EnvML.Print
+                        EnvML.Syntax
+                        Source.Desugar 
+                        Source.Errors
+                        Source.LocallyNameless
+                        Source.TypeExpansion
+                        Source.Elaboration
                         CoreE.Print
                         CoreE.Eval
                         CoreE.Check

@@ -2,9 +2,9 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use >=>" #-}
-module EnvML.Elaboration where
+module Source.Elaboration where
 
-import EnvML.Errors
+import Source.Errors
 import Syntax
 
 elaborateTyp :: SourceTyp -> CoreTyp

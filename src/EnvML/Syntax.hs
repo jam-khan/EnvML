@@ -1,5 +1,5 @@
 {-# LANGUAGE InstanceSigs #-}
-module Source.Syntax where
+module EnvML.Syntax where
 
 
 main :: IO ()
@@ -59,6 +59,8 @@ data EnvE
 data Module
   = Functor Name Typ Module -- functor (x : A) struct x end
   | Struct  Env             -- struct type a = int; x = 1 end
+  | MApp    Module Module   -- M1 M2
+  | MLink   Module Module   -- M1 |><| M2    
   deriving (Eq)
 
 data Exp
@@ -75,6 +77,7 @@ data Exp
   | RProj Exp Name          -- e.l
   | FEnv  Env               -- [type a = int, x = 1]
   | Anno  Exp Typ           -- (e::A)
+  | ModE  Module            -- functor or struct
   deriving (Eq)
 
 data Literal 

@@ -31,7 +31,7 @@ keyLen (TypeEq _ : bs)  = 1 + keyLen bs
     (x, Γ)↑     = (x, Γ)c↑ 
 -}
 tshift :: Int -> Typ -> Typ
-tshift _ TyInt              = TyInt
+tshift _ (TyLit i)          = TyLit i
 tshift x (TyVar y)          = if x <= y then TyVar (1 + y) else TyVar y
 tshift x (TyArr a1 a2)      = TyArr (tshift x a1) (tshift x a2)
 tshift x (TyAll a)          = TyAll (tshift (1 + x) a)
@@ -89,7 +89,7 @@ concrete :: TyEnv -> Bool
 concrete g = and [x /= Kind | x <- g]
 
 teq :: TyEnv -> Typ -> Typ -> TyEnv -> Bool
-teq _ TyInt TyInt _                 = True
+teq _ (TyLit a) (TyLit b) _         = a == b
 teq g1 (TyVar x) b g2               =
   maybe (case b of
           TyVar y -> inner g1 x == inner g2 y
@@ -184,7 +184,10 @@ getVar (Type _ : g) x   = getVar g (x - 1)
 -- | Infer the type of an expression
 --   Returns Just typ if inference succeeds, Nothing otherwise
 infer :: TyEnv -> Exp -> Maybe Typ
-infer _ (Lit _)     = Just TyInt
+infer _ (Lit lit)   = pure $ TyLit $ inferLit lit
+  where inferLit (LitInt  _) = TyInt
+        inferLit (LitBool _) = TyBool
+        inferLit (LitStr  _) = TyStr
 infer g (Var x)     = getVar g x
 infer g (App e1 e2) = do
   TyArr a b <- infer g e1

@@ -44,9 +44,9 @@ Right (TmRec "MyModule" (TmStruct (TySAnd TySInt TySInt) (TmLit 42)))
 >>> desugar (SVar "undefinedVar")
 Left (DesugarFailed "Variable identifier \"undefinedVar\" couldn't get transformed.")
 -}
-module EnvML.Desugar where
+module Source.Desugar where
 
-import EnvML.Errors
+import Source.Errors
 import Syntax
 
 extractLetParams :: [(String, SurfaceTyp, SurfaceTm)] -> [(String, SurfaceTyp)]

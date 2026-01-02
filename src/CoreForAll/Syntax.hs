@@ -1,7 +1,15 @@
 module CoreForAll.Syntax where
 
+type TyEnv = [TyEnvE]
+
+data TyEnvE
+  = Type    Typ
+  | Kind 
+  | TypeEq  Typ
+  deriving (Eq, Show)
+
 data Typ
-  = TyInt
+  = TyLit    TyLit
   | TyVar    Int
   | TyArr    Typ Typ
   | TyAll    Typ
@@ -11,16 +19,21 @@ data Typ
   | TyEnvt   TyEnv
   deriving (Eq, Show)
 
-type TyEnv = [TyEnvE]
+data TyLit 
+  = TyInt                   -- int
+  | TyBool                  -- bool
+  | TyStr                   -- string
+  deriving (Eq, Show)
 
-data TyEnvE
-  = Type    Typ
-  | Kind 
-  | TypeEq  Typ
+-- Environment
+type Env = [EnvE]
+
+-- Environment elements
+data EnvE = ExpE Exp | TypE Typ
   deriving (Eq, Show)
 
 data Exp
-  = Lit   Int
+  = Lit   Literal
   -- De-bruijn index
   | Var   Int
   -- Term abstractions etc.
@@ -41,10 +54,8 @@ data Exp
   | Anno  Exp Typ
   deriving (Eq, Show)
 
--- Environment
-type Env = [EnvE]
-
--- Environment elements
-data EnvE = ExpE Exp | TypE Typ
+data Literal 
+  = LitInt  Int             -- 1, 2, etc.
+  | LitBool Bool            -- false, true
+  | LitStr  String          -- "hello"
   deriving (Eq, Show)
-

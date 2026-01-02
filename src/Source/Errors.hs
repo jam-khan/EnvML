@@ -1,4 +1,4 @@
-module EnvML.Errors where
+module Source.Errors where
 
 -- | Represents errors that can occur during type expansion.
 data TypeExpansionError

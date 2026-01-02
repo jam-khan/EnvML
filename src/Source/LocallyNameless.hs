@@ -1,9 +1,9 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use tuple-section" #-}
-module EnvML.LocallyNameless where
+module Source.LocallyNameless where
 
-import EnvML.Errors
+import Source.Errors
 import Syntax
 
 type Depth = Integer
