@@ -1,5 +1,7 @@
-import Formalization.Syntax
+import Formalization.EnvML.Syntax
 import Formalization.LambdaE.Syntax
+
+open EnvML
 
 namespace EnvML
 

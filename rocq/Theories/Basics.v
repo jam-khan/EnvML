@@ -5,6 +5,7 @@ Import Syntax.
 Require Import Coq.Lists.List.
 Require Import Coq.Classes.EquivDec.
 
+
 Fixpoint elaborate_typ (s : styp) : typ :=
   match s with
   | Sint       => int

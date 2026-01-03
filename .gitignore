@@ -7,25 +7,25 @@ extra/*
 src/Addition.hs
 src/FullIsorec/*
 .vscode/*
-proofs/core/*.aux
-proofs/core/*.glob
-# proofs/core/*.mk
+rocq/core/*.aux
+rocq/core/*.glob
+rocq/Theories/*.mk
 src/EnvML/Parser/Interface/ParseInterface.info
 src/EnvML/Parser/Interface/ParseInterface.hs
 src/EnvML/Parser/Implementation/ParseImp.info
 src/EnvML/Parser/Implementation/ParseImp.hs
-proofs/*.mk.d
-proofs/*.vos
-proofs/*.vo
-proofs/*.vok
-proofs/*.v.crashcoqide
-proofs/*.cache
-proofs/*.aux
-proofs/*.d
-proofs/*.glob
-proofs/Makefile
-proofs/Makefile.conf
-proofs/Makefile
+rocq/*.mk.d
+/*.vos
+rocq/Theories/*.vo
+rocq/Theories/*.vok
+rocq/Theories/*.v.crashcoqide
+rocq/Theories/*.cache
+rocq/Theories/*.aux
+rocq/Theories/*.d
+rocq/Theories/*.glob
+rocq/Theories/Makefile
+rocq/Theories//Makefile.conf
+rocq/Theories//Makefile
 src/EnvML/Parser/Happy.info
 
 *.vo
@@ -35,9 +35,9 @@ src/EnvML/Parser/Happy.info
 *.aux
 
 # Coq makefile generated files
-.Makefile.d
-Makefile.conf
-**/Makefile
+**/.CoqMakefile.d
+**/CoqMakefile.conf
+**/CoqMakefile
 
 # OCaml artifacts (sometimes produced by Coq)
 *.cm*

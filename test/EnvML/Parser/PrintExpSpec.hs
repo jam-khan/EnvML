@@ -1,7 +1,7 @@
-module EnvML.PrintExpSpec (spec) where
+module EnvML.Parser.PrintExpSpec (spec) where
 
 import Test.Hspec
-import EnvML.Syntax
+import EnvML.Parser.AST
 import EnvML.Print (stringOfExp)
 
 -- Shorthands

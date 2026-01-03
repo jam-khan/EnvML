@@ -1,5 +1,6 @@
 import Formalization.Elaboration.Rules
 
+
 theorem TypeElaborationUniqueness : ∀ (ST : EnvML.Typ) (CT₁ CT₂ : LambdaE.Typ),
     EnvML.ElaborateType ST = CT₁ →
     EnvML.ElaborateType ST = CT₂ →

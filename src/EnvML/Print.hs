@@ -1,6 +1,6 @@
 module EnvML.Print where
 
-import EnvML.Syntax
+import EnvML.Parser.AST
 
 main :: IO ()
 main = error "TODO"

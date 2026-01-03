@@ -1,4 +1,3 @@
-import Formalization.Syntax
 import Formalization.LambdaE.Syntax
 import Formalization.Elaboration.Rules
 import Formalization.Elaboration.Theorems

@@ -1,7 +1,7 @@
-module EnvML.PrintTypSpec (spec) where
+module EnvML.Parser.PrintTypSpec (spec) where
 
 import Test.Hspec
-import EnvML.Syntax
+import EnvML.Parser.AST
 import EnvML.Print (stringOfTyp)
 
 -- Shorthands

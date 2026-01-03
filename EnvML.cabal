@@ -1,18 +1,20 @@
 cabal-version:      2.4
 name:               EnvML
 version:            0.1.0.0
-
 author:             jam-khan
 maintainer:         jamkhan@connect.hku.hk
-
 extra-source-files: CHANGELOG.md
 
 library
+    hs-source-dirs:   src
+    
     exposed-modules:    Utils 
                         Syntax
                         EnvML.Elab
                         EnvML.Print
                         EnvML.Syntax
+                        EnvML.Parser.AST
+                        EnvML.Parser.Process
                         Source.Desugar 
                         Source.Errors
                         Source.LocallyNameless
@@ -24,39 +26,39 @@ library
                         CoreForAll.Eval
                         CoreForAll.Check
                         CoreForAll.Syntax
-
-    build-depends:    base ^>=4.17.2.0,
+    
+    build-depends:    base >= 4.17 && < 5,
                       QuickCheck,
                       parsec,
                       megaparsec,
-                      parser-combinators >=1.3.0,
+                      parser-combinators,
                       array,
                       containers,
                       text,
-                      haskeline >= 0.8,
+                      haskeline,
                       filepath,
                       directory,
                       configurator,
                       bytestring,
                       binary,
                       mtl
-    hs-source-dirs:   src, test, examples
+    
     ghc-options:      -Wall
     default-language: Haskell2010
 
 executable EnvML
     main-is:          Main.hs
-    build-depends:
-        base ^>=4.17.2.0,
-        EnvML
+    
+    build-depends:    base >= 4.17 && < 5,
+                      EnvML
 
     hs-source-dirs:   app
     default-language: Haskell2010
 
-
 test-suite tests
     type: exitcode-stdio-1.0
     main-is: Spec.hs
+                     
     hs-source-dirs: test
 
     build-depends:
