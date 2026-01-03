@@ -1,0 +1,1 @@
+{"version":4,"references":{},"module":"Formalization","directImports":[["Formalization.ENVCAP.Syntax",false,false,false],["Formalization.LambdaE.Syntax",false,false,false],["Formalization.Elaboration.Rules",false,false,false],["Formalization.Elaboration.Theorems",false,false,false]]}

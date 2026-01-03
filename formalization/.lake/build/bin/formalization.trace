@@ -1,0 +1,26 @@
+{"synthetic": false,
+ "outputs": "321879691066779876",
+ "log":
+ [{"message":
+   ".> MACOSX_DEPLOYMENT_TARGET=99.0 /Users/richiewilynnton/.elan/toolchains/leanprover--lean4---v4.22.0/bin/clang -o /Users/richiewilynnton/work/envcap/formalization/.lake/build/bin/formalization /Users/richiewilynnton/work/envcap/formalization/.lake/build/ir/Main.c.o.export /Users/richiewilynnton/work/envcap/formalization/.lake/build/ir/Formalization/ENVCAP/Syntax.c.o.export /Users/richiewilynnton/work/envcap/formalization/.lake/build/ir/Formalization/LambdaE/Syntax.c.o.export /Users/richiewilynnton/work/envcap/formalization/.lake/build/ir/Formalization/Elaboration/Rules.c.o.export /Users/richiewilynnton/work/envcap/formalization/.lake/build/ir/Formalization/Elaboration/Theorems.c.o.export /Users/richiewilynnton/work/envcap/formalization/.lake/build/ir/Formalization.c.o.export -L /Users/richiewilynnton/.elan/toolchains/leanprover--lean4---v4.22.0/lib/lean --sysroot /Users/richiewilynnton/.elan/toolchains/leanprover--lean4---v4.22.0 -L /Users/richiewilynnton/.elan/toolchains/leanprover--lean4---v4.22.0/lib -L /Users/richiewilynnton/.elan/toolchains/leanprover--lean4---v4.22.0/lib/libc -fuse-ld=lld -lleancpp -lInit -lStd -lLean -lleanrt -lc++ -lLake -lgmp -luv",
+   "level": "trace"}],
+ "inputs":
+ [["linkObjs",
+   [["/Users/richiewilynnton/work/envcap/formalization/.lake/build/ir/Main.c.o.export",
+     "7059896524653891205"],
+    ["/Users/richiewilynnton/work/envcap/formalization/.lake/build/ir/Formalization/ENVCAP/Syntax.c.o.export",
+     "6589243539559172591"],
+    ["/Users/richiewilynnton/work/envcap/formalization/.lake/build/ir/Formalization/LambdaE/Syntax.c.o.export",
+     "15815412279389802228"],
+    ["/Users/richiewilynnton/work/envcap/formalization/.lake/build/ir/Formalization/Elaboration/Rules.c.o.export",
+     "1293172457625464367"],
+    ["/Users/richiewilynnton/work/envcap/formalization/.lake/build/ir/Formalization/Elaboration/Theorems.c.o.export",
+     "12642652635427153947"],
+    ["/Users/richiewilynnton/work/envcap/formalization/.lake/build/ir/Formalization.c.o.export",
+     "8315860612440274630"]]],
+  ["linkLibs", "1723"],
+  ["Lean 4.22.0, commit ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05",
+   "8739116525927611134"],
+  ["traceArgs: #[]", "1723"],
+  ["arm64-apple-darwin23.6.0", "17616366027971700708"]],
+ "depHash": "12339321762059904734"}
