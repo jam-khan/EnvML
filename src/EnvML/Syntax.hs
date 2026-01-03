@@ -138,3 +138,4 @@ instance Show TyLit where
   show TyInt  = "int"
   show TyBool = "bool"
   show TyStr  = "string"
+

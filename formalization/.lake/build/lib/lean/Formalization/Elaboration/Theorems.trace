@@ -1,0 +1,31 @@
+{"synthetic": false,
+ "outputs":
+ {"o": ["5516996788547443186"],
+  "i": "18316901163866558702",
+  "c": "534492287291209546"},
+ "log":
+ [{"message":
+   ".> LEAN_PATH=/Users/richiewilynnton/work/envcap/formalization/.lake/build/lib/lean /Users/richiewilynnton/.elan/toolchains/leanprover--lean4---v4.22.0/bin/lean /Users/richiewilynnton/work/envcap/formalization/Formalization/Elaboration/Theorems.lean -o /Users/richiewilynnton/work/envcap/formalization/.lake/build/lib/lean/Formalization/Elaboration/Theorems.olean -i /Users/richiewilynnton/work/envcap/formalization/.lake/build/lib/lean/Formalization/Elaboration/Theorems.ilean -c /Users/richiewilynnton/work/envcap/formalization/.lake/build/ir/Formalization/Elaboration/Theorems.c --setup /Users/richiewilynnton/work/envcap/formalization/.lake/build/ir/Formalization/Elaboration/Theorems.setup.json --json",
+   "level": "trace"}],
+ "inputs":
+ [["Formalization.Elaboration.Theorems:deps",
+   [["deps",
+     [["formalization/Formalization:extraDep",
+       [["@formalization:extraDep", "1723"]]],
+      ["import oleans",
+       [["Formalization.Elaboration.Rules:olean",
+         [["Formalization.Elaboration.Rules:deps", "13542207273166781784"],
+          ["/Users/richiewilynnton/work/envcap/formalization/.lake/build/lib/lean/Formalization/Elaboration/Rules.olean",
+           "11147216638982326627"]]]]]]],
+    ["libs",
+     [["import dynlibs", "1723"],
+      ["package external libraries", "1723"],
+      ["module dynlibs", "1723"],
+      ["module plugins", "1723"]]]]],
+  ["Lean 4.22.0, commit ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05",
+   "8739116525927611134"],
+  ["/Users/richiewilynnton/work/envcap/formalization/Formalization/Elaboration/Theorems.lean",
+   "10732729033782613173"],
+  ["options", "1723"],
+  ["Module.leanArgs: #[]", "1723"]],
+ "depHash": "18168316681692577122"}

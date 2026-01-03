@@ -1,0 +1,27 @@
+{"synthetic": false,
+ "outputs":
+ {"o": ["15025683696865535918"],
+  "i": "10414603392832603261",
+  "c": "13322907391447789281"},
+ "log":
+ [{"message":
+   ".> LEAN_PATH=/Users/richiewilynnton/work/envcap/formalization/.lake/build/lib/lean /Users/richiewilynnton/.elan/toolchains/leanprover--lean4---v4.22.0/bin/lean /Users/richiewilynnton/work/envcap/formalization/Formalization/ENVCAP/Syntax.lean -o /Users/richiewilynnton/work/envcap/formalization/.lake/build/lib/lean/Formalization/ENVCAP/Syntax.olean -i /Users/richiewilynnton/work/envcap/formalization/.lake/build/lib/lean/Formalization/ENVCAP/Syntax.ilean -c /Users/richiewilynnton/work/envcap/formalization/.lake/build/ir/Formalization/ENVCAP/Syntax.c --setup /Users/richiewilynnton/work/envcap/formalization/.lake/build/ir/Formalization/ENVCAP/Syntax.setup.json --json",
+   "level": "trace"}],
+ "inputs":
+ [["Formalization.ENVCAP.Syntax:deps",
+   [["deps",
+     [["formalization/Formalization:extraDep",
+       [["@formalization:extraDep", "1723"]]],
+      ["import oleans", "1723"]]],
+    ["libs",
+     [["import dynlibs", "1723"],
+      ["package external libraries", "1723"],
+      ["module dynlibs", "1723"],
+      ["module plugins", "1723"]]]]],
+  ["Lean 4.22.0, commit ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05",
+   "8739116525927611134"],
+  ["/Users/richiewilynnton/work/envcap/formalization/Formalization/ENVCAP/Syntax.lean",
+   "4752084011307724550"],
+  ["options", "1723"],
+  ["Module.leanArgs: #[]", "1723"]],
+ "depHash": "16321074500057761433"}
