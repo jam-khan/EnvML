@@ -16,8 +16,8 @@ data TyEnvE
   deriving (Eq)
 
 data ModuleTyp
-  = TyArrowM Typ ModuleTyp
-  | TySig    Intf
+  = TySig    Intf
+  | TyArrowM Typ ModuleTyp
   deriving (Eq)
 
 type Intf = [IntfE]         -- (sig ... end) .eli
@@ -85,3 +85,4 @@ data Literal
   | LitBool Bool            -- false, true
   | LitStr  String          -- "hello"
   deriving (Eq)
+

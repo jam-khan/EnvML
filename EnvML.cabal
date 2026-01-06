@@ -11,10 +11,11 @@ library
     exposed-modules:    Utils 
                         Syntax
                         EnvML.Elab
-                        EnvML.Print
                         EnvML.Syntax
                         EnvML.Parser.AST
                         EnvML.Parser.Process
+                        EnvML.Parser.Parser
+                        EnvML.Parser.Lexer
                         Source.Desugar 
                         Source.Errors
                         Source.LocallyNameless

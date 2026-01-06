@@ -88,18 +88,75 @@ data Literal
   | LitStr  String          -- "hello"
   deriving (Eq)
 
-instance Show Literal where
-  show :: Literal -> String
-  show (LitInt i)  = show i
-  show (LitBool b) = if b then "true" else "false"
-  show (LitStr s)  = show s
 
-showEnv :: TyEnv -> String
-showEnv env = "[" ++ showEnv' env ++ "]"
-  where 
-    showEnv' :: TyEnv -> String
-    showEnv' [] = ""
-    showEnv' ((x, t):xs) = x ++ ": " ++ show t ++ ", " ++ show xs
+type Precedence = Int
+
+typPrec :: Typ -> Precedence
+typPrec t = case t of
+  TyLit _     -> 4
+  TyVar _     -> 4
+  TyRcd _ _   -> 4
+  TyEnvt _    -> 4
+  TyModule _  -> 4
+  TySubstT {} -> 3
+  TyArr _ _   -> 2
+  TyBoxT _ _  -> 1
+  TyAll _ _   -> 1
+
+expPrec :: Exp -> Precedence
+expPrec e = case e of
+  Anno _ _  -> 0
+  Box _ _   -> 1
+  Clos {}   -> 1
+  TClos {}  -> 1
+  Lam {}    -> 2
+  TLam {}   -> 2
+  App _ _   -> 3
+  TApp _ _  -> 3
+  RProj _ _ -> 3
+  Lit _     -> 5
+  Var _     -> 5
+  Rec _ _   -> 5
+  FEnv _    -> 5
+  ModE _    -> 5
+
+parensIf :: Bool -> String -> String
+parensIf True s = "(" ++ s ++ ")"
+parensIf False s = s
+
+showTyBind :: (Name, TyEnvE) -> String
+showTyBind (n, Type t) = n ++ " : " ++ show t
+showTyBind (n, Kind) = n ++ " : Type"
+showTyBind (n, TypeEq t) = n ++ " = " ++ show t
+
+showEnvBind :: (Name, EnvE) -> String
+showEnvBind (n, ExpE e) = n ++ " = " ++ show e
+showEnvBind (n, TypE t) = "type " ++ n ++ " = " ++ show t
+
+showEnv :: Env -> String
+showEnv [] = ""
+showEnv [b] = showEnvBind b
+showEnv (b : bs) = showEnvBind b ++ ", " ++ showEnv bs
+
+showIntf :: Intf -> String
+showIntf [] = ""
+showIntf [e] = show e
+showIntf (e:es) = show e ++ "; " ++ showIntf es
+
+instance Show ModuleTyp where
+  show :: ModuleTyp -> String
+  show (TyArrowM t m) = 
+      let sT = show t
+          sM = show m
+      in "(" ++ sT ++ " ->m " ++ sM ++ ")"
+  show (TySig mt) = 
+      let sIntf = showIntf mt
+       in "sig " ++ sIntf ++ " end"
+
+showTyEnv :: TyEnv -> String
+showTyEnv [] = ""
+showTyEnv [b] = showTyBind b
+showTyEnv (b : bs) = showTyBind b ++ ", " ++ showTyEnv bs
 
 instance Show TyEnvE where
   show :: TyEnvE -> String
@@ -107,36 +164,109 @@ instance Show TyEnvE where
   show Kind       = "Type"
   show (TypeEq t) = "(" ++ show t ++ ")="
 
-instance Show ModuleTyp where
-  show :: ModuleTyp -> String
-  show (TyArrowM typ typm) = "(" ++ show typ ++ " ->m " ++ show typm ++ ")"
-  show (TySig intf)        = "sig " ++ showIntf intf ++ " end"
-    where 
-      showIntf :: Intf -> String
-      showIntf []     = "[]"
-      showIntf (x:xs) = show x ++ "; " ++ show xs
-
 instance Show IntfE where
   show :: IntfE -> String
-  show (TyDef x ty)   = "type " ++ x ++ " = " ++ show ty
-  show (ValDecl x ty) = "val "  ++ x ++ " : " ++ show ty
-  show (ModDecl x s)  = "module " ++ x ++ " : " ++ s
-  show (SigDecl x ty) = "module type " ++ x ++ " = " ++ show ty
+  show (TyDef n t)     = "type " ++ n ++ " = " ++ show t
+  show (ValDecl n t)   = "val " ++ n  ++ " :  "  ++ show t
+  show (ModDecl n1 n2) = "module " ++ n1  ++ " :  "  ++ n2
+  show (SigDecl n mt)  = "module type " ++ n  ++ " = "  ++ show mt
 
 instance Show Typ where
-  show :: Typ -> String
-  show (TyLit lit)       = show lit
-  show (TyVar x)         = x
-  show (TyArr tyA tyB)   = show tyA ++ "(" ++ show tyB ++ ")"
-  show (TyAll x ty)      = "forall " ++ x ++ ". (" ++ show ty ++ ")"
-  show (TyBoxT tye ty)   = show tye ++ "=>" ++ show ty
-  show (TySubstT t1 x t2)= "("++ show t1 ++ ")" ++ "[" ++ x ++ ":=" ++ show t2 ++ "]"
-  show (TyRcd x a)       = "{" ++ x ++ ":" ++ show a ++ "}"
-  show (TyEnvt env)      = showEnv env
-  show (TyModule typm)   = "sig:" ++ "(" ++ show typm ++ ")"
+  show:: Typ -> String
+  show (TyLit l) = show l
+  show (TyVar s) = s
+  show (TyArr t1 t2) =
+    let s1 = parensIf (typPrec t1 <= typPrec (TyArr t1 t2)) (show t1)
+        s2 = show t2
+    in s1 ++ " -> " ++ s2
+  show (TyAll x t) =
+    let s = parensIf (typPrec t < typPrec (TyAll x t)) (show t)
+    in "forall " ++ x ++ ". " ++ s
+  show (TyBoxT bs t) =
+    let sBinds = showTyEnv bs
+        sTyp = parensIf (typPrec t < typPrec (TyBoxT bs t)) (show t)
+    in "[" ++ sBinds ++ "] ===> " ++ sTyp
+  show (TySubstT t1 x t2) =
+    let s1 = show t1
+        s2 = parensIf (typPrec t2 < typPrec (TySubstT t1 x t2)) (show t2)
+    in s1 ++ "[" ++ x ++ ":=" ++ s2 ++ "]"
+  show (TyEnvt bs) = "[" ++ showTyEnv bs ++ "]"
+  show (TyRcd label t) = "{" ++ label ++ " : " ++ show t ++ "}"
+  show (TyModule mt) = show mt
 
 instance Show TyLit where
   show :: TyLit -> String
   show TyInt  = "int"
   show TyBool = "bool"
   show TyStr  = "string"
+
+instance Show Module where  
+  show :: Module -> String
+  show (Functor n t m) =
+      let sT = show t
+          sM = show m
+      in "functor (" ++ n ++ " : " ++ sT ++ ") " ++ sM
+  show (Struct env) = 
+      let sEnv = showEnv env
+      in "struct " ++ sEnv ++ " end"
+  show (MApp m1 m2) = 
+      let sM1 = show m1
+          sM2 = show m2
+      in "(" ++ sM1 ++ ") (" ++ sM2 ++ ")"
+  show (MLink m1 m2) = 
+      let sM1 = show m1
+          sM2 = show m2
+      in "(" ++ sM1 ++ ") |><| (" ++ sM2 ++ ")"
+
+instance Show Exp where
+  show :: Exp -> String
+  show (Lit l) = show l
+  show (Var n) = n
+  show (Lam n t e) =
+    let sT = show t
+        sE = show e
+    in "fun (" ++ n ++ ": " ++ sT ++ ") -> " ++ sE
+  show (Box env e) =
+    let sCets = showEnv env
+        sE = parensIf (expPrec e < expPrec (Box env e)) (show e)
+    in "box [" ++ sCets ++ "] in " ++ sE
+  show (App e1 e2) =
+    let s1 = parensIf (expPrec e1 < expPrec (App e1 e2)) (show e1)
+        s2 = show e2
+    in s1 ++ "(" ++ s2 ++ ")"
+  show (TLam n e) =
+      let sE = show e
+      in "fun type " ++ n ++ " -> " ++ sE
+  show (Clos cetList n t e) =
+    let sCets = showEnv cetList
+        sT = show t
+        sE = parensIf (expPrec e < expPrec (Clos cetList n t e)) (show e)
+    in "clos [" ++ sCets ++ "] (" ++ n ++ ": " ++ sT ++ ") -> " ++ sE
+  show (TClos cetList n e) =
+    let sCets = showEnv cetList
+        sE = parensIf (expPrec e < expPrec (TClos cetList n e)) (show e)
+    in "clos [" ++ sCets ++ "] type " ++ n ++ "-> " ++ sE
+  show (TApp e t) =
+    let sE = parensIf (expPrec e < expPrec (TApp e t)) (show e)
+        sT = show t
+    in sE ++ "<" ++ sT ++ ">"
+  show (FEnv env) =
+    let sEnv = showEnv env
+    in "[" ++ sEnv ++ "]"
+  show (Rec label e) =
+    let sE = show e
+    in "{" ++ label ++ " = " ++ sE ++ "}"
+  show (RProj e label) =
+    let sE = parensIf (expPrec e < expPrec (RProj e label)) (show e)
+    in sE ++ "." ++ label
+  show (Anno e t) =
+    let sE = parensIf (expPrec e < expPrec (Anno e t)) (show e)
+        sT = show t
+    in sE ++ " :: " ++ sT
+  show (ModE m) = show m
+
+instance Show Literal where
+  show :: Literal -> String
+  show (LitInt i)  = show i
+  show (LitBool b) = if b then "true" else "false"
+  show (LitStr s)  = show s

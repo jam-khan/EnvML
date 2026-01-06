@@ -5,32 +5,43 @@ import qualified CoreForAll.Syntax as Core
 
 elabTyEnv ::
   EnvML.TyEnv
+  -> Core.TyEnv
+elabTyEnv = map elabTyEnvE
+
+elabTyEnvE ::
+  EnvML.TyEnvE
   -> Core.TyEnvE
-elabTyEnv = error "Type Environment Elaboration To Do"
+elabTyEnvE (EnvML.Type t)   = Core.Type   $ elabTyp [] t
+elabTyEnvE EnvML.Kind       = Core.Kind
+elabTyEnvE (EnvML.TypeEq t) = Core.TypeEq $ elabTyp [] t
 
 elabModTyp ::
   EnvML.TyEnv
   -> EnvML.ModuleTyp
   -> Core.Typ
-elabModTyp = error "Module type elaboration to do"
+elabModTyp _ (EnvML.TySig intf)     = Core.TyEnvt $ elabIntf [] intf  
+elabModTyp _ (EnvML.TyArrowM a sigB)= Core.TyArr (elabTyp [] a) (elabModTyp [] sigB)
 
 elabIntf ::
   EnvML.TyEnv
   -> EnvML.Intf
   -> Core.TyEnv
-elabIntf = error "Interface elaboration to do"
+elabIntf g = map (elabIntfE g)
 
 elabIntfE ::
   EnvML.TyEnv
   -> EnvML.IntfE
-  -> Core.TyEnv
-elabIntfE = error "Interface elements elaboration to do"
+  -> Core.TyEnvE
+elabIntfE g (EnvML.TyDef t)     = Core.Type $ elabTyp g t
+elabIntfE g (EnvML.ValDecl ty)  = Core.Type $ elabTyp g ty
+elabIntfE g (EnvML.ModDecl intf)= Core.Type $ Core.TyEnvt $ elabIntf g intf
+elabIntfE g (EnvML.SigDecl mty) = Core.Type $ elabModTyp g mty
 
 elabTyp ::
   EnvML.TyEnv
   -> EnvML.Typ
   -> Core.Typ
-elabTyp = error "Types elaboration to do"
+elabTyp env = error "Types elaboration to do"
 
 elabTyLit ::
   EnvML.TyEnv
@@ -41,20 +52,20 @@ elabTyLit = error "Literal types elaboration to do"
 elabEnv ::
   EnvML.TyEnv
   -> EnvML.Env
-  -> Core.Env
+  -> (EnvML.TyEnv, Core.Env)
 elabEnv = error "Environments elaboration to do"
 
 elabEnvE ::
   EnvML.TyEnv
   -> EnvML.EnvE
-  -> Core.EnvE
+  -> (EnvML.TyEnvE, Core.EnvE)
 elabEnvE = error "Environments elaboration to do"
 
-elabM :: 
+elabInferM :: 
   EnvML.TyEnv 
   -> EnvML.Module
-  -> Core.Exp
-elabM = error "Module elaboration to do"
+  -> (EnvML.Typ, Core.Exp)
+elabInferM = error "Module elaboration to do"
 
 elabExp ::
   EnvML.TyEnv
