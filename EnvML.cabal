@@ -13,9 +13,9 @@ library
                         EnvML.Elab
                         EnvML.Syntax
                         EnvML.Parser.AST
-                        EnvML.Parser.Process
-                        EnvML.Parser.Parser
-                        EnvML.Parser.Lexer
+                        EnvML.Parser.Parse
+                        EnvML.Parser.HappyAlex.Parser
+                        EnvML.Parser.HappyAlex.Lexer
                         Source.Desugar 
                         Source.Errors
                         Source.LocallyNameless
