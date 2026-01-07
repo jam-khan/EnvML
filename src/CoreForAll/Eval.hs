@@ -59,3 +59,4 @@ eval env = go
         rlookupv v l
     go (Anno e _)           = 
         eval env e
+    go (Fix e) = pure $ Clos env (Fix e)

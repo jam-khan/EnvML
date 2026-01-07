@@ -52,6 +52,8 @@ data Exp
   -- First-class Environment
   | FEnv  Env
   | Anno  Exp Typ
+  -- Fixpoint
+  | Fix Exp
   deriving (Eq, Show)
 
 data Literal 
