@@ -1,0 +1,10 @@
+cradle:
+  cabal:
+    - path: "src"
+      component: "lib:EnvML"
+
+    - path: "app"
+      component: "exe:EnvML"
+
+    - path: "test"
+      component: "test:tests"

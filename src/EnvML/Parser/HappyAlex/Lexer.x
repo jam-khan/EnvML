@@ -17,6 +17,8 @@ tokens :-
   let         { \_ -> TokLet  }
   val         { \_ -> TokVal  }
   type        { \_ -> TokType }
+  fun         { \_ -> TokLam  }
+  clos        { \_ -> TokClos }
 
   -- Symbols
   "="         { \_ -> TokEq       }
@@ -46,6 +48,8 @@ data Token
   | TokType
   | TokLet
   | TokVal
+  | TokLam
+  | TokClos
   -- Symbol Tokens
   | TokEq
   | TokColon    
