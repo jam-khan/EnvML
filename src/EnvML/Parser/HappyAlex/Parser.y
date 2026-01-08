@@ -17,20 +17,45 @@ import EnvML.Parser.AST
   let       { TokLet }
   val       { TokVal }
   type      { TokType }
+  Type      { TokBType }
   int       { TokTInt }
+  bool      { TokTBool }
+  true      { TokTrue }
+  false     { TokFalse }
+  stringt   { TokTStr }
+  str       { TokStr $$ }
   id        { TokVar $$ }
   num       { TokInt $$ }
-  fun       { TokLam   }
+  fun       { TokFun   }
   clos      { TokClos  }
+  box       { TokBox   }
+  in        { TokIn    }
+  forall    { TokForall }
+  module    { TokModule }
+  sig       { TokSig }
+  end       { TokEnd }
+  functor   { TokFunctor }
+  struct    { TokStruct }
   '='       { TokEq }
   ':'       { TokColon }
+  ';'       { TokSemi }
   ';;'      { TokSemiSemi }
+  '::'      { TokDoubleColon }
+  ':='      { TokColonEqual }
   '->'      { TokArrow }
+  '===>'    { TokTripleArrow }
+  '->m'     { TokArrowM }
   ','       { TokComma }
+  '.'       { TokDot }
   '('       { TokLParen }
   ')'       { TokRParen }
   '['       { TokLBracket }
   ']'       { TokRBracket }
+  '{'       { TokLBrace }
+  '}'       { TokRBrace }
+  '<'       { TokLAngle }
+  '>'       { TokRAngle }
+  '|><|'    { TokLink }
 
 %right '->'
 
@@ -42,7 +67,12 @@ import EnvML.Parser.AST
 
 -- A program file is implicitly a Struct containing a list of Env elements
 ModuleBody :: { Module }
-  : ModuleEnv { Struct $1 }
+  : functor '(' id ':' Typ ')' '->' ModuleBody { Functor $3 $5 $8 }
+  | ModuleEnv { Struct $1 }
+  | struct ModuleEnv end { Struct $2 } -- allow explicit struct ... end
+  | ModuleBody '(' ModuleBody ')' { MApp $1 $3 }
+  | ModuleBody '|><|' ModuleBody { MLink $1 $3 }
+  | '(' ModuleBody ')'           { $2 }         
 
 ModuleEnv :: { Env }
   : ModuleEnvElem ModuleEnv     { $1 : $2 }
@@ -59,6 +89,8 @@ ModuleEnvElem :: { (Name, EnvE) }
 -- An interface file is implicitly a TySig containing a list of Intf elements
 InterfaceBody :: { ModuleTyp }
   : Intf { TySig $1 }
+  | sig Intf end {TySig $2 } -- allow explicit sig ... end
+  | Typ '->m' InterfaceBody { TyArrowM $1 $3 }
 
 Intf :: { Intf }
   : IntfE Intf          { $1 : $2 }
@@ -67,33 +99,37 @@ Intf :: { Intf }
 IntfE :: { IntfE }
   : val id ':' Typ ';;'  { ValDecl $2 $4 }
   | type id '=' Typ ';;' { TyDef $2 $4 }
+  | module id ':' id ';;' { ModDecl $2 $4 }  
+  | module type id '=' InterfaceBody ';;' { SigDecl $3 $5 }
 
 -------------------------------------------------------------------------
 -- Core Expressions and Types
 -------------------------------------------------------------------------
 
 Exp :: { Exp }
-  -- Lambdas & Type Lambdas (Lowest precedence, right associative)
   : fun '(' id ':' Typ ')' '->' Exp   { Lam $3 $5 $8 }
   | clos '[' Env ']' '(' id ':' Typ ')' '->' Exp  { Clos $3 $6 $8 $11 }
---  | fun type id '->' Exp              { TLam $3 $5 }
---  | box '[' Env ']' in Exp            { Box $3 $6 }
---  | Term '::' Typ                     { Anno $1 $3 }
+  | fun type id '->' Exp              { TLam $3 $5 }
+  | clos '[' Env ']' type id '->' Exp  { TClos $3 $6 $8 }
+  | box '[' Env ']' in Exp            { Box $3 $6 }
+  | Term '::' Typ                     { Anno $1 $3 }
+  | ModuleBody                        { ModE $1 }
   | Term                              { $1 }
 
 Term :: { Exp }
-  -- Application & Projection (Left associative)
-  : Term Atom                         { App $1 $2 }
---  | Term '<' Typ '>'                  { TApp $1 $3 }
---  | Term '.' id                       { RProj $1 $3 }
+  : Term '(' Atom ')'                   { App $1 $3 }
+  | Term '<' Typ '>'                  { TApp $1 $3 }
+  | Term '.' id                       { RProj $1 $3 }
   | Atom                              { $1 }
 
 Atom :: { Exp }
   : num                               { Lit (LitInt $1) }
---  | str                               { Lit (LitStr $1) }
+  | str                               { Lit (LitStr $1) }
+  | true                              { Lit (LitBool True) }
+  | false                              { Lit (LitBool False) }
   | id                                { Var $1 }
---  | '{' id '=' Exp '}'                { Rec $2 $4 }
---  | '[' Env ']'                       { FEnv $2 }
+  | '{' id '=' Exp '}'                { Rec $2 $4 }
+  | '[' Env ']'                       { FEnv $2 }
   | '(' Exp ')'                       { $2 }
 
 
@@ -107,10 +143,31 @@ EnvElem :: { (Name, EnvE) }
   | type id '=' Typ       { ($2, TypE $4) }
 
 Typ :: { Typ }
-  : int                 { TyLit TyInt }
-  | id                  { TyVar $1 }
-  | Typ '->' Typ        { TyArr $1 $3 }
-  | '(' Typ ')'         { $2 }
+   : BaseTyp '->' Typ                  { TyArr $1 $3 }
+   | forall id '.' Typ                 { TyAll $2 $4 }
+   | '[' TyEnv ']' '===>' Typ          { TyBoxT $2 $5 }
+   | '[' id ':=' Typ ']' Typ           { TySubstT $2 $4 $6 }
+   | InterfaceBody                     { TyModule $1 }
+   | BaseTyp                           { $1 }
+
+BaseTyp :: { Typ }
+  : int                               { TyLit TyInt }
+  | bool                              { TyLit TyBool }
+  | stringt                           { TyLit TyStr }
+  | id                                { TyVar $1 }
+  | '{' id ':' Typ '}'                { TyRcd $2 $4 }
+  | '[' TyEnv ']'                    { TyEnvt $2 }
+  | '(' Typ ')'                       { $2 }
+
+TyEnv :: { TyEnv }
+  : TyEnvElem ',' TyEnv               { $1 : $3 }
+  | TyEnvElem                         { [$1] }
+  |                                   { [] }
+
+TyEnvElem :: { (Name, TyEnvE) }
+  : id ':' Type                       { ($1, Kind) }
+  | id ':' Typ                        { ($1, Type $3) }
+  | id '=' Typ                        { ($1, TypeEq $3) }
 
 {
 parseError :: [Token] -> a

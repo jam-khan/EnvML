@@ -59,7 +59,7 @@ data EnvE
   deriving (Eq)
 
 data Module
-  = Functor Name Typ Module -- functor (x : A) struct x end
+  = Functor Name Typ Module -- functor (x : A) ->
   | Struct  Env             -- struct type a = int; x = 1 end
   | MApp    Module Module   -- M1 M2
   | MLink   Module Module   -- M1 |><| M2    
@@ -69,7 +69,7 @@ data Exp
   = Lit   Literal           -- Literals: int, double, bool, string
   | Var   Name              -- Var x, y, hello
   | Lam   Name Typ Exp      -- fun (x: A) -> x + 1
-  | Clos  Env Name Typ Exp  -- clos [t = int, x = 1] (y: t) -> x + y
+  | Clos  Env Name Typ Exp  -- clos [type t = int, x = 1] (y: t) -> x + y
   | App   Exp Exp           -- f(x)
   | TLam  Name Exp          -- fun type a' -> fun (x: a') -> x
   | TClos Env Name Exp      -- clos [type t = int, x = 1] -> 
