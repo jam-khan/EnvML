@@ -38,9 +38,9 @@ spec = do
       parseModule (lexer input) `shouldBe` expected
 
     it "parses module linking" $ do
-        let input = "(struct end) |><| (struct end)"
-        let expected = MLink (Struct []) (Struct [])
-        parseModule (lexer input) `shouldBe` expected
+      let input = "link(struct end, struct end)"
+      let expected = MLink (Struct []) (Struct [])
+      parseModule (lexer input) `shouldBe` expected
 
   describe "EnvML.Parser (.emli / Interfaces)" $ do
     it "parses a simple val declaration" $ do
@@ -259,7 +259,7 @@ spec = do
       parseTyp (lexer input) `shouldBe` expected
 
     it "parses environment types" $ do
-      let input = "[x : Type, y : int, a = int]"
+      let input = "[x : Type, y : int, a : (int)=]"
       let expected =
             TyEnvt
               [ ("x", Kind),

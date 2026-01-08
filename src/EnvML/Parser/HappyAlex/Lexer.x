@@ -32,11 +32,12 @@ tokens :-
   end         { \_ -> TokEnd  }
   functor     { \_ -> TokFunctor  }
   struct     { \_ -> TokStruct  }
+  link     { \_ -> TokLink  }
 
   -- Symbols
   "="         { \_ -> TokEq       }
   ":"         { \_ -> TokColon    }
-  ":="         { \_ -> TokColonEqual    }
+  ":="        { \_ -> TokColonEqual    }
   "("         { \_ -> TokLParen   }
   ")"         { \_ -> TokRParen   }
   "["         { \_ -> TokLBracket }
@@ -53,7 +54,6 @@ tokens :-
   "->"        { \_ -> TokArrow    }
   "->m"       { \_ -> TokArrowM    }
   "===>"      { \_ -> TokTripleArrow    }
-  "|><|"      { \_ -> TokLink    }
 
   -- Literals and Identifiers
   $digit+             { \s -> TokInt (read s) }

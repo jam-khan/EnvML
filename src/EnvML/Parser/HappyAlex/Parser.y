@@ -36,6 +36,7 @@ import EnvML.Parser.AST
   end       { TokEnd }
   functor   { TokFunctor }
   struct    { TokStruct }
+  link      { TokLink }
   '='       { TokEq }
   ':'       { TokColon }
   ';'       { TokSemi }
@@ -55,7 +56,6 @@ import EnvML.Parser.AST
   '}'       { TokRBrace }
   '<'       { TokLAngle }
   '>'       { TokRAngle }
-  '|><|'    { TokLink }
 
 %right '->'
 
@@ -71,7 +71,7 @@ ModuleBody :: { Module }
   | ModuleEnv { Struct $1 }
   | struct ModuleEnv end { Struct $2 } -- allow explicit struct ... end
   | ModuleBody '(' ModuleBody ')' { MApp $1 $3 }
-  | ModuleBody '|><|' ModuleBody { MLink $1 $3 }
+  | link '(' ModuleBody ',' ModuleBody ')' { MLink $3 $5 }
   | '(' ModuleBody ')'           { $2 }         
 
 ModuleEnv :: { Env }
@@ -156,7 +156,7 @@ BaseTyp :: { Typ }
   | stringt                           { TyLit TyStr }
   | id                                { TyVar $1 }
   | '{' id ':' Typ '}'                { TyRcd $2 $4 }
-  | '[' TyEnv ']'                    { TyEnvt $2 }
+  | '[' TyEnv ']'                     { TyEnvt $2 }
   | '(' Typ ')'                       { $2 }
 
 TyEnv :: { TyEnv }
@@ -167,7 +167,7 @@ TyEnv :: { TyEnv }
 TyEnvElem :: { (Name, TyEnvE) }
   : id ':' Type                       { ($1, Kind) }
   | id ':' Typ                        { ($1, Type $3) }
-  | id '=' Typ                        { ($1, TypeEq $3) }
+  | id ':' '(' Typ ')' '='           { ($1, TypeEq $4) }
 
 {
 parseError :: [Token] -> a
