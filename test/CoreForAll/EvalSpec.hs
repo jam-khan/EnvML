@@ -1,5 +1,6 @@
 module CoreForAll.EvalSpec (spec) where
 
+--
 import CoreForAll.Eval (eval)
 import CoreForAll.Syntax
 import Test.Hspec
@@ -7,68 +8,67 @@ import Test.Hspec
 eval0 :: Exp -> Maybe Exp
 eval0 = eval []
 
---
--- var0 :: Exp
--- var0 = Var 0
---
-idE :: Exp
-idE = Lam (Var 0)
-
-lit :: Int -> Exp
-lit n = Lit (LitInt n)
-
-constFun :: Exp
-constFun = Lam (Lam (Var 1))
-
-selfApp :: Exp
-selfApp = Lam (App (Var 0) (Var 0))
-
--- idApp42 :: Exp
--- idApp42 = App idE (Lit 42)
---
--- tid :: Exp
--- tid = TLam (Lam (Var 0))
---
--- tidApp42 :: Exp
--- tidApp42 = App (TApp tid TyInt) (Lit 42)
---
--- recX42 :: Exp
--- recX42 = Rec "x" (Lit 42)
---
--- projX42 :: Exp
--- projX42 = RProj recX42 "x"
---
-fixId :: Exp
-fixId = Fix idE
-
-fixE :: Exp -> Exp
-fixE = Fix
-
-zero :: Exp
-zero = Lam (Lam (Var 0))
-
-one :: Exp
-one = Lam (Lam (App (Var 1) (Var 0)))
-
-succ :: Exp
-succ = Lam (Lam (Lam (App (Var 1) (App (App (Var 2) (Var 1)) (Var 0)))))
-
-add :: Exp
-add = Fix ()
-
 evalTests :: [(String, Exp, Maybe Exp)]
 evalTests =
-  [ ( "literal",
+  [ ( "int literal evaluates to itself",
       Lit (LitInt 42),
       Just (Lit (LitInt 42))
     ),
-    ( "fix produces a closure",
-      fixId,
-      Just (Clos [] (Fix idE))
+    ( "sub operation evaluates correctly",
+      Sub (Lit (LitInt 5)) (Lit (LitInt 3)),
+      Just (Lit (LitInt 2))
     ),
-    ( "recursive record lookup",
-      recLookup (Rec "a" (Rec "a" (Rec "a" (Lit (LitInt 100))))),
-      Just (Lit (LitInt 100))
+    ( "mul operation evaluates correctly",
+      Mul (Lit (LitInt 4)) (Lit (LitInt 2)),
+      Just (Lit (LitInt 8))
+    ),
+    ( "if expression evaluates correctly",
+      If (Lit (LitBool True)) (Lit (LitInt 1)) (Lit (LitInt 0)),
+      Just (Lit (LitInt 1))
+    ),
+    ( "equality evaluates correctly",
+      Eq (Lit (LitInt 1)) (Lit (LitInt 2)),
+      Just (Lit (LitBool False))
+    ),
+    ( "function application",
+      App
+        (Lam (Sub (Var 0) (Lit (LitInt 1))))
+        (Lit (LitInt 5)),
+      Just (Lit (LitInt 4))
+    ),
+    ( "empty closure application",
+      App
+        ( Clos
+            []
+            (Sub (Var 0) (Lit (LitInt 1)))
+        )
+        (Lit (LitInt 10)),
+      Just (Lit (LitInt 9))
+    ),
+    ( "closure application with env",
+      App
+        ( Clos
+            [ExpE (Lit (LitInt 3))]
+            (Mul (Var 0) (Var 1))
+        )
+        (Lit (LitInt 10)),
+      Just (Lit (LitInt 30))
+    ),
+    ( "fixpoint factorial",
+      let factorial =
+            Fix
+              ( Lam
+                  ( If
+                      (Eq (Var 0) (Lit (LitInt 0)))
+                      (Lit (LitInt 1))
+                      ( Mul
+                          (Var 0)
+                          (App (Var 1) (Sub (Var 0) (Lit (LitInt 1))))
+                      )
+                  )
+              )
+       in App (Anno factorial (TyArr (TyLit TyInt) (TyLit TyInt))) (Lit (LitInt 5)),
+      Just (Lit (LitInt 120))
     )
   ]
 
@@ -79,4 +79,4 @@ spec =
   where
     mkTest (name, e, expected) =
       it name $
-        eval0 e `shouldBe` expected
+        eval [] e `shouldBe` expected

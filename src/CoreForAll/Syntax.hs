@@ -3,26 +3,26 @@ module CoreForAll.Syntax where
 type TyEnv = [TyEnvE]
 
 data TyEnvE
-  = Type    Typ
-  | Kind 
-  | TypeEq  Typ
+  = Type Typ
+  | Kind
+  | TypeEq Typ
   deriving (Eq, Show)
 
 data Typ
-  = TyLit    TyLit
-  | TyVar    Int
-  | TyArr    Typ Typ
-  | TyAll    Typ
-  | TyBoxT   TyEnv Typ
+  = TyLit TyLit
+  | TyVar Int
+  | TyArr Typ Typ
+  | TyAll Typ
+  | TyBoxT TyEnv Typ
   | TySubstT Typ Typ
-  | TyRcd    String Typ
-  | TyEnvt   TyEnv
+  | TyRcd String Typ
+  | TyEnvt TyEnv
   deriving (Eq, Show)
 
-data TyLit 
-  = TyInt                   -- int
-  | TyBool                  -- bool
-  | TyStr                   -- string
+data TyLit
+  = TyInt -- int
+  | TyBool -- bool
+  | TyStr -- string
   deriving (Eq, Show)
 
 -- Environment
@@ -33,31 +33,35 @@ data EnvE = ExpE Exp | TypE Typ
   deriving (Eq, Show)
 
 data Exp
-  = Lit   Literal
-  -- De-bruijn index
-  | Var   Int
-  -- Term abstractions etc.
-  | Lam   Exp
-  | Clos  Env Exp
-  | App   Exp Exp
-  -- Type abstractions etc.
-  | TLam  Exp
+  = Lit Literal
+  | -- De-bruijn index
+    Var Int
+  | -- Term abstractions etc.
+    Lam Exp
+  | Clos Env Exp
+  | App Exp Exp
+  | -- Type abstractions etc.
+    TLam Exp
   | TClos Env Exp
-  | TApp  Exp Typ
-  -- Box
-  | Box   Env Exp
-  -- Records
-  | Rec   String Exp
+  | TApp Exp Typ
+  | -- Box
+    Box Env Exp
+  | -- Records
+    Rec String Exp
   | RProj Exp String
-  -- First-class Environment
-  | FEnv  Env
-  | Anno  Exp Typ
-  -- Fixpoint
+  | -- First-class Environment
+    FEnv Env
+  | Anno Exp Typ
+   -- Extensions
   | Fix Exp
+  | Sub Exp Exp
+  | Mul Exp Exp
+  | If Exp Exp Exp
+  | Eq Exp Exp
   deriving (Eq, Show)
 
-data Literal 
-  = LitInt  Int             -- 1, 2, etc.
-  | LitBool Bool            -- false, true
-  | LitStr  String          -- "hello"
+data Literal
+  = LitInt Int -- 1, 2, etc.
+  | LitBool Bool -- false, true
+  | LitStr String -- "hello"
   deriving (Eq, Show)

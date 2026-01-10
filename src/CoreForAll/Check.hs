@@ -214,6 +214,24 @@ infer g (RProj e l) = do
   rlk g1 l
 infer g (Anno e t) = 
   if check g e t then Just t else Nothing
+infer g (Sub e1 e2) = do 
+    guard (check g e1 (TyLit TyInt))
+    guard (check g e2 (TyLit TyInt))
+    return (TyLit TyInt)
+infer g (Mul e1 e2) = do
+    guard (check g e1 (TyLit TyInt))
+    guard (check g e2 (TyLit TyInt))
+    return (TyLit TyInt)
+infer g (If e1 e2 e3) = do
+    guard (check g e1 (TyLit TyBool))
+    t2 <- infer g e2
+    t3 <- infer g e3
+    guard (teq g t2 t3 g)
+    return t2
+infer g (Eq e1 e2) = do
+    t1 <- infer g e1
+    guard (check g e2 t1)
+    return (TyLit TyBool)
 infer _ _ = Nothing  -- Other cases cannot be inferred
 
 -- | Check an expression against a type
@@ -229,6 +247,8 @@ check g (TClos d e) (TyBoxT g1 (TyAll a)) =
   case infer g (FEnv d) of
     Just (TyEnvt g2) -> g1 == g2 && lvalue d && check (Kind : g1) e a
     _ -> False
+check g (Fix e) (TyArr a b) =
+    check (Type (TyArr a b) : g) e (TyArr a b)
 check g e t =
   case infer g e of
     Just t' -> teq g t' t g  -- Use type equality
