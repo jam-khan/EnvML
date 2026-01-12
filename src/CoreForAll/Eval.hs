@@ -48,7 +48,8 @@ eval env = go
     go e@(FEnv []) = pure e
     go (FEnv (ExpE e' : ve)) = do
       FEnv ve1 <- eval env (FEnv ve)
-      eval ve1 e'
+      ee <- eval ve1 e'
+      pure $ FEnv (ExpE ee : ve1)
     go (FEnv (TypE a : e1)) = do
       -- b_tdef
       FEnv ve1 <- eval env (FEnv e1)

@@ -54,6 +54,10 @@ evalTests =
         (Lit (LitInt 10)),
       Just (Lit (LitInt 30))
     ),
+    ( "first-class environments",
+      FEnv [ExpE (Lit (LitInt 3)), TypE (TyLit TyInt), ExpE (Lit (LitBool True)), TypE (TyLit TyBool)],
+      Just (FEnv [ExpE (Lit (LitInt 3)), TypE (TyBoxT [TypeEq (TyBoxT [] (TyLit TyBool))] (TyLit TyInt)), ExpE (Lit (LitBool True)), TypE (TyBoxT [] (TyLit TyBool))])
+    ),
     ( "fixpoint factorial",
       let factorial =
             Fix
