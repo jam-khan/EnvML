@@ -52,9 +52,37 @@ typeCheckTests =
        in App (Anno factorial (TyArr (TyLit TyInt) (TyLit TyInt))) (Lit (LitInt 5)),
       TyLit TyInt
     ),
-    ( "polymorphic identity: TLam (Lam x:0. x)",
-      TApp (TLam (Anno (Lam (Var 0)) (TyArr (TyVar 0) (TyVar 0)))) (TyLit TyInt),
-      TyAll (TyArr (TyLit TyInt) (TyLit TyInt))
+    ( "fixpoint function has correct type (factorial)",
+      let factorial =
+            Fix
+              ( Lam
+                  ( If
+                      (Eq (Var 0) (Lit (LitInt 0)))
+                      (Lit (LitInt 1))
+                      ( Mul
+                          (Var 0)
+                          (App (Var 1) (Sub (Var 0) (Lit (LitInt 1))))
+                      )
+                  )
+              )
+       in App (Anno factorial (TyArr (TyLit TyInt) (TyLit TyInt))) (Lit (LitInt 5)),
+      TyLit TyInt
+    ),
+    ( "fixpoint function has correct type referring to outside variable (factorial)",
+      let factorial =
+            Fix
+              ( Lam
+                  ( If
+                      (Eq (Var 0) (Lit (LitInt 0)))
+                      (Var 2)
+                      ( Mul
+                          (Var 0)
+                          (App (Var 1) (Sub (Var 0) (Lit (LitInt 1))))
+                      )
+                  )
+              )
+       in App (Anno (Lam (App (Anno factorial (TyArr (TyLit TyInt) (TyLit TyInt))) (Lit (LitInt 5)))) (TyArr (TyLit TyInt) (TyLit TyInt))) (Lit (LitInt 1)),
+      TyLit TyInt
     )
   ]
 

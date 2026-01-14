@@ -71,7 +71,23 @@ evalTests =
                       )
                   )
               )
-       in App (Anno factorial (TyArr (TyLit TyInt) (TyLit TyInt))) (Lit (LitInt 5)),
+       in App factorial (Lit (LitInt 5)),
+      Just (Lit (LitInt 120))
+    ),
+    ( "fixpoint factorial correctly refers to outside variable",
+      let factorial =
+            Fix
+              ( Lam
+                  ( If
+                      (Eq (Var 0) (Lit (LitInt 0)))
+                      (Var 2)
+                      ( Mul
+                          (Var 0)
+                          (App (Var 1) (Sub (Var 0) (Lit (LitInt 1))))
+                      )
+                  )
+              )
+       in App (Lam (App factorial (Lit (LitInt 5)))) (Lit (LitInt 1)),
       Just (Lit (LitInt 120))
     )
   ]
