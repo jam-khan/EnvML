@@ -266,7 +266,7 @@ infer ctx (If cond e1 e2) =
                         else Left $ TypeError "Branches of if must have the same type"
         else Left $ TypeError "Condition must be of type Bool"
 infer ctx (Fix tA e) =
-    if check (TyCAnd ctx tA) e tA
+    if check (TyCAnd ctx tA) e tA 
         then Right tA
         else Left $ TypeError "Fixpoint type check failed"
 infer ctx (Tag tm ty) = case infer ctx tm of
