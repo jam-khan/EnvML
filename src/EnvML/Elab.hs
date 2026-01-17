@@ -5,7 +5,6 @@ module EnvML.Elab where
 
 import qualified CoreForAll.Syntax as Core
 import qualified EnvML.Syntax as EnvML
-
 type ElabError = String
 
 elabTyEnv ::
@@ -47,7 +46,7 @@ elabTyp ::
   EnvML.Typ ->
   Core.Typ
 elabTyp _ (EnvML.TyLit i) = Core.TyLit (elabTyLit i)
-elabTyp env (EnvML.TyVar n) = error "TODO"
+elabTyp _ (EnvML.TyVar n) = Core.TyVar n
 elabTyp env (EnvML.TyArr a1 a2) =
   Core.TyArr (elabTyp env a1) (elabTyp env a2)
 elabTyp env (EnvML.TyAll a) =
@@ -56,7 +55,12 @@ elabTyp env (EnvML.TyBoxT g1 a) =
   Core.TyBoxT (elabTyEnv g1) (elabTyp (g1 ++ env) a)
 elabTyp env (EnvML.TySubstT a1 a2) =
   Core.TySubstT (elabTyp env a1) (elabTyp (EnvML.TypeEq a1 : env) a2)
-elabTyp env _ = error "Types elaboration to do"
+elabTyp env (EnvML.TyRcd l a) =
+  Core.TyRcd l (elabTyp env a)
+elabTyp _ (EnvML.TyEnvt bs) =
+  Core.TyEnvt (elabTyEnv bs)
+elabTyp env (EnvML.TyModule mt) = 
+    elabModTyp env mt
 
 elabTyLit ::
   EnvML.TyLit ->
@@ -81,7 +85,10 @@ elabInferM ::
   EnvML.TyEnv ->
   EnvML.Module ->
   (EnvML.Typ, Core.Exp)
-elabInferM = error "Module elaboration to do"
+elabInferM env (EnvML.Functor a m) = error "TODO"
+elabInferM env (EnvML.Struct c) = error "TODO"
+elabInferM env (EnvML.MApp m1 m2) = error "TODO"
+elabInferM env (EnvML.MLink m1 m2) = error "TODO"
 
 keyLen :: EnvML.TyEnv -> Int
 keyLen [] = 0
@@ -108,17 +115,21 @@ tshift x (EnvML.TyRcd l a) = EnvML.TyRcd l (tshift x a)
 tshift x (EnvML.TyEnvt bs) = EnvML.TyEnvt (tshiftBinds x bs)
 tshift x (EnvML.TyModule mt) = error "TODO"
 
-tlookup :: EnvML.TyEnv -> Int -> Either ElabError EnvML.Typ
-tlookup [] _ = Left "Unbound type variable"
-tlookup (EnvML.Type _ : t) x = tlookup t x
-tlookup (EnvML.TypeEq a : _) 0 = pure (tshift 0 a)
-tlookup (EnvML.TypeEq _ : t) x = tshift 0 <$> tlookup t (x - 1)
-tlookup (EnvML.Kind : _) 0 = Left "Kind found when looking for type"
-tlookup (EnvML.Kind : t) x = tshift 0 <$> tlookup t (x - 1)
+lookt :: EnvML.TyEnv -> Int -> Either ElabError EnvML.Typ
+lookt [] _ = Left "Unbound type variable"
+lookt (EnvML.Type _ : t) x = lookt t x
+lookt (EnvML.TypeEq a : _) 0 = pure (tshift 0 a)
+lookt (EnvML.TypeEq _ : t) x = tshift 0 <$> lookt t (x - 1)
+lookt (EnvML.Kind : _) 0 = Left "Kind found when looking for type"
+lookt (EnvML.Kind : t) x = tshift 0 <$> lookt t (x - 1)
 
-{-
-    if * ∉ Γ, then Γ is concrete.
--}
+getVar :: EnvML.TyEnv -> Int -> Either ElabError EnvML.Typ
+getVar [] _             = Left "Unbound type variable"
+getVar (EnvML.Kind : g) x     = tshift 0 <$> getVar g x
+getVar (EnvML.TypeEq _ : g) x = tshift 0 <$> getVar g x
+getVar (EnvML.Type a : _) 0   = Right a
+getVar (EnvML.Type _ : g) x   = getVar g (x - 1)
+
 concrete :: EnvML.TyEnv -> Bool
 concrete g = and [x /= EnvML.Kind | x <- g]
 
@@ -130,7 +141,6 @@ inner (EnvML.TypeEq _ : g) x = inner g (x - 1)
 inner (EnvML.Kind : _g) 0 = pure 0
 inner (EnvML.Kind : g) x = (+ 1) <$> inner g (x - 1)
 
--- | Helper for comparing environment types
 teqEnv :: EnvML.TyEnv -> EnvML.TyEnv -> EnvML.TyEnv -> EnvML.TyEnv -> Bool
 teqEnv _ [] [] _ = True
 teqEnv g1 (EnvML.Kind : e1) (EnvML.Kind : e2) g2 =
@@ -144,7 +154,7 @@ teqEnv _ _ _ _ = False
 teq :: EnvML.TyEnv -> EnvML.Typ -> EnvML.Typ -> EnvML.TyEnv -> Bool
 teq _ (EnvML.TyLit a) (EnvML.TyLit b) _ = a == b
 teq g1 (EnvML.TyVar x) b g2 =
-  case tlookup g1 x of
+  case lookt g1 x of
     Right a ->
       teq g1 a b g2
     Left _ ->
@@ -152,7 +162,7 @@ teq g1 (EnvML.TyVar x) b g2 =
         EnvML.TyVar y -> inner g1 x == inner g2 y
         _ -> False
 teq g1 a (EnvML.TyVar y) g2 =
-  case tlookup g2 y of
+  case lookt g2 y of
     Right b -> teq g1 a b g2
     Left _ -> False
 teq _g1 (EnvML.TyBoxT g3 a) b g2 =
@@ -181,13 +191,36 @@ value (EnvML.FEnv e) = lvalue e
 value (EnvML.Rec _ v) = value v
 value _ = False
 
--- | Check if a closure environment is all values
 lvalue :: EnvML.Env -> Bool
 lvalue [] = True
 lvalue (EnvML.ExpE v : e) = lvalue e && value v
 lvalue (EnvML.TypE (EnvML.TyBoxT _ _) : e) =
   lvalue e
 lvalue (EnvML.TypE _ : _) = False
+
+lbIn :: String -> EnvML.Typ -> Bool
+lbIn l (EnvML.TyEnvt (EnvML.Type (EnvML.TyRcd l' _) : _)) = l == l'
+lbIn l (EnvML.TyEnvt (EnvML.Type _ : g)) = lbIn l (EnvML.TyEnvt g)
+lbIn l (EnvML.TyEnvt (EnvML.TypeEq _ : g)) = lbIn l (EnvML.TyEnvt g)
+lbIn _ _ = False
+
+wrapping :: EnvML.TyEnv -> EnvML.Typ -> Maybe EnvML.Typ
+wrapping [] a = Just a
+wrapping (EnvML.Type _ : g) a = wrapping g a
+wrapping (EnvML.TypeEq c : g) a = wrapping g (EnvML.TySubstT c a)
+wrapping (EnvML.Kind : _) _ = Nothing
+
+rlk :: EnvML.TyEnv -> String -> Maybe EnvML.Typ
+rlk [] _ = Nothing
+rlk (EnvML.Type (EnvML.TyRcd l1 a) : g1) l
+  | l == l1 && not (lbIn l (EnvML.TyEnvt g1)) = wrapping g1 a -- rlk_hit
+  | l /= l1 = rlk g1 l -- rlk_left
+  | otherwise = Nothing
+rlk (EnvML.Type (EnvML.TyEnvt t2) : g1) l
+  | not (lbIn l (EnvML.TyEnvt g1)) = wrapping g1 =<< rlk t2 l
+  | otherwise = Nothing
+rlk (EnvML.TypeEq _ : g1) l = rlk g1 l -- rlk_left_t
+rlk _ _ = Nothing
 
 elabExpCheck ::
   EnvML.TyEnv ->
@@ -216,12 +249,13 @@ elabExpCheck env (EnvML.TClos d e) (EnvML.TyBoxT g1 (EnvML.TyAll a))
       case d' of
         Core.FEnv d'' -> pure $ Core.TClos d'' e'
         _ -> Left "Expected FEnv in elaboration of type closure"
+elabExpCheck env (EnvML.ModE m) (EnvML.TyModule mt) = error "TODO"
 elabExpCheck env e ty =
   do
     (ty', e') <- elabExpInfer env e
     if teq env ty' ty env
       then Right e'
-      else Left "Type mismatch in elaboration"
+      else Left $ "Type mismatch in elaboration check: expected " ++ show ty ++ ", got " ++ show ty'
 
 elabExpInfer ::
   EnvML.TyEnv ->
@@ -233,8 +267,8 @@ elabExpInfer _ (EnvML.Lit l) =
     EnvML.LitBool b -> Right $ (EnvML.TyLit EnvML.TyBool, Core.Lit (Core.LitBool b))
     EnvML.LitStr s -> Right $ (EnvML.TyLit EnvML.TyStr, Core.Lit (Core.LitStr s))
 elabExpInfer env (EnvML.Var n) = do
-  t <- tlookup env n
-  Right (t, Core.Var n)
+  t <- getVar env n
+  Right (t, Core.Var n) 
 elabExpInfer env (EnvML.App e1 e2) = do
   (ty1, e1') <- elabExpInfer env e1
   case ty1 of
@@ -262,18 +296,24 @@ elabExpInfer env (EnvML.Rec l e) =
   do
     (te, e') <- elabExpInfer env e
     Right (EnvML.TyRcd l te, Core.Rec l e')
-elabExpInfer env (EnvML.RProj e l) = error "TODO"
-elabExpInfer env (EnvML.FEnv (EnvML.ExpE e : d)) = do
-  di <- elabExpInfer env (EnvML.FEnv d)
-  case di of
-    (EnvML.TyEnvt g1, Core.FEnv d') -> do
+elabExpInfer env (EnvML.RProj e l) =
+  do
+    (ty, e') <- elabExpInfer env e
+    case ty of
+      EnvML.TyEnvt g1 ->
+        case rlk g1 l of
+          Just t -> Right (t, Core.RProj e' l)
+          Nothing -> Left "Label not found in record projection"
+      _ -> Left "Expected environment type in record projection"
+elabExpInfer env (EnvML.FEnv (EnvML.ExpE e : d)) =
+  case elabExpInfer env (EnvML.FEnv d) of
+    Right (EnvML.TyEnvt g1, Core.FEnv d') -> do
       (te, e') <- elabExpInfer (g1 ++ env) e
       Right (EnvML.TyEnvt (EnvML.Type te : g1), Core.FEnv (Core.ExpE e' : d'))
     _ -> Left "Expected environment type in FEnv"
-elabExpInfer env (EnvML.FEnv (EnvML.TypE t : d)) = do
-  di <- elabExpInfer env (EnvML.FEnv d)
-  case di of
-    (EnvML.TyEnvt g1, Core.FEnv d') ->
+elabExpInfer env (EnvML.FEnv (EnvML.TypE t : d)) =
+  case elabExpInfer env (EnvML.FEnv d) of
+    Right (EnvML.TyEnvt g1, Core.FEnv d') ->
       let t' = elabTyp (g1 ++ env) t
        in Right (EnvML.TyEnvt (EnvML.TypeEq t : g1), Core.FEnv (Core.TypE t' : d'))
     _ -> Left "Expected environment type in FEnv"
@@ -283,5 +323,4 @@ elabExpInfer env (EnvML.Anno e t) =
   do
     e' <- elabExpCheck env e t
     Right (t, Core.Anno e' (elabTyp [] t))
-elabExpInfer _ (EnvML.ModE m) = error "TODO"
-elabExpInfer _ _ = Left "Cannot infer type for expression"
+elabExpInfer env e = Left $ "Cannot infer type for expression: " ++ show e 
