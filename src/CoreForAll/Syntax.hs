@@ -65,3 +65,4 @@ data Literal
   | LitBool Bool -- false, true
   | LitStr String -- "hello"
   deriving (Eq, Show)
+
