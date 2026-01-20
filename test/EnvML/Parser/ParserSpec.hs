@@ -94,34 +94,32 @@ spec = do
       parseExp (lexer "myVar") `shouldBe` Var "myVar"
 
     it "parses lambda functions" $ do
-      let input = "fun (x: int) -> x"
-      let expected = Lam "x" (TyLit TyInt) (Var "x")
+      let input = "fun (x) -> x"
+      let expected = Lam "x" (Var "x")
       parseExp (lexer input) `shouldBe` expected
 
     it "parses nested lambda functions" $ do
-      let input = "fun (x: int) -> fun (y : int) -> y"
-      let expected = Lam "x" (TyLit TyInt) (Lam "y" (TyLit TyInt) (Var "y"))
+      let input = "fun (x) -> fun (y) -> y"
+      let expected = Lam "x" (Lam "y" (Var "y"))
       parseExp (lexer input) `shouldBe` expected
 
     it "parses closure" $ do
-      let input = "clos [type t = int, x = 1] (y: t) -> y"
+      let input = "clos [type t = int, x = 1] (y) -> y"
       let expected =
             Clos
               [ ("t", TypE (TyLit TyInt)),
                 ("x", ExpE (Lit (LitInt 1)))
               ]
               "y"
-              (TyVar "t")
               (Var "y")
       parseExp (lexer input) `shouldBe` expected
 
     it "parses closure with empty env" $ do
-      let input = "clos [] (y: t) -> y"
+      let input = "clos [] (y) -> y"
       let expected =
             Clos
               []
               "y"
-              (TyVar "t")
               (Var "y")
       parseExp (lexer input) `shouldBe` expected
 
@@ -201,13 +199,13 @@ spec = do
       parseExp (lexer input) `shouldBe` expected
 
     it "parses box construction + function" $ do
-      let input = "box [type t = int, x = 1] in fun (y: t) -> x"
+      let input = "box [type t = int, x = 1] in fun (y) -> x"
       let expected =
             Box
               [ ("t", TypE (TyLit TyInt)),
                 ("x", ExpE (Lit (LitInt 1)))
               ]
-              (Lam "y" (TyVar "t") (Var "x"))
+              (Lam "y" (Var "x"))
       parseExp (lexer input) `shouldBe` expected
 
   describe "EnvML.Parser (Types)" $ do

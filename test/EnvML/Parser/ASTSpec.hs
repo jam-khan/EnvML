@@ -27,14 +27,14 @@ prettyExpTests =
   , (App x (App y z), "x(y(z))")
 
     -- Lambdas
-  , (Lam "x" int x, "fun (x: int) -> x")
-  , (Lam "x" int (App x y), "fun (x: int) -> x(y)")
-  , (App (Lam "x" int x) y, "(fun (x: int) -> x)(y)")
+  , (Lam "x" x, "fun (x) -> x")
+  , (Lam "x" (App x y), "fun (x) -> x(y)")
+  , (App (Lam "x"x) y, "(fun (x) -> x)(y)")
 
     -- Type abstraction
   , (TLam "a" x, "fun type a -> x")
-  , (Lam "x" (TyVar "a") (TLam "a" x),
-      "fun (x: a) -> fun type a -> x")
+  , (Lam "x" (TLam "a" x),
+      "fun (x) -> fun type a -> x")
 
     -- Type application
   , (TApp x int, "x<int>")
@@ -52,10 +52,10 @@ prettyExpTests =
   , (App (Box [] x) y, "(box [] in x)(y)")
 
     -- Closures
-  , (Clos [] "x" int x, "clos [] (x: int) -> x")
-  , (App (Clos [] "x" int x) y, "(clos [] (x: int) -> x)(y)")
-  , (Clos [("x", ExpE x)] "y" int (App x y),
-      "clos [x = x] (y: int) -> x(y)")
+  , (Clos [] "x" x, "clos [] (x) -> x")
+  , (App (Clos [] "x" x) y, "(clos [] (x) -> x)(y)")
+  , (Clos [("x", ExpE x)] "y" (App x y),
+      "clos [x = x] (y) -> x(y)")
 
     -- Records
   , (Rec "x" (Lit (LitInt 42)), "{x = 42}")
@@ -101,11 +101,11 @@ prettyExpTests =
      "struct  end :: sig  end")
 
     -- Precedence tests
-  , (App (Lam "x" int x) (Lam "y" int y),
-     "(fun (x: int) -> x)(fun (y: int) -> y)")
+  , (App (Lam "x" x) (Lam "y" y),
+     "(fun (x) -> x)(fun (y) -> y)")
 
-  , (App (Box [] (Lam "x" int x)) y,
-     "(box [] in fun (x: int) -> x)(y)")
+  , (App (Box [] (Lam "x" x)) y,
+     "(box [] in fun (x) -> x)(y)")
 
   , (RProj (TApp x (TyVar "A")) "l",
      "x<A>.l")
