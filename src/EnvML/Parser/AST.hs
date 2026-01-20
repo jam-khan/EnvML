@@ -68,8 +68,8 @@ data Module
 data Exp
   = Lit   Literal           -- Literals: int, double, bool, string
   | Var   Name              -- Var x, y, hello
-  | Lam   Name Typ Exp      -- fun (x: A) -> x + 1
-  | Clos  Env Name Typ Exp  -- clos [type t = int, x = 1] (y: t) -> x + y
+  | Lam   Name Exp      -- fun (x: A) -> x + 1
+  | Clos  Env Name Exp  -- clos [type t = int, x = 1] (y: t) -> x + y
   | App   Exp Exp           -- f(x)
   | TLam  Name Exp          -- fun type a' -> fun (x: a') -> x
   | TClos Env Name Exp      -- clos [type t = int, x = 1] -> 
@@ -226,10 +226,9 @@ instance Show Exp where
   show :: Exp -> String
   show (Lit l) = show l
   show (Var n) = n
-  show (Lam n t e) =
-    let sT = show t
-        sE = show e
-    in "fun (" ++ n ++ ": " ++ sT ++ ") -> " ++ sE
+  show (Lam n e) =
+    let sE = show e
+    in "fun (" ++ n ++ ") -> " ++ sE
   show (Box env e) =
     let sCets = showEnv env
         sE = parensIf (expPrec e < expPrec (Box env e)) (show e)
@@ -241,11 +240,10 @@ instance Show Exp where
   show (TLam n e) =
       let sE = show e
       in "fun type " ++ n ++ " -> " ++ sE
-  show (Clos cetList n t e) =
+  show (Clos cetList n e) =
     let sCets = showEnv cetList
-        sT = show t
-        sE = parensIf (expPrec e < expPrec (Clos cetList n t e)) (show e)
-    in "clos [" ++ sCets ++ "] (" ++ n ++ ": " ++ sT ++ ") -> " ++ sE
+        sE = parensIf (expPrec e < expPrec (Clos cetList n e)) (show e)
+    in "clos [" ++ sCets ++ "] (" ++ n ++ ") -> " ++ sE
   show (TClos cetList n e) =
     let sCets = showEnv cetList
         sE = parensIf (expPrec e < expPrec (TClos cetList n e)) (show e)
