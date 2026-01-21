@@ -1,4 +1,7 @@
-module EnvML.Parser.ElabAST where
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Redundant where" #-}
+module EnvML.Parser.ElabAST (elabExp, elabTyp, elabIntf, elabModule, elabModuleTyp) where
 
 -- Named AST
 -- De-bruijn AST
@@ -23,6 +26,13 @@ getName ie =
     N.ModDecl n _ -> n
     N.SigDecl n _ -> n
 
+-- All user-given type environments are reversed from this phase on
+elabTyEnv :: Ctx -> N.TyEnv -> D.TyEnv
+elabTyEnv ctx env = reverse $ elabTyEnv' ctx env
+  where
+    elabTyEnv' _ [] = []
+    elabTyEnv' ctx' ((n, e) : es) = elabTyEnvE ctx' e : elabTyEnv' (n : ctx') es
+
 elabTyp :: Ctx -> N.Typ -> D.Typ
 elabTyp ctx t = case t of
   N.TyLit l -> D.TyLit (elabLitTyp l)
@@ -39,9 +49,11 @@ elabTyp ctx t = case t of
      in D.TyBoxT g (elabTyp gNames t1)
   -- TySubstT: [x:=A] b
   N.TySubstT x a b ->
-    D.TySubstT (elabTyp (x : ctx) a) (elabTyp ctx b)
+    D.TySubstT (elabTyp ctx a) (elabTyp (x : ctx) b) -- TODO: x should not be passed to elabTyp b
+    -- because the body should come from a forall typ, which should already be indexed.
+    -- Next step should be to ensure subst is a purely internal type. 
   N.TyRcd s t1 -> D.TyRcd s (elabTyp ctx t1)
-  N.TyEnvt env -> D.TyEnvt (map (\(_, e) -> elabTyEnvE ctx e) env)
+  N.TyEnvt env -> D.TyEnvt (elabTyEnv ctx env)
   N.TyModule mt -> D.TyModule (elabModuleTyp ctx mt)
 
 elabTyEnvE :: Ctx -> N.TyEnvE -> D.TyEnvE
@@ -55,12 +67,12 @@ elabModuleTyp ctx mt = case mt of
   N.TyArrowM t mt1 -> D.TyArrowM (elabTyp ctx t) (elabModuleTyp ctx mt1)
   N.TySig intf -> D.TySig (elabIntf ctx intf)
 
+-- All user-given type interfaces are reversed from this phase on
 elabIntf :: Ctx -> N.Intf -> D.Intf
-elabIntf ctx intf = elabIntf' ctx intf'
+elabIntf ctx intf = reverse $ elabIntf' ctx intf
   where
-    intf' = reverse intf
     elabIntf' _ [] = []
-    elabIntf' ctx' (x : xs) = elabIntfE ctx' x : elabIntf' (getName x : ctx') xs
+    elabIntf' ctx (x : xs) = elabIntfE ctx x : elabIntf' (getName x : ctx) xs
 
 elabIntfE :: Ctx -> N.IntfE -> D.IntfE
 elabIntfE ctx ie = case ie of
@@ -74,13 +86,13 @@ elabLitTyp N.TyInt = D.TyInt
 elabLitTyp N.TyBool = D.TyBool
 elabLitTyp N.TyStr = D.TyStr
 
+-- All user-given environments are reversed from this phase on
 elabEnv :: Ctx -> N.Env -> D.Env
-elabEnv _ [] = []
-elabEnv ctx ((_, e) : es) =
-    let es' = elabEnv ctx es
-        c = map fst es
-    in elabEnvE c e : es'
-    
+elabEnv ctx env = reverse $ elabEnv' ctx env
+  where
+    elabEnv' _ [] = []
+    elabEnv' ctx' ((n, e) : es) = elabEnvE ctx' e : elabEnv' (n : ctx') es
+
 elabEnvE :: Ctx -> N.EnvE -> D.EnvE
 elabEnvE ctx e =
   case e of
@@ -89,13 +101,13 @@ elabEnvE ctx e =
 
 elabModule :: Ctx -> N.Module -> D.Module
 elabModule ctx (N.Functor n t m) =
-    D.Functor (elabTyp ctx t) (elabModule (n : ctx) m)
-elabModule ctx (N.Struct env) = 
-    D.Struct (elabEnv ctx env)
+  D.Functor (elabTyp ctx t) (elabModule (n : ctx) m)
+elabModule ctx (N.Struct env) =
+  D.Struct (elabEnv ctx env)
 elabModule ctx (N.MApp m1 m2) =
-    D.MApp (elabModule ctx m1) (elabModule ctx m2)
+  D.MApp (elabModule ctx m1) (elabModule ctx m2)
 elabModule ctx (N.MLink m1 m2) =
-    D.MLink (elabModule ctx m1) (elabModule ctx m2)
+  D.MLink (elabModule ctx m1) (elabModule ctx m2)
 
 elabExp :: Ctx -> N.Exp -> D.Exp
 elabExp _ (N.Lit l) =
@@ -117,7 +129,8 @@ elabExp ctx (N.TClos env a e) =
 elabExp ctx (N.TApp e t) =
   D.TApp (elabExp ctx e) (elabTyp ctx t)
 elabExp ctx (N.Box env e) =
-  D.Box (elabEnv ctx env) (elabExp ctx e)
+  let boxenv = map fst env
+   in D.Box (elabEnv ctx env) (elabExp boxenv e)
 elabExp ctx (N.Rec l e) =
   D.Rec l (elabExp ctx e)
 elabExp ctx (N.RProj e a) =
@@ -127,4 +140,4 @@ elabExp ctx (N.FEnv env) =
 elabExp ctx (N.Anno e t) =
   D.Anno (elabExp ctx e) (elabTyp ctx t)
 elabExp ctx (N.ModE m) =
-    D.ModE (elabModule ctx m)
+  D.ModE (elabModule ctx m)
