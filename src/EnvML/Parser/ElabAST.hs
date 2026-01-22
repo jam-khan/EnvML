@@ -48,10 +48,6 @@ elabTyp ctx t = case t of
         gNames = reverse (map fst env)
      in D.TyBoxT g (elabTyp gNames t1)
   -- TySubstT: [x:=A] b
-  N.TySubstT x a b ->
-    D.TySubstT (elabTyp ctx a) (elabTyp (x : ctx) b) -- TODO: x should not be passed to elabTyp b
-    -- because the body should come from a forall typ, which should already be indexed.
-    -- Next step should be to ensure subst is a purely internal type. 
   N.TyRcd s t1 -> D.TyRcd s (elabTyp ctx t1)
   N.TyEnvt env -> D.TyEnvt (elabTyEnv ctx env)
   N.TyModule mt -> D.TyModule (elabModuleTyp ctx mt)
@@ -72,7 +68,7 @@ elabIntf :: Ctx -> N.Intf -> D.Intf
 elabIntf ctx intf = reverse $ elabIntf' ctx intf
   where
     elabIntf' _ [] = []
-    elabIntf' ctx (x : xs) = elabIntfE ctx x : elabIntf' (getName x : ctx) xs
+    elabIntf' ctx' (x : xs) = elabIntfE ctx' x : elabIntf' (getName x : ctx') xs
 
 elabIntfE :: Ctx -> N.IntfE -> D.IntfE
 elabIntfE ctx ie = case ie of

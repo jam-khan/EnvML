@@ -185,26 +185,6 @@ prettyTypTests =
   , (TyBoxT [] (TyArr int int),
       "[] ===> (int -> int)")
 
-    -- Substitution types
-  , (TySubstT "x" int a,
-      "[x:=int]a")
-  , (TySubstT "x" (TyArr int int) a,
-      "[x:=(int -> int)]a")
-
-  , (TySubstT "x" (TySubstT "y" int b) a,
-      "[x:=[y:=int]b]a")
-
-  , (TyArr (TySubstT "x" int a) b,
-      "([x:=int]a -> b)")
-  , (TySubstT "x" a (TyArr b c),
-      "[x:=a]((b -> c))")
-
-  , (TyAll "a" (TySubstT "x" b a),
-      "forall a. [x:=b]a")
-
-  , (TyBoxT [] (TySubstT "x" int a),
-      "[] ===> [x:=int]a")
-
     -- Module types
   , (TyModule (TySig []),
       "sig  end")

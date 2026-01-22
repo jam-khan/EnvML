@@ -41,10 +41,6 @@ spec = do
                        [D.TypeEq (D.TyLit D.TyInt), D.TypeEq (D.TyLit D.TyBool)]
                        (D.TyVar 1)
 
-    it "elaborates TySubstT correctly" $ do
-      let ty = N.TySubstT "A" (N.TyLit N.TyInt) (N.TyVar "A")
-      elabTyp [] ty `shouldBe` D.TySubstT (D.TyLit D.TyInt) (D.TyVar 0)
-
     it "elaborates record types" $ do
       let ty = N.TyRcd "x" (N.TyLit N.TyInt)
       elabTyp [] ty `shouldBe` D.TyRcd "x" (D.TyLit D.TyInt)

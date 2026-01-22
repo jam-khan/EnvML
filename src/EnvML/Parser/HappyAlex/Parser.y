@@ -146,7 +146,6 @@ Typ :: { Typ }
    : BaseTyp '->' Typ                  { TyArr $1 $3 }
    | forall id '.' Typ                 { TyAll $2 $4 }
    | '[' TyEnv ']' '===>' Typ          { TyBoxT $2 $5 }
-   | '[' id ':=' Typ ']' Typ           { TySubstT $2 $4 $6 }
    | InterfaceBody                     { TyModule $1 }
    | BaseTyp                           { $1 }
 

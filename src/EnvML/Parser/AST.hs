@@ -37,7 +37,6 @@ data Typ
   | TyArr    Typ Typ        -- A -> B
   | TyAll    Name Typ       -- forall a'. T
   | TyBoxT   TyEnv Typ      -- [t1 : int, t2 : int, t3: bool] ==> A
-  | TySubstT Name Typ Typ   -- [x:=A] B % substitute x for A in B
   | TyRcd    String Typ     -- {l : A}
   | TyEnvt   TyEnv          -- [t : A, t1 : Type, t2 : A=]
   | TyModule ModuleTyp      -- Note: First-class modules   
@@ -98,7 +97,6 @@ typPrec t = case t of
   TyRcd _ _   -> 4
   TyEnvt _    -> 4
   TyModule _  -> 4
-  TySubstT {} -> 3
   TyArr _ _   -> 2
   TyBoxT _ _  -> 1
   TyAll _ _   -> 1
@@ -190,10 +188,6 @@ instance Show Typ where
     let sBinds = showTyEnv bs
         sTyp = parensIf (typPrec t < typPrec (TyBoxT bs t)) (show t)
     in "[" ++ sBinds ++ "] ===> " ++ sTyp
-  show (TySubstT x t1 t2) =
-    let s1 = show t1
-        s2 = parensIf (typPrec t2 < typPrec (TySubstT x t1 t2)) (show t2)
-    in "[" ++ x ++ ":=" ++ s1 ++ "]" ++ s2
   show (TyEnvt bs) = "[" ++ showTyEnv bs ++ "]"
   show (TyRcd label t) = "{" ++ label ++ " : " ++ show t ++ "}"
   show (TyModule mt) = show mt

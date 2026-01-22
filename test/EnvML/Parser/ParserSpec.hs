@@ -251,11 +251,6 @@ spec = do
       let expected = TyRcd "l" (TyLit TyInt)
       parseTyp (lexer input) `shouldBe` expected
 
-    it "parses substitution types" $ do
-      let input = "[x:=int] int"
-      let expected = TySubstT "x" (TyLit TyInt) (TyLit TyInt)
-      parseTyp (lexer input) `shouldBe` expected
-
     it "parses environment types" $ do
       let input = "[x : Type, y : int, a : (int)=]"
       let expected =
