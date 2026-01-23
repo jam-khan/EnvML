@@ -1,4 +1,3 @@
-
 module type Database = sig
     val name : string;;
     val execute  : string -> string
