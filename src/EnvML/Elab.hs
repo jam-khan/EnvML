@@ -1,19 +1,18 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Redundant $" #-}
 module EnvML.Elab where
 
-import qualified CoreForAll.Syntax as Core
-import qualified EnvML.Syntax as EnvML
-import Control.Monad (unless)
+import qualified  CoreForAll.Syntax as Core
+import qualified  EnvML.Syntax as EnvML
+import            Control.Monad (unless)
+
 type ElabError = String
 
 elabTyEnv ::
   EnvML.TyEnv 
   -> EnvML.TyEnv
   -> Either ElabError Core.TyEnv
-elabTyEnv _g []   = pure []
-elabTyEnv g (x:xs)= do
+elabTyEnv _g []     = pure []
+elabTyEnv g (x:xs)  = do
   x'  <- elabTyEnvE g x
   xs' <- elabTyEnv (x:g) xs
   Right $ x':xs'
@@ -22,27 +21,32 @@ elabTyEnvE ::
   EnvML.TyEnv
   -> EnvML.TyEnvE
   -> Either ElabError Core.TyEnvE
-elabTyEnvE g (EnvML.Type t)   = Core.Type   <$> elabTyp g t
-elabTyEnvE _g EnvML.Kind      = pure Core.Kind
-elabTyEnvE g (EnvML.TypeEq t) = Core.TypeEq <$> elabTyp g t
+elabTyEnvE g (EnvML.Type t)   = 
+  Core.Type   <$> elabTyp g t
+elabTyEnvE _g EnvML.Kind      = 
+  pure Core.Kind
+elabTyEnvE g (EnvML.TypeEq t) = 
+  Core.TypeEq <$> elabTyp g t
 
 elabModTyp ::
   EnvML.TyEnv
   -> EnvML.ModuleTyp
   -> Either ElabError Core.Typ
-elabModTyp g (EnvML.TySig intf)       = Core.TyEnvt <$> elabIntf g intf
-elabModTyp g (EnvML.TyArrowM a sigB)  = Core.TyArr <$> elabTyp g a <*> elabModTyp g sigB
+elabModTyp g (EnvML.TySig intf)       = 
+  Core.TyEnvt <$> elabIntf g intf
+elabModTyp g (EnvML.TyArrowM a sigB)  = 
+  Core.TyArr <$> elabTyp g a <*> elabModTyp g sigB
 
 elabIntf ::
-  EnvML.TyEnv ->
-  EnvML.Intf ->
-  Either ElabError Core.TyEnv
+  EnvML.TyEnv
+  -> EnvML.Intf
+  -> Either ElabError Core.TyEnv
 elabIntf g = mapM (elabIntfE g)
 
 elabIntfE ::
-  EnvML.TyEnv ->
-  EnvML.IntfE ->
-  Either ElabError Core.TyEnvE
+  EnvML.TyEnv
+  -> EnvML.IntfE
+  -> Either ElabError Core.TyEnvE
 elabIntfE g (EnvML.TyDef t)       = Core.Type <$> elabTyp g t
 elabIntfE g (EnvML.ValDecl ty)    = Core.Type <$> elabTyp g ty
 elabIntfE g (EnvML.ModDecl intf)  = Core.Type <$> elabTyp g intf
@@ -72,51 +76,55 @@ elabTyp g (EnvML.TyModule mt) =
     elabModTyp g mt
 
 elabTyLit ::
-  EnvML.TyLit ->
-  Core.TyLit
+  EnvML.TyLit
+  -> Core.TyLit
 elabTyLit EnvML.TyInt   = Core.TyInt
 elabTyLit EnvML.TyBool  = Core.TyBool
 elabTyLit EnvML.TyStr   = Core.TyStr
 
 elabInferM ::
-  EnvML.TyEnv ->
-  EnvML.Module ->
-  (EnvML.Typ, Core.Exp)
-elabInferM env (EnvML.Functor a m)  = error "TODO"
-elabInferM env (EnvML.Struct c)     = error "TODO"
-elabInferM env (EnvML.MApp m1 m2)   = error "TODO"
-elabInferM env (EnvML.MLink m1 m2)  = error "TODO"
+  EnvML.TyEnv
+  -> EnvML.Module
+  -> Either ElabError (EnvML.ModuleTyp, Core.Exp)
+-- Functor goes to lambdas.
+elabInferM _g (EnvML.Functor _m) = error "TODO"
+-- Struct goes to FEnv.
+elabInferM _g (EnvML.Struct _c)     = error "TODO"
+-- Module Application shall have special types and goes to lambda app.
+elabInferM _g (EnvML.MApp _m1 _m2)  = error "TODO"
+-- Module linking shall be same as module applications.
+elabInferM _g (EnvML.MLink _m1 _m2) = error "TODO"
 
--- Here, three cases
--- 
 elabEnv ::
-  EnvML.TyEnv ->
-  EnvML.Env ->
-  Either ElabError (EnvML.TyEnv, Core.Env)
-elabEnv _env []     = Right $ ([], [])
+  EnvML.TyEnv
+  -> EnvML.Env
+  -> Either ElabError (EnvML.TyEnv, Core.Env)
+elabEnv _env []     = Right ([], [])
 elabEnv env (x:xs)  = do
   (etyp, etm) <- elabEnvE env x
   let env'    = etyp:env
   (tyEnv', xs') <- elabEnv env' xs
-  -- Note: 
   Right $ (etyp : tyEnv', etm:xs')
-  -- 1. get `(environment type, elaborated environment term)` from `elaborate x`
-  -- 2. add environment type to current env
-  -- 3. elaborate remaining elements under new typing context
-  -- 4. concatenate result and send back
 
 elabEnvE ::
-  EnvML.TyEnv ->
-  EnvML.EnvE ->
-  Either ElabError (EnvML.TyEnvE, Core.EnvE)
-elabEnvE env (EnvML.ExpE e) = error "Expression elaboration in environment to do."
-elabEnvE env (EnvML.TypE t) = error "Type elaboration in environment to do."
+  EnvML.TyEnv
+  -> EnvML.EnvE
+  -> Either ElabError (EnvML.TyEnvE, Core.EnvE)
+elabEnvE _g (EnvML.ExpE _e) = error "Expression elaboration in environment to do."
+elabEnvE _g (EnvML.TypE _t) = error "Type elaboration in environment to do."
+
+elabLit ::
+  EnvML.Literal
+  -> (EnvML.TyLit, Core.Literal)
+elabLit (EnvML.LitInt i)  = (EnvML.TyInt,   Core.LitInt i)
+elabLit (EnvML.LitBool b) = (EnvML.TyBool,  Core.LitBool b)
+elabLit (EnvML.LitStr s)  = (EnvML.TyStr,   Core.LitStr s)
 
 elabExpCheck ::
-  EnvML.TyEnv ->
-  EnvML.Exp ->
-  EnvML.Typ ->
-  Either ElabError Core.Exp
+  EnvML.TyEnv
+  -> EnvML.Exp
+  -> EnvML.Typ
+  -> Either ElabError Core.Exp
 elabExpCheck g (EnvML.Lam e) (EnvML.TyArr a b)  =
   Core.Lam  <$> elabExpCheck (EnvML.Type a : g) e b
 elabExpCheck g (EnvML.TLam e) (EnvML.TyAll a)   =
@@ -137,49 +145,48 @@ elabExpCheck env (EnvML.TClos d e) (EnvML.TyBoxT g1 (EnvML.TyAll a)) = do
   case d' of
     Core.FEnv d'' -> pure $ Core.TClos d'' e'
     _ -> Left "Expected FEnv in elaboration of type closure"
-elabExpCheck env (EnvML.ModE m) (EnvML.TyModule mt) = error "TODO"
+elabExpCheck _env (EnvML.ModE _m) (EnvML.TyModule _mt) = error "TODO"
 elabExpCheck env e ty = do
   (ty', e') <- elabExpInfer env e
   if teq env ty' ty env
     then Right e'
     else Left $ "Type mismatch in elaboration check: expected " ++ show ty ++ ", got " ++ show ty'
 
-elabLit ::
-  EnvML.Literal
-  -> (EnvML.TyLit, Core.Literal)
-elabLit (EnvML.LitInt i)  = (EnvML.TyInt,   Core.LitInt i)
-elabLit (EnvML.LitBool b) = (EnvML.TyBool,  Core.LitBool b)
-elabLit (EnvML.LitStr s)  = (EnvML.TyStr,   Core.LitStr s)
 
 elabExpInfer ::
-  EnvML.TyEnv ->
-  EnvML.Exp ->
-  Either ElabError (EnvML.Typ, Core.Exp)
-elabExpInfer _ (EnvML.Lit l)    =
+  EnvML.TyEnv
+  -> EnvML.Exp
+  -> Either ElabError (EnvML.Typ, Core.Exp)
+elabExpInfer _ (EnvML.Lit l)        =
   let (tyLit, tmLit) = elabLit l
   in  Right $ (EnvML.TyLit tyLit, Core.Lit tmLit)
-elabExpInfer env (EnvML.Var n)  = do
+elabExpInfer env (EnvML.Var n)      = do
   t <- getVar env n
-  Right (t, Core.Var n) 
-elabExpInfer env (EnvML.App e1 e2) = do
+  Right (t, Core.Var n)
+elabExpInfer _g (EnvML.Lam _e)      =
+  Left "Lambdas (fun var -> e) can not be inferred, must be checked."
+elabExpInfer _g (EnvML.Clos _ _)    =
+  Left "Closures can not be inferred, must be checked."
+elabExpInfer env (EnvML.App e1 e2)  = do
   (ty1, e1') <- elabExpInfer env e1
   case ty1 of
     EnvML.TyArr a b -> do
       e2' <- elabExpCheck env e2 a
       Right (b, Core.App e1' e2')
     _ -> Left "Expected function type in application"
-elabExpInfer g (EnvML.TApp e t) =
-  do
-    (ty, e') <- elabExpInfer g e
-    case ty of
-      EnvML.TyAll a -> do
-        t' <- elabTyp g t
-        Right (EnvML.TySubstT t a, Core.TApp e' t')
-      _ -> Left "Expected universal type in type application"
-elabExpInfer env (EnvML.TLam e) = do
+elabExpInfer env (EnvML.TLam e)   = do
   (t, e') <- elabExpInfer (EnvML.Kind : env) e
   Right (EnvML.TyAll t, Core.TLam e')
-elabExpInfer env (EnvML.Box d e) = do
+elabExpInfer _g (EnvML.TClos _ _) =
+  Left "Type (Big) Lambdas can not be infered. Must be checked."
+elabExpInfer g (EnvML.TApp e t)   = do
+  (ty, e') <- elabExpInfer g e
+  case ty of
+    EnvML.TyAll a -> do
+      t' <- elabTyp g t
+      Right (EnvML.TySubstT t a, Core.TApp e' t')
+    _ -> Left "Expected universal type in type application"
+elabExpInfer env (EnvML.Box d e)  = do
   dd <- elabExpInfer env (EnvML.FEnv d)
   case dd of
     (EnvML.TyEnvt g1, Core.FEnv d') -> do
@@ -199,27 +206,49 @@ elabExpInfer env (EnvML.RProj e l) =
           Just t -> Right (t, Core.RProj e' l)
           Nothing -> Left "Label not found in record projection"
       _ -> Left "Expected environment type in record projection"
-elabExpInfer env (EnvML.FEnv (EnvML.ExpE e : d)) =
-  case elabExpInfer env (EnvML.FEnv d) of
-    Right (EnvML.TyEnvt g1, Core.FEnv d') -> do
-      (te, e') <- elabExpInfer (g1 ++ env) e
-      Right (EnvML.TyEnvt (EnvML.Type te : g1), Core.FEnv (Core.ExpE e' : d'))
-    _ -> Left "Expected environment type in FEnv"
-elabExpInfer env (EnvML.FEnv (EnvML.TypE t : d)) =
-  case elabExpInfer env (EnvML.FEnv d) of
-    Right (EnvML.TyEnvt g1, Core.FEnv d') -> do
-      t' <- elabTyp (g1 ++ env) t
-      Right (EnvML.TyEnvt (EnvML.TypeEq t : g1), Core.FEnv (Core.TypE t' : d'))
-    _ -> Left "Expected environment type in FEnv"
-elabExpInfer _ (EnvML.FEnv []) =
-  Right (EnvML.TyEnvt [], Core.FEnv [])
+elabExpInfer g (EnvML.FEnv x) =
+  case x of
+    [] -> Right (EnvML.TyEnvt [], Core.FEnv [])
+    (EnvML.ExpE e : d) ->
+      case elabExpInfer g (EnvML.FEnv d) of
+        Right (EnvML.TyEnvt g1, Core.FEnv d') -> do
+          (te, e') <- elabExpInfer (g1 ++ g) e
+          Right (EnvML.TyEnvt (EnvML.Type te : g1), Core.FEnv (Core.ExpE e' : d'))
+        _ -> Left "Expected environment type in FEnv"
+    (EnvML.TypE t : d)  ->
+      case elabExpInfer g (EnvML.FEnv d) of
+        Right (EnvML.TyEnvt g1, Core.FEnv d') -> do
+          t' <- elabTyp (g1 ++ g) t
+          Right (EnvML.TyEnvt (EnvML.TypeEq t : g1), Core.FEnv (Core.TypE t' : d'))
+        _ -> Left "Expected environment type in FEnv"  
 elabExpInfer g (EnvML.Anno e t)   = do
     e' <- elabExpCheck g e t
     t' <- elabTyp g t
     Right (t, Core.Anno e' t')
-elabExpInfer env e = Left $ "Cannot infer type for expression: " ++ show e 
+elabExpInfer _ (EnvML.ModE _) = Left "Modules infer elaboration: TO BE ADDED."
 
+-- Module elaborations
+elabModInfer ::
+  EnvML.TyEnv
+  -> EnvML.Module
+  -> Either ElabError (EnvML.ModuleTyp, Core.Exp)
+elabModInfer g (EnvML.Functor mod) = error "Functor elaboration to do."
+elabModInfer g (EnvML.Struct  env) = error "Struct elaboration to do."
+elabModInfer g (EnvML.MApp m1 m2)  = error "Struct elaboration to do."
+elabModInfer g (EnvML.MLink m1 m2) = do
+  (t1, e1) <- elabModInfer g m1
+  case t1 of
+    {- t11 ->m t12 -}
+    (EnvML.TyArrowM t11 t12) -> do
+      unless (elabModCheck m2 t11) $
+        Left "M1 must be functor to link with M2."
+      pure $ (t12, Core.App e1 e2)
+    _ -> Left "M1 must be functor to link with M2."
 
+elabModCheck ::
+  EnvML.TyEnv
+  -> EnvML.Module
+  -> Either ElabError ()
 {- Utilities -}
 
 keyLen :: EnvML.TyEnv -> Int
@@ -236,27 +265,39 @@ tshiftBinds x (EnvML.Type a : bs) =
 tshiftBinds x (EnvML.TypeEq a : bs) =
   EnvML.TypeEq (tshift (keyLen bs + x) a) : tshiftBinds x bs
 
-tshift :: 
+tshift ::
   Int 
   -> EnvML.Typ 
   -> EnvML.Typ
-tshift _ (EnvML.TyLit i)        = 
-  EnvML.TyLit i
-tshift x (EnvML.TyVar y)        = 
-  if x <= y then EnvML.TyVar (1 + y) else EnvML.TyVar y
-tshift x (EnvML.TyArr a1 a2)    = 
-  EnvML.TyArr (tshift x a1) (tshift x a2)
-tshift x (EnvML.TyAll a)        = 
-  EnvML.TyAll (tshift (1 + x) a)
-tshift _ (EnvML.TyBoxT t a)     =
-  EnvML.TyBoxT t a -- aBoxT is opaque, no shifting inside
-tshift x (EnvML.TySubstT a1 a2) = 
-  EnvML.TySubstT (tshift x a1) (tshift (1 + x) a2)
-tshift x (EnvML.TyRcd l a)      = 
-  EnvML.TyRcd l (tshift x a)
-tshift x (EnvML.TyEnvt bs)      = 
-  EnvML.TyEnvt (tshiftBinds x bs)
-tshift x (EnvML.TyModule mt)    = error "TODO"
+tshift _ (EnvML.TyLit i)        
+  = EnvML.TyLit i
+tshift x (EnvML.TyVar y)        
+  = if x <= y 
+      then EnvML.TyVar (1 + y) 
+      else EnvML.TyVar y
+tshift x (EnvML.TyArr a1 a2)
+  = EnvML.TyArr (tshift x a1) (tshift x a2)
+tshift x (EnvML.TyAll a)
+  = EnvML.TyAll (tshift (1 + x) a)
+tshift _ (EnvML.TyBoxT t a)
+  = EnvML.TyBoxT t a -- aBoxT is opaque, no shifting inside
+tshift x (EnvML.TySubstT a1 a2)
+  = EnvML.TySubstT (tshift x a1) (tshift (1 + x) a2)
+tshift x (EnvML.TyRcd l a)
+  = EnvML.TyRcd l (tshift x a)
+tshift x (EnvML.TyEnvt bs)
+  = EnvML.TyEnvt (tshiftBinds x bs)
+tshift x (EnvML.TyModule mty)
+  = EnvML.TyModule $ tshiftM x mty
+
+tshiftM ::
+  Int
+  -> EnvML.ModuleTyp
+  -> EnvML.ModuleTyp
+tshiftM x (EnvML.TySig m)
+  = error "TODO."
+tshiftM x (EnvML.TyArrowM ty mty) 
+  = EnvML.TyArrowM (tshift x ty) (tshiftM x mty)
 
 lookt :: 
   EnvML.TyEnv 
@@ -292,7 +333,20 @@ inner (EnvML.TypeEq _ : g) x = inner g (x - 1)
 inner (EnvML.Kind : _g) 0 = pure 0
 inner (EnvML.Kind : g) x = (+ 1) <$> inner g (x - 1)
 
-teqEnv :: EnvML.TyEnv -> EnvML.TyEnv -> EnvML.TyEnv -> EnvML.TyEnv -> Bool
+teqM ::
+  EnvML.TyEnv
+  -> EnvML.ModuleTyp
+  -> EnvML.ModuleTyp
+  -> EnvML.TyEnv
+  -> Bool
+teqM g1 _ _ g2 = error "TODO."
+
+teqEnv :: 
+  EnvML.TyEnv
+  -> EnvML.TyEnv
+  -> EnvML.TyEnv
+  -> EnvML.TyEnv
+  -> Bool
 teqEnv _ [] [] _ = True
 teqEnv g1 (EnvML.Kind : e1) (EnvML.Kind : e2) g2 =
   teqEnv g1 e1 e2 g2
@@ -302,7 +356,12 @@ teqEnv g1 (EnvML.TypeEq a : e1) (EnvML.TypeEq b : e2) g2 =
   teqEnv g1 e1 e2 g2 && teq (e1 ++ g1) a b (e2 ++ g2)
 teqEnv _ _ _ _ = False
 
-teq :: EnvML.TyEnv -> EnvML.Typ -> EnvML.Typ -> EnvML.TyEnv -> Bool
+teq :: 
+  EnvML.TyEnv
+  -> EnvML.Typ
+  -> EnvML.Typ
+  -> EnvML.TyEnv
+  -> Bool
 teq _ (EnvML.TyLit a) (EnvML.TyLit b) _ = a == b
 teq g1 (EnvML.TyVar x) b g2 =
   case lookt g1 x of
@@ -334,7 +393,9 @@ teq g1 (EnvML.TyRcd l1 a) (EnvML.TyRcd l2 b) g2 =
   l1 == l2 && teq g1 a b g2
 teq _ _ _ _ = False
 
-value :: EnvML.Exp -> Bool
+value :: 
+  EnvML.Exp
+  -> Bool
 value (EnvML.Lit _) = True
 value (EnvML.Clos e _) = lvalue e
 value (EnvML.TClos e _) = lvalue e
@@ -342,14 +403,19 @@ value (EnvML.FEnv e) = lvalue e
 value (EnvML.Rec _ v) = value v
 value _ = False
 
-lvalue :: EnvML.Env -> Bool
+lvalue :: 
+  EnvML.Env
+  -> Bool
 lvalue [] = True
 lvalue (EnvML.ExpE v : e) = lvalue e && value v
 lvalue (EnvML.TypE (EnvML.TyBoxT _ _) : e) =
   lvalue e
 lvalue (EnvML.TypE _ : _) = False
 
-lbIn :: String -> EnvML.Typ -> Bool
+lbIn ::
+  String
+  -> EnvML.Typ
+  -> Bool
 lbIn l (EnvML.TyEnvt (EnvML.Type (EnvML.TyRcd l' _) : _)) = l == l'
 lbIn l (EnvML.TyEnvt (EnvML.Type _ : g)) = lbIn l (EnvML.TyEnvt g)
 lbIn l (EnvML.TyEnvt (EnvML.TypeEq _ : g)) = lbIn l (EnvML.TyEnvt g)
