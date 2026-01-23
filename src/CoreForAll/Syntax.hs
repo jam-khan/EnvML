@@ -60,8 +60,8 @@ data Exp
   | Eq Exp Exp
   deriving (Eq, Show)
 
-data Literal
-  = LitInt Int -- 1, 2, etc.
-  | LitBool Bool -- false, true
-  | LitStr String -- "hello"
+data Literal 
+  = LitInt  Int             -- 1, 2, etc.
+  | LitBool Bool            -- false, true
+  | LitStr  String          -- "hello"
   deriving (Eq, Show)
