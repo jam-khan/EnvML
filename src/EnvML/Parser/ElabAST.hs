@@ -98,8 +98,12 @@ elabEnvE ctx e =
 elabModule :: Ctx -> N.Module -> D.Module
 elabModule ctx (N.Functor n t m) =
   D.Functor (elabTyp ctx t) (elabModule (n : ctx) m)
-elabModule ctx (N.Struct env) =
-  D.Struct (elabEnv ctx env)
+elabModule ctx (N.Struct imps env) =
+    let binds = map fst imps
+        ctx' = reverse binds ++ ctx
+        structMod = D.Struct (elabEnv ctx' env)
+    in
+    foldr (\(_, t) modl -> D.Functor (elabTyp ctx t) modl) structMod imps
 elabModule ctx (N.MApp m1 m2) =
   D.MApp (elabModule ctx m1) (elabModule ctx m2)
 elabModule ctx (N.MLink m1 m2) =

@@ -14,7 +14,7 @@ spec :: Spec
 spec = describe "Feature: Basic Modules" $ do
 
   it "parses x.eml" $ 
-    parseEmlFile "examples/basic-module/x.eml" `shouldParseAs` Struct 
+    parseEmlFile "examples/basic-module/x.eml" `shouldParseAs` Struct []
       [ ("x", ExpE (Lit (LitInt 1)))
       ]
 

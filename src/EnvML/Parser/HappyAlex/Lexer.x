@@ -31,8 +31,9 @@ tokens :-
   sig         { \_ -> TokSig  }
   end         { \_ -> TokEnd  }
   functor     { \_ -> TokFunctor  }
-  struct     { \_ -> TokStruct  }
-  link     { \_ -> TokLink  }
+  struct      { \_ -> TokStruct  }
+  link        { \_ -> TokLink  }
+  import      { \_ -> TokImport  }
 
   -- Symbols
   "="         { \_ -> TokEq       }
@@ -85,6 +86,7 @@ data Token
   | TokEnd
   | TokFunctor
   | TokStruct
+  | TokImport
   -- Symbol Tokens
   | TokEq
   | TokColon    

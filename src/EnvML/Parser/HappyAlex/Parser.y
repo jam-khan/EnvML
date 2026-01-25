@@ -37,6 +37,7 @@ import EnvML.Parser.AST
   functor   { TokFunctor }
   struct    { TokStruct }
   link      { TokLink }
+  import    { TokImport }
   '='       { TokEq }
   ':'       { TokColon }
   ';'       { TokSemi }
@@ -67,12 +68,7 @@ import EnvML.Parser.AST
 
 -- A program file is implicitly a Struct containing a list of Env elements
 ModuleBody :: { Module }
-  : functor '(' id ':' Typ ')' '->' ModuleBody { Functor $3 $5 $8 }
-  | ModuleEnv { Struct $1 }
-  | struct ModuleEnv end { Struct $2 } -- allow explicit struct ... end
-  | ModuleBody '(' ModuleBody ')' { MApp $1 $3 }
-  | link '(' ModuleBody ',' ModuleBody ')' { MLink $3 $5 }
-  | '(' ModuleBody ')'           { $2 }         
+  : ModuleImports ModuleEnv { Struct $1 $2 }
 
 ModuleEnv :: { Env }
   : ModuleEnvElem ModuleEnv     { $1 : $2 }
@@ -81,6 +77,17 @@ ModuleEnv :: { Env }
 ModuleEnvElem :: { (Name, EnvE) }
   : let id '=' Exp ';;'   { ($2, ExpE $4) }
   | type id '=' Typ ';;'  { ($2, TypE $4) }
+
+ModuleImports :: { Imports }
+  : import ImportList ';;'    { $2 }  
+  |                           { [] } 
+
+ImportList :: { Imports }
+  : ImportItem ',' ImportList { $1 : $3 } 
+  | ImportItem                { [$1] }    
+
+ImportItem :: { (Name, Typ) }
+  : id ':' Typ                { ($1, $3) }
 
 -------------------------------------------------------------------------
 -- .emli Files (Signatures)
@@ -113,8 +120,15 @@ Exp :: { Exp }
   | clos '[' Env ']' type id '->' Exp  { TClos $3 $6 $8 }
   | box '[' Env ']' in Exp            { Box $3 $6 }
   | Term '::' Typ                     { Anno $1 $3 }
-  | ModuleBody                        { ModE $1 }
+  | ModuleExp                         { ModE $1 }
   | Term                              { $1 }
+
+ModuleExp :: { Module }
+  : struct ModuleImports ModuleEnv end { Struct $2 $3 }
+  | ModuleExp '(' ModuleExp ')'        { MApp $1 $3 }
+  | link '(' ModuleExp ',' ModuleExp ')' { MLink $3 $5 }
+  | functor '(' id ':' Typ ')' '->' ModuleExp  { Functor $3 $5 $8 }
+  | '(' ModuleExp ')'                  { $2 }
 
 Term :: { Exp }
   : Term '(' Atom ')'                   { App $1 $3 }
@@ -132,7 +146,6 @@ Atom :: { Exp }
   | '[' Env ']'                       { FEnv $2 }
   | '(' Exp ')'                       { $2 }
 
-
 Env :: { Env }
   : EnvElem ',' Env  { $1 : $3 }
   | EnvElem                  { [$1] }
@@ -146,7 +159,7 @@ Typ :: { Typ }
    : BaseTyp '->' Typ                  { TyArr $1 $3 }
    | forall id '.' Typ                 { TyAll $2 $4 }
    | '[' TyEnv ']' '===>' Typ          { TyBoxT $2 $5 }
-   | InterfaceBody                     { TyModule $1 }
+   | ModuleTyp                         { TyModule $1 }
    | BaseTyp                           { $1 }
 
 BaseTyp :: { Typ }
@@ -157,6 +170,11 @@ BaseTyp :: { Typ }
   | '{' id ':' Typ '}'                { TyRcd $2 $4 }
   | '[' TyEnv ']'                     { TyEnvt $2 }
   | '(' Typ ')'                       { $2 }
+
+ModuleTyp :: { ModuleTyp }
+  : sig Intf end                      { TySig $2 }
+  | Typ '->m' ModuleTyp               { TyArrowM $1 $3 }
+  | '(' ModuleTyp ')'                 { $2 }
 
 TyEnv :: { TyEnv }
   : TyEnvElem ',' TyEnv               { $1 : $3 }

@@ -73,31 +73,31 @@ prettyExpTests =
   , (Anno (RProj x "x") int, "x.x :: int")
 
     -- Module expressions
-  , (ModE (Struct []),
+  , (ModE (Struct [] []),
      "struct  end")
 
-  , (ModE (Struct [("x", ExpE (Lit (LitInt 1)))]),
+  , (ModE (Struct [] [("x", ExpE (Lit (LitInt 1)))]),
      "struct x = 1 end")
 
-  , (ModE (Functor "X" (TyVar "A") (Struct [])),
+  , (ModE (Functor "X" (TyVar "A") (Struct [] [])),
      "functor (X : A) struct  end")
 
   , (ModE
         (MApp
-          (Functor "X" (TyVar "A") (Struct []))
-          (Struct [])),
+          (Functor "X" (TyVar "A") (Struct [] []))
+          (Struct [] [])),
      "(functor (X : A) struct  end) (struct  end)")
 
   , (ModE
         (MLink
-          (Struct [])
-          (Struct [])),
+          (Struct [] [])
+          (Struct [] [])),
      "(struct  end) |><| (struct  end)")
 
-  , (RProj (ModE (Struct [])) "x",
+  , (RProj (ModE (Struct [] [])) "x",
      "struct  end.x")
 
-  , (Anno (ModE (Struct [])) (TyModule (TySig [])),
+  , (Anno (ModE (Struct [] [])) (TyModule (TySig [])),
      "struct  end :: sig  end")
 
     -- Precedence tests

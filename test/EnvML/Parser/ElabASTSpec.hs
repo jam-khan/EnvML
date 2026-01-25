@@ -140,19 +140,25 @@ spec = do
   describe "elabModule" $ do
     it "elaborates structs with environments + reversal" $ do
       let env = [("x", N.ExpE (N.Lit (N.LitInt 1))), ("y", N.ExpE (N.Var "x"))]
-      elabModule [] (N.Struct env)
+      elabModule [] (N.Struct [] env)
         `shouldBe` D.Struct [D.ExpE (D.Var 0), D.ExpE (D.Lit (D.LitInt 1))]
 
+    it "elaborates structs with imports as functors" $ do
+      let imps = [("A", N.TyLit N.TyInt), ("B", N.TyLit N.TyBool)]
+          env = [("x", N.ExpE (N.Lit (N.LitInt 1)))]
+      elabModule [] (N.Struct imps env)
+        `shouldBe` D.Functor (D.TyLit D.TyInt) (D.Functor (D.TyLit D.TyBool) (D.Struct [D.ExpE (D.Lit (D.LitInt 1))]))
+
     it "elaborates functors" $ do
-      let m = N.Functor "X" (N.TyLit N.TyInt) (N.Struct [("x", N.ExpE (N.Var "X"))])
+      let m = N.Functor "X" (N.TyLit N.TyInt) (N.Struct [] [("x", N.ExpE (N.Var "X"))])
       elabModule [] m `shouldBe` D.Functor (D.TyLit D.TyInt) (D.Struct [D.ExpE (D.Var 0)])
 
-    it "elaborates module applications" $ do
-      let m1 = N.Struct [("x", N.ExpE (N.Lit (N.LitInt 1)))]
-          m2 = N.Struct []
+    it "elaborates module applications regardless of no functors (no checks in this phase)" $ do
+      let m1 = N.Struct [] [("x", N.ExpE (N.Lit (N.LitInt 1)))]
+          m2 = N.Struct [] []
       elabModule [] (N.MApp m1 m2) `shouldBe` D.MApp (D.Struct [D.ExpE (D.Lit (D.LitInt 1))]) (D.Struct [])
 
     it "elaborates module links" $ do
-      let m1 = N.Struct []
-          m2 = N.Struct []
+      let m1 = N.Struct [] []
+          m2 = N.Struct [] []
       elabModule [] (N.MLink m1 m2) `shouldBe` D.MLink (D.Struct []) (D.Struct [])
