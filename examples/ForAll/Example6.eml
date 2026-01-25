@@ -1,16 +1,35 @@
-(* Contextual Polymorphism with first-class modules with polymorphic get_x *)
+(* Safe module concatenation *)
 
-module type ENV = 
-  sig (t : type)
-    val x : t
+module type M = 
+  sig
+    type t = bool;;
+    yes : t;;
+    no  : t;;
+    choose : t -> t -> t;;
   end;;
 
-let get_x : forall t. ENV @t -> t =
-  fun (type t) (env : ENV @t) ->
-    box env in (x :: t);;
+module type N =
+  sig
+    type t = int;;
+    inc  : t -> t;;
+  end;;
 
-let env_int  : ENV @int  = struct let x = 42 end;;
-let env_bool : ENV @bool = struct let x = true end;;
+module m : M =
+  struct
+    type t = bool;;
+    yes = true;;
+    no = false;;
+    choose (l : t) (r : t) = if l then r else l;;
+  end;;
 
-let res1 : int  = (get_x @int env_int);;  (* 42 *)
-let res2 : bool = (get_x @bool env_bool);; (* true *)
+module n : N =
+  struct
+    type t = int;;
+    inc (x : t) = x + 1;;
+  end;;
+
+let M_N : M ++ N |> (bool -> (int -> int)) =
+    with (m ++ n) in
+      fun (b : bool) ->
+        fun (x : t) ->
+          if b == Yes then inc(x) else x
