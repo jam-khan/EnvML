@@ -1,15 +1,14 @@
 (* Example 2: Interesting Sandboxing *)
 
-let SECRET : string = "PRIVATE";;
+let SECRET : INT = 3141;;
 
 module type POLICY = 
-  sig 
-    log : string -> ()
-  end;;
+  sig log : forall t. t -> () end;;
 
 module guest_policy : POLICY =
   struct
-    log : string -> () = fun (msg) -> print msg
+    log : forall t. t -> () = 
+        fun (msg : t) -> print msg
   end;;
 
 (* Type check: Pass *)
