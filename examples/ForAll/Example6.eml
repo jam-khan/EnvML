@@ -1,0 +1,16 @@
+(* Contextual Polymorphism with first-class modules with polymorphic get_x *)
+
+module type ENV = 
+  sig (t : type)
+    val x : t
+  end;;
+
+let get_x : forall t. ENV @t -> t =
+  fun (type t) (env : ENV @t) ->
+    box env in (x :: t);;
+
+let env_int  : ENV @int  = struct let x = 42 end;;
+let env_bool : ENV @bool = struct let x = true end;;
+
+let res1 : int  = (get_x @int env_int);;  (* 42 *)
+let res2 : bool = (get_x @bool env_bool);; (* true *)
