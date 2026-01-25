@@ -13,12 +13,12 @@ data TyEnvE
   = Type    Typ
   | Kind
   | TypeEq  Typ
-  deriving (Eq, Show)
+  deriving (Show, Eq)
 
 data ModuleTyp
   = TySig    Intf
   | TyArrowM Typ ModuleTyp
-  deriving (Eq, Show)
+  deriving (Show, Eq)
 
 type Intf = [IntfE]         -- (sig ... end) .eli
 
@@ -27,7 +27,7 @@ data IntfE
   | ValDecl  Typ       -- (val x : t)
   | ModDecl  Typ       -- (module M : S)
   | SigDecl  ModuleTyp -- (module type S = ...)
-  deriving (Eq, Show)
+  deriving (Show, Eq)
 
 data Typ
   = TyLit    TyLit          -- int, bool, or string
@@ -39,13 +39,13 @@ data Typ
   | TyRcd    String Typ     -- {l : A}
   | TyEnvt   TyEnv          -- [t : A, t1 : Type, t2 : A=]
   | TyModule ModuleTyp      -- Note: First-class modules   
-  deriving (Eq, Show)
+  deriving (Show, Eq)
 
 data TyLit 
   = TyInt                   -- int
   | TyBool                  -- bool
   | TyStr                   -- string
-  deriving (Eq, Show)
+  deriving (Show, Eq)
 
 -- Environment
 type Env = [EnvE]
@@ -54,14 +54,14 @@ type Env = [EnvE]
 data EnvE 
   = ExpE Exp 
   | TypE Typ
-  deriving (Eq, Show)
+  deriving (Show, Eq)
 
 data Module
   = Functor Typ Module      -- functor (x : A) struct x end
   | Struct  Env             -- struct type a = int; x = 1 end
   | MApp    Module Module   -- M1 M2
-  | MLink   Module Module   -- link(M1, M2)
-  deriving (Eq, Show)
+  | MLink   Module Module   -- M1 |><| M2    
+  deriving (Show, Eq)
 
 data Exp
   = Lit   Literal           -- Literals: int, double, bool, string
@@ -78,11 +78,11 @@ data Exp
   | FEnv  Env               -- [type a = int, x = 1]
   | Anno  Exp Typ           -- (e::A)
   | ModE  Module            -- functor or struct
-  deriving (Eq, Show)
+  deriving (Show, Eq)
 
 data Literal 
   = LitInt  Int             -- 1, 2, etc.
   | LitBool Bool            -- false, true
   | LitStr  String          -- "hello"
-  deriving (Eq, Show)
+  deriving (Show, Eq)
 

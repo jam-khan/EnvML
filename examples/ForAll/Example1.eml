@@ -1,0 +1,17 @@
+(* Example 1: Basic Sandboxing *)
+
+module type SAFE_ENV = 
+  sig
+    val pi : int;;
+    val r  : int;;
+  end;;
+
+module safe_env : SAFE_ENV =
+  struct
+    let pi = 3.14;;
+    let r  = 1;;
+  end;;
+
+let secret : int = 17;;
+let x : int     = with safe_env in secret;;        (* Does not type checks *)
+let y : double  = with safe_env in pi * (r ** 2);; (* Pass *)

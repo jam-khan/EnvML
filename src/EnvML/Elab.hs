@@ -87,7 +87,7 @@ elabInferM ::
   -> EnvML.Module
   -> Either ElabError (EnvML.ModuleTyp, Core.Exp)
 -- Functor goes to lambdas.
-elabInferM _g (EnvML.Functor _m) = error "TODO"
+elabInferM _g (EnvML.Functor x _m) = error "TODO"
 -- Struct goes to FEnv.
 elabInferM _g (EnvML.Struct _c)     = error "TODO"
 -- Module Application shall have special types and goes to lambda app.
@@ -232,7 +232,7 @@ elabModInfer ::
   EnvML.TyEnv
   -> EnvML.Module
   -> Either ElabError (EnvML.ModuleTyp, Core.Exp)
-elabModInfer g (EnvML.Functor mod) = error "Functor elaboration to do."
+elabModInfer g (EnvML.Functor x mod) = error "Functor elaboration to do."
 elabModInfer g (EnvML.Struct  env) = error "Struct elaboration to do."
 elabModInfer g (EnvML.MApp m1 m2)  = error "Struct elaboration to do."
 elabModInfer g (EnvML.MLink m1 m2) = do
@@ -240,15 +240,18 @@ elabModInfer g (EnvML.MLink m1 m2) = do
   case t1 of
     {- t11 ->m t12 -}
     (EnvML.TyArrowM t11 t12) -> do
-      unless (elabModCheck m2 t11) $
+      unless (elabModCheck g m2 t11) $
         Left "M1 must be functor to link with M2."
+      (t2, e2) <- elabModInfer g m2 
       pure $ (t12, Core.App e1 e2)
     _ -> Left "M1 must be functor to link with M2."
 
 elabModCheck ::
   EnvML.TyEnv
   -> EnvML.Module
-  -> Either ElabError ()
+  -> EnvML.Typ
+  -> Bool
+elabModCheck = error "TODO"
 {- Utilities -}
 
 keyLen :: EnvML.TyEnv -> Int

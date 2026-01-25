@@ -1,0 +1,11 @@
+module type ENV =
+  sig
+    type t = int;;
+    inc : t -> t;;
+  end;;
+
+module env : ENV =
+  struct
+    type t = int;;
+    inc n = n + 1;;
+  end;;

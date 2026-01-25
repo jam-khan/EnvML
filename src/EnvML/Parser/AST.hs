@@ -37,7 +37,6 @@ data Typ
   | TyArr    Typ Typ        -- A -> B
   | TyAll    Name Typ       -- forall a'. T
   | TyBoxT   TyEnv Typ      -- [t1 : int, t2 : int, t3: bool] ==> A
-  | TySubstT Name Typ Typ   -- [x:=A] B % substitute x for A in B
   | TyRcd    String Typ     -- {l : A}
   | TyEnvt   TyEnv          -- [t : A, t1 : Type, t2 : A=]
   | TyModule ModuleTyp      -- Note: First-class modules   
@@ -68,8 +67,8 @@ data Module
 data Exp
   = Lit   Literal           -- Literals: int, double, bool, string
   | Var   Name              -- Var x, y, hello
-  | Lam   Name Typ Exp      -- fun (x: A) -> x + 1
-  | Clos  Env Name Typ Exp  -- clos [type t = int, x = 1] (y: t) -> x + y
+  | Lam   Name Exp      -- fun (x: A) -> x + 1
+  | Clos  Env Name Exp  -- clos [type t = int, x = 1] (y: t) -> x + y
   | App   Exp Exp           -- f(x)
   | TLam  Name Exp          -- fun type a' -> fun (x: a') -> x
   | TClos Env Name Exp      -- clos [type t = int, x = 1] -> 
@@ -98,7 +97,6 @@ typPrec t = case t of
   TyRcd _ _   -> 4
   TyEnvt _    -> 4
   TyModule _  -> 4
-  TySubstT {} -> 3
   TyArr _ _   -> 2
   TyBoxT _ _  -> 1
   TyAll _ _   -> 1
@@ -190,10 +188,6 @@ instance Show Typ where
     let sBinds = showTyEnv bs
         sTyp = parensIf (typPrec t < typPrec (TyBoxT bs t)) (show t)
     in "[" ++ sBinds ++ "] ===> " ++ sTyp
-  show (TySubstT x t1 t2) =
-    let s1 = show t1
-        s2 = parensIf (typPrec t2 < typPrec (TySubstT x t1 t2)) (show t2)
-    in "[" ++ x ++ ":=" ++ s1 ++ "]" ++ s2
   show (TyEnvt bs) = "[" ++ showTyEnv bs ++ "]"
   show (TyRcd label t) = "{" ++ label ++ " : " ++ show t ++ "}"
   show (TyModule mt) = show mt
@@ -226,10 +220,9 @@ instance Show Exp where
   show :: Exp -> String
   show (Lit l) = show l
   show (Var n) = n
-  show (Lam n t e) =
-    let sT = show t
-        sE = show e
-    in "fun (" ++ n ++ ": " ++ sT ++ ") -> " ++ sE
+  show (Lam n e) =
+    let sE = show e
+    in "fun (" ++ n ++ ") -> " ++ sE
   show (Box env e) =
     let sCets = showEnv env
         sE = parensIf (expPrec e < expPrec (Box env e)) (show e)
@@ -241,11 +234,10 @@ instance Show Exp where
   show (TLam n e) =
       let sE = show e
       in "fun type " ++ n ++ " -> " ++ sE
-  show (Clos cetList n t e) =
+  show (Clos cetList n e) =
     let sCets = showEnv cetList
-        sT = show t
-        sE = parensIf (expPrec e < expPrec (Clos cetList n t e)) (show e)
-    in "clos [" ++ sCets ++ "] (" ++ n ++ ": " ++ sT ++ ") -> " ++ sE
+        sE = parensIf (expPrec e < expPrec (Clos cetList n e)) (show e)
+    in "clos [" ++ sCets ++ "] (" ++ n ++ ") -> " ++ sE
   show (TClos cetList n e) =
     let sCets = showEnv cetList
         sE = parensIf (expPrec e < expPrec (TClos cetList n e)) (show e)

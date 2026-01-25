@@ -107,8 +107,8 @@ IntfE :: { IntfE }
 -------------------------------------------------------------------------
 
 Exp :: { Exp }
-  : fun '(' id ':' Typ ')' '->' Exp   { Lam $3 $5 $8 }
-  | clos '[' Env ']' '(' id ':' Typ ')' '->' Exp  { Clos $3 $6 $8 $11 }
+  : fun '(' id ')' '->' Exp   { Lam $3 $6 }
+  | clos '[' Env ']' '(' id ')' '->' Exp  { Clos $3 $6 $9 }
   | fun type id '->' Exp              { TLam $3 $5 }
   | clos '[' Env ']' type id '->' Exp  { TClos $3 $6 $8 }
   | box '[' Env ']' in Exp            { Box $3 $6 }
@@ -146,7 +146,6 @@ Typ :: { Typ }
    : BaseTyp '->' Typ                  { TyArr $1 $3 }
    | forall id '.' Typ                 { TyAll $2 $4 }
    | '[' TyEnv ']' '===>' Typ          { TyBoxT $2 $5 }
-   | '[' id ':=' Typ ']' Typ           { TySubstT $2 $4 $6 }
    | InterfaceBody                     { TyModule $1 }
    | BaseTyp                           { $1 }
 
