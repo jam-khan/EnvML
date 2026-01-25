@@ -1,0 +1,23 @@
+(* Example 2: Interesting Sandboxing *)
+
+let SECRET : string = "PRIVATE";;
+
+module type POLICY = 
+  sig 
+    log : string -> ()
+  end;;
+
+module guest_policy : POLICY =
+  struct
+    log : string -> () = fun (msg) -> print msg
+  end;;
+
+(* Type check: Pass *)
+let result : POLICY |> () =
+  box guest_policy in 
+    log("Printing...");;
+
+(* Type check: Fail *)
+let leak : POLICY |> () =
+  box guest_policy in
+    log(SECRET);;
