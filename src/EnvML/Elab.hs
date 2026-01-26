@@ -112,6 +112,8 @@ elabEnvE ::
   -> Either ElabError (EnvML.TyEnvE, Core.EnvE)
 elabEnvE _g (EnvML.ExpE _e) = error "Expression elaboration in environment to do."
 elabEnvE _g (EnvML.TypE _t) = error "Type elaboration in environment to do."
+elabEnvE _g (EnvML.ModExpE _m) = error "Module expression elaboration in environment to do."
+elabEnvE _g (EnvML.ModTypE _mt) = error "Module type elaboration in environment to do."
 
 elabLit ::
   EnvML.Literal
@@ -221,6 +223,10 @@ elabExpInfer g (EnvML.FEnv x) =
           t' <- elabTyp (g1 ++ g) t
           Right (EnvML.TyEnvt (EnvML.TypeEq t : g1), Core.FEnv (Core.TypE t' : d'))
         _ -> Left "Expected environment type in FEnv"  
+    (EnvML.ModExpE _ : _) ->
+      Left "Module expressions in FEnv elaboration: TO BE ADDED."
+    (EnvML.ModTypE _ : _)  ->
+        Left "Module types in FEnv elaboration: TO BE ADDED."
 elabExpInfer g (EnvML.Anno e t)   = do
     e' <- elabExpCheck g e t
     t' <- elabTyp g t
@@ -414,6 +420,8 @@ lvalue (EnvML.ExpE v : e) = lvalue e && value v
 lvalue (EnvML.TypE (EnvML.TyBoxT _ _) : e) =
   lvalue e
 lvalue (EnvML.TypE _ : _) = False
+lvalue (EnvML.ModExpE _ : _) = error "TODO: lvalue for ModExpE"
+lvalue (EnvML.ModTypE _ : _) = error "TODO: lvalue for ModTypE"
 
 lbIn ::
   String
