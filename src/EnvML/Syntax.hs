@@ -57,10 +57,12 @@ data EnvE
   deriving (Show, Eq)
 
 data Module
-  = Functor Typ Module      -- functor (x : A) struct x end
-  | Struct  Env             -- struct type a = int; x = 1 end
-  | MApp    Module Module   -- M1 M2
-  | MLink   Module Module   -- M1 |><| M2    
+  = VarM     Int             -- module variable
+  | Functor  Module          -- functor (x : A) struct x end    ~~> lambda
+  | Functort Module          -- functor (t : type) struct x end ~~> Big Lambda
+  | Struct   Env             -- struct type a = int; x = 1 end  ~~> Env
+  | MApp     Module Module   -- M1 ^ M2                         ~~> e1 e2
+  | MAppt    Module Typ      -- M1 ^ @A                         ~~> e1 @A
   deriving (Show, Eq)
 
 data Exp
