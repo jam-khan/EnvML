@@ -1,3 +1,5 @@
+(* Example 0: Basic modules *)
+
 module type ENV =
   sig
     type t = int;;
@@ -7,5 +9,7 @@ module type ENV =
 module env : ENV =
   struct
     type t = int;;
-    inc n = n + 1;;
+    inc : t -> t = fun n -> n + 1;;
   end;;
+
+let result : int = with env in inc(10);;

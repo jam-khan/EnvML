@@ -1,21 +1,36 @@
-(* Manifest types and Type Equalities *)
+(* Safe module concatenation *)
 
-module type ENV = 
-  sig 
-    type t = int;;
-    inc : t -> t;;
+module type M = 
+  sig
+    type t = bool;;
+    yes : t;;
+    no  : t;;
+    choose : t -> t -> t;;
   end;;
 
-functor env (i : int) : ENV =
+module m : M =
   struct
-    type t = int;;
-    inc (x : int) = x + i;;
+    type t   = bool;;
+    yes : t  = true;;
+    no  : t  = false;;
+    choose : t -> t -> t = fun l r -> if l then r else l;;
   end;;
 
-let id1 : int -> int =
-  with env (0) in
-    fun (x : t) -> inc (x);;
+module type N =
+  sig
+    type l = int;;
+    inc : l -> l;;
+  end;;
 
-let id2 : ENV |> int -> int =
-  with env (0) in
-    fun (x : t) -> inc (x);;
+module n : N =
+  struct
+    type l = int;;
+    inc : l -> l = fun x -> x + 1;;
+  end;;
+
+let M_N : ctx M, N |> (bool -> (int -> int)) =
+    box env m, n in
+      (fun b ->
+        (fun x -> if b == Yes then inc(x) else x
+        ):: (l -> l)
+      ) :: (bool -> (l -> l));;
