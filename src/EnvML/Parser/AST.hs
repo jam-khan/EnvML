@@ -276,7 +276,13 @@ instance Show Exp where
         sT = show t
      in sE ++ " :: " ++ sT
   show (ModE m) = show m
-  show _ = "Not Implemented yet" -- TODO: Extensions
+  show (BinOp op) = show op
+
+instance Show BinOp where
+  show :: BinOp -> String
+  show (Add e1 e2) = show e1 ++ " + " ++ show e2
+  show (Sub e1 e2) = show e1 ++ " - " ++ show e2
+  show _ = "<binop> not implemented"
 
 instance Show Literal where
   show :: Literal -> String

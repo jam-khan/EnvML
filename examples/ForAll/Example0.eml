@@ -12,4 +12,4 @@ module let env : ENV =
     let inc : t -> t = fun (n) -> n + 1;;
   end;;
 
--- let result : int = box env in inc(10);;
+ let result : int = box [x = env] in x.inc(10);;
