@@ -57,6 +57,9 @@ import EnvML.Parser.AST
   '}'       { TokRBrace }
   '<'       { TokLAngle }
   '>'       { TokRAngle }
+  '+'       { TokPlus   }
+  '-'       { TokDash   }
+  '*'       { TokStar   }
 
 %right '->'
 
@@ -76,8 +79,10 @@ ModuleEnv :: { Env }
 
 ModuleEnvElem :: { (Name, EnvE) }
   : let id '=' Exp ';;'   { ($2, ExpE $4) }
+  | let id ':' Typ '=' Exp ';;' { ($2, ExpE (Anno $6 $4)) }
   | type id '=' Typ ';;'  { ($2, TypE $4) }
   | module let id '=' Exp ';;' { ($3, ModExpE $5) }
+  | module let id ':' Typ '=' Exp ';;' { ($3, ModExpE (Anno $7 $5)) }
   | module type id '=' Typ ';;' { ($3, ModTypE $5) }
 
 ModuleImports :: { Imports }
@@ -98,7 +103,6 @@ ImportItem :: { (Name, Typ) }
 -- An interface file is implicitly a TySig containing a list of Intf elements
 InterfaceBody :: { ModuleTyp }
   : Intf { TySig $1 }
-  | sig Intf end {TySig $2 } -- allow explicit sig ... end
   | Typ '->m' InterfaceBody { TyArrowM $1 $3 }
 
 Intf :: { Intf }
@@ -122,6 +126,8 @@ Exp :: { Exp }
   | clos '[' Env ']' type id '->' Exp  { TClos $3 $6 $8 }
   | box '[' Env ']' in Exp            { Box $3 $6 }
   | Term '::' Typ                     { Anno $1 $3 }
+  | Exp '+' Exp                       { BinOp (Add $1 $3) }
+  | Exp '-' Exp                       { BinOp (Sub $1 $3) }
   | ModuleExp                         { ModE $1 }
   | Term                              { $1 }
 

@@ -232,6 +232,8 @@ elabExpInfer g (EnvML.Anno e t)   = do
     t' <- elabTyp g t
     Right (t, Core.Anno e' t')
 elabExpInfer _ (EnvML.ModE _) = Left "Modules infer elaboration: TO BE ADDED."
+elabExpInfer _ (EnvML.BinOp _) = Left "Binary operations infer elaboration: TO BE ADDED."
+elabExpInfer _ _ = Left "Expression inference elaboration: TO BE ADDED."
 
 -- Module elaborations
 elabModInfer ::

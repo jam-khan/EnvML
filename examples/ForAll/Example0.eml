@@ -1,11 +1,15 @@
+-- Example 0: Basic modules 
+
 module type ENV =
   sig
     type t = int;;
-    inc : t -> t;;
+    val inc : t -> t;;
   end;;
 
-module env : ENV =
+module let env : ENV =
   struct
     type t = int;;
-    inc n = n + 1;;
+    let inc : t -> t = fun (n) -> n + 1;;
   end;;
+
+-- let result : int = box env in inc(10);;

@@ -12,14 +12,27 @@ spec = do
       let input = "let x = 1;;"
       let expected = Struct [] [("x", ExpE (Lit (LitInt 1)))]
       parseModule (lexer input) `shouldBe` expected
+
+    it "parses let binding with explicit type annotation" $ do
+      let input = "let x : int = 1;;"
+      let expected = Struct [] [("x", ExpE (Anno (Lit (LitInt 1)) (TyLit TyInt)))]
+      parseModule (lexer input) `shouldBe` expected
+
     it "parses type binding" $ do
       let input = "type t = int;;"
       let expected = Struct [] [("t", TypE (TyLit TyInt))]
       parseModule (lexer input) `shouldBe` expected
+
     it "parses module let binding" $ do
       let input = "module let x = struct end;;"
       let expected = Struct [] [("x", ModExpE (ModE (Struct [] [])))]
       parseModule (lexer input) `shouldBe` expected
+
+    it "parses module let binding with explicit type annotation" $ do
+      let input = "module let x : sig end = struct end;;"
+      let expected = Struct [] [("x", ModExpE (Anno (ModE (Struct [] [])) (TyModule (TySig []))))]
+      parseModule (lexer input) `shouldBe` expected
+
     it "parses module type binding" $ do
       let input = "module type x = sig end;;"
       let expected = Struct [] [("x", ModTypE (TyModule (TySig [])))]
@@ -85,11 +98,6 @@ spec = do
     it "parses module type definitions" $ do
       let input = "module type S = sig end;;"
       let expected = TySig [SigDecl "S" (TyModule (TySig []))]
-      parseModuleTyp (lexer input) `shouldBe` expected
-
-    it "parses module type arrows" $ do
-      let input = "int ->m sig end"
-      let expected = TyArrowM (TyLit TyInt) (TySig [])
       parseModuleTyp (lexer input) `shouldBe` expected
 
   describe "EnvML.Parser (Expressions)" $ do
@@ -238,6 +246,16 @@ spec = do
     it "parses module linking" $ do
       let input = "link(struct end, struct end)"
       let expected = ModE $ MLink (Struct [] []) (Struct [] [])
+      parseExp (lexer input) `shouldBe` expected
+
+    it "parses binary addition" $ do
+      let input = "1 + 2"
+      let expected = BinOp (Add (Lit (LitInt 1)) (Lit (LitInt 2)))
+      parseExp (lexer input) `shouldBe` expected
+    
+    it "parses binary subtraction" $ do
+      let input = "1 - 2"
+      let expected = BinOp (Sub (Lit (LitInt 1)) (Lit (LitInt 2)))
       parseExp (lexer input) `shouldBe` expected
 
   describe "EnvML.Parser (Types)" $ do

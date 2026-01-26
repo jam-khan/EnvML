@@ -15,11 +15,11 @@ evalTests =
       Just (Lit (LitInt 42))
     ),
     ( "sub operation evaluates correctly",
-      Sub (Lit (LitInt 5)) (Lit (LitInt 3)),
+      BinOp $ Sub (Lit (LitInt 5)) (Lit (LitInt 3)),
       Just (Lit (LitInt 2))
     ),
     ( "mul operation evaluates correctly",
-      Mul (Lit (LitInt 4)) (Lit (LitInt 2)),
+      BinOp $ Mul (Lit (LitInt 4)) (Lit (LitInt 2)),
       Just (Lit (LitInt 8))
     ),
     ( "if expression evaluates correctly",
@@ -27,12 +27,12 @@ evalTests =
       Just (Lit (LitInt 1))
     ),
     ( "equality evaluates correctly",
-      Eq (Lit (LitInt 1)) (Lit (LitInt 2)),
+      BinOp $ EqEq (Lit (LitInt 1)) (Lit (LitInt 2)),
       Just (Lit (LitBool False))
     ),
     ( "function application",
       App
-        (Lam (Sub (Var 0) (Lit (LitInt 1))))
+        (Lam (BinOp $ Sub (Var 0) (Lit (LitInt 1))))
         (Lit (LitInt 5)),
       Just (Lit (LitInt 4))
     ),
@@ -40,7 +40,7 @@ evalTests =
       App
         ( Clos
             []
-            (Sub (Var 0) (Lit (LitInt 1)))
+            (BinOp $ Sub (Var 0) (Lit (LitInt 1)))
         )
         (Lit (LitInt 10)),
       Just (Lit (LitInt 9))
@@ -49,7 +49,7 @@ evalTests =
       App
         ( Clos
             [ExpE (Lit (LitInt 3))]
-            (Mul (Var 0) (Var 1))
+            (BinOp $ Mul (Var 0) (Var 1))
         )
         (Lit (LitInt 10)),
       Just (Lit (LitInt 30))
@@ -63,11 +63,11 @@ evalTests =
             Fix
               ( Lam
                   ( If
-                      (Eq (Var 0) (Lit (LitInt 0)))
+                      (BinOp $ EqEq (Var 0) (Lit (LitInt 0)))
                       (Lit (LitInt 1))
-                      ( Mul
+                      ( BinOp $ Mul
                           (Var 0)
-                          (App (Var 1) (Sub (Var 0) (Lit (LitInt 1))))
+                          (App (Var 1) (BinOp $ Sub (Var 0) (Lit (LitInt 1))))
                       )
                   )
               )
@@ -79,11 +79,11 @@ evalTests =
             Fix
               ( Lam
                   ( If
-                      (Eq (Var 0) (Lit (LitInt 0)))
+                      (BinOp $ EqEq (Var 0) (Lit (LitInt 0)))
                       (Var 2)
-                      ( Mul
+                      ( BinOp $ Mul
                           (Var 0)
-                          (App (Var 1) (Sub (Var 0) (Lit (LitInt 1))))
+                          (App (Var 1) (BinOp $ Sub (Var 0) (Lit (LitInt 1))))
                       )
                   )
               )

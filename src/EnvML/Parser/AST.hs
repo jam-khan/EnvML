@@ -83,6 +83,14 @@ data Exp
   | FEnv Env -- [type a = int, x = 1]
   | Anno Exp Typ -- (e::A)
   | ModE Module -- functor or struct
+  -- Extensions
+  | BinOp BinOp
+  deriving (Eq)
+
+data BinOp
+  = Add Exp Exp
+  | Sub Exp Exp
+  | Mul Exp Exp
   deriving (Eq)
 
 data Literal
@@ -120,6 +128,7 @@ expPrec e = case e of
   Rec _ _ -> 5
   FEnv _ -> 5
   ModE _ -> 5
+  _ -> 4 -- TODO: Extensions
 
 parensIf :: Bool -> String -> String
 parensIf True s = "(" ++ s ++ ")"
@@ -267,6 +276,7 @@ instance Show Exp where
         sT = show t
      in sE ++ " :: " ++ sT
   show (ModE m) = show m
+  show _ = "Not Implemented yet" -- TODO: Extensions
 
 instance Show Literal where
   show :: Literal -> String

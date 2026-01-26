@@ -111,6 +111,11 @@ elabModule ctx (N.MApp m1 m2) =
 elabModule ctx (N.MLink m1 m2) =
   D.MLink (elabModule ctx m1) (elabModule ctx m2)
 
+elabBinOp :: Ctx -> N.BinOp -> D.BinOp
+elabBinOp ctx (N.Add e1 e2) = D.Add (elabExp ctx e1) (elabExp ctx e2)
+elabBinOp ctx (N.Sub e1 e2) = D.Sub (elabExp ctx e1) (elabExp ctx e2)
+elabBinOp ctx (N.Mul e1 e2) = D.Mul (elabExp ctx e1) (elabExp ctx e2)
+
 elabExp :: Ctx -> N.Exp -> D.Exp
 elabExp _ (N.Lit l) =
   case l of
@@ -143,3 +148,5 @@ elabExp ctx (N.Anno e t) =
   D.Anno (elabExp ctx e) (elabTyp ctx t)
 elabExp ctx (N.ModE m) =
   D.ModE (elabModule ctx m)
+elabExp ctx (N.BinOp op) =
+  D.BinOp $ elabBinOp ctx op

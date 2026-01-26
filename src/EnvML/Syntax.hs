@@ -82,6 +82,14 @@ data Exp
   | FEnv  Env               -- [type a = int, x = 1]
   | Anno  Exp Typ           -- (e::A)
   | ModE  Module            -- functor or struct
+-- Extensions
+  | BinOp BinOp
+  deriving (Show, Eq)
+
+data BinOp
+  = Add Exp Exp
+  | Sub Exp Exp
+  | Mul Exp Exp
   deriving (Show, Eq)
 
 data Literal 
