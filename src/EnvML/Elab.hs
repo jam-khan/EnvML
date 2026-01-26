@@ -50,7 +50,7 @@ elabIntfE ::
 elabIntfE g (EnvML.TyDef t)       = Core.Type <$> elabTyp g t
 elabIntfE g (EnvML.ValDecl ty)    = Core.Type <$> elabTyp g ty
 elabIntfE g (EnvML.ModDecl intf)  = Core.Type <$> elabTyp g intf
-elabIntfE g (EnvML.SigDecl mty)   = Core.Type <$> elabModTyp g mty
+elabIntfE g (EnvML.SigDecl mty)   = Core.Type <$> elabTyp g mty
 
 elabTyp ::
   EnvML.TyEnv 

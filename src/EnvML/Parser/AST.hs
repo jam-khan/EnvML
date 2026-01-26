@@ -29,8 +29,8 @@ type Intf = [IntfE] -- (sig ... end) .eli
 data IntfE
   = TyDef Name Typ -- (type t = ...)
   | ValDecl Name Typ -- (val x : t)
-  | ModDecl Name Name -- (module M : S)
-  | SigDecl Name ModuleTyp -- (module type S = ...)
+  | ModDecl Name Typ -- (module M : S)
+  | SigDecl Name Typ -- (module type S = ...)
   deriving (Eq)
 
 data Typ
@@ -57,13 +57,15 @@ type Env = [(Name, EnvE)]
 data EnvE
   = ExpE Exp
   | TypE Typ
+  | ModExpE Exp
+  | ModTypE Typ
   deriving (Eq)
 
 data Module
   = Functor Name Typ Module -- functor (x : A) ->
   | Struct Imports Env -- struct type a = int; x = 1 end
   | MApp Module Module -- M1 M2
-  | MLink Module Module -- M1 |><| M2
+  | MLink Module Module -- link(M1, M2)
   deriving (Eq)
 
 data Exp
@@ -135,6 +137,8 @@ showTyBind (n, TypeEq t) = n ++ " = " ++ show t
 showEnvBind :: (Name, EnvE) -> String
 showEnvBind (n, ExpE e) = n ++ " = " ++ show e
 showEnvBind (n, TypE t) = "type " ++ n ++ " = " ++ show t
+showEnvBind (n, ModExpE m) = "module " ++ n ++ " = " ++ show m
+showEnvBind (n, ModTypE mt) = "module type " ++ n ++ " = " ++ show mt
 
 showEnv :: Env -> String
 showEnv [] = ""
@@ -171,7 +175,7 @@ instance Show IntfE where
   show :: IntfE -> String
   show (TyDef n t) = "type " ++ n ++ " = " ++ show t
   show (ValDecl n t) = "val " ++ n ++ " :  " ++ show t
-  show (ModDecl n1 n2) = "module " ++ n1 ++ " :  " ++ n2
+  show (ModDecl n m) = "module " ++ n ++ " :  " ++ show m
   show (SigDecl n mt) = "module type " ++ n ++ " = " ++ show mt
 
 instance Show Typ where

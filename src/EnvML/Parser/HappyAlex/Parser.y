@@ -77,6 +77,8 @@ ModuleEnv :: { Env }
 ModuleEnvElem :: { (Name, EnvE) }
   : let id '=' Exp ';;'   { ($2, ExpE $4) }
   | type id '=' Typ ';;'  { ($2, TypE $4) }
+  | module let id '=' Exp ';;' { ($3, ModExpE $5) }
+  | module type id '=' Typ ';;' { ($3, ModTypE $5) }
 
 ModuleImports :: { Imports }
   : import ImportList ';;'    { $2 }  
@@ -106,8 +108,8 @@ Intf :: { Intf }
 IntfE :: { IntfE }
   : val id ':' Typ ';;'  { ValDecl $2 $4 }
   | type id '=' Typ ';;' { TyDef $2 $4 }
-  | module id ':' id ';;' { ModDecl $2 $4 }  
-  | module type id '=' InterfaceBody ';;' { SigDecl $3 $5 }
+  | module id ':' Typ ';;' { ModDecl $2 $4 }  
+  | module type id '=' Typ ';;' { SigDecl $3 $5 }
 
 -------------------------------------------------------------------------
 -- Core Expressions and Types
@@ -154,6 +156,8 @@ Env :: { Env }
 EnvElem :: { (Name, EnvE) }
   : id '=' Exp            { ($1, ExpE $3) }
   | type id '=' Typ       { ($2, TypE $4) }
+  | module id '=' Exp     { ($2, ModExpE $4) }
+  | module type id '=' Typ { ($3, ModTypE $5) }
 
 Typ :: { Typ }
    : BaseTyp '->' Typ                  { TyArr $1 $3 }

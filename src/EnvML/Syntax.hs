@@ -25,8 +25,9 @@ type Intf = [IntfE]         -- (sig ... end) .eli
 data IntfE 
   = TyDef    Typ       -- (type t = ...)   
   | ValDecl  Typ       -- (val x : t)
+-- Note: ModDecl and SigDecl accept Typ because they can refer to variables
   | ModDecl  Typ       -- (module M : S)
-  | SigDecl  ModuleTyp -- (module type S = ...)
+  | SigDecl  Typ       -- (module type S = ...)
   deriving (Show, Eq)
 
 data Typ
@@ -54,6 +55,9 @@ type Env = [EnvE]
 data EnvE 
   = ExpE Exp 
   | TypE Typ
+-- Note: ModExpE and TypExpE accept Exp and Typ respectively because they can refer to variables
+  | ModExpE Exp
+  | ModTypE Typ
   deriving (Show, Eq)
 
 data Module

@@ -11,14 +11,19 @@ shouldParseSigAs :: IO ModuleTyp -> ModuleTyp -> Expectation
 shouldParseSigAs action expected = action `shouldReturn` expected
 
 spec :: Spec
-spec = describe "Feature: Basic Modules" $ do
+spec = do
+    describe "Basic Modules" $ do
 
-  it "parses x.eml" $ 
-    parseEmlFile "examples/basic-module/x.eml" `shouldParseAs` Struct []
-      [ ("x", ExpE (Lit (LitInt 1)))
-      ]
+      it "parses x.eml" $ 
+        parseEmlFile "examples/basic-module/x.eml" `shouldParseAs` Struct []
+          [ ("x", ExpE (Lit (LitInt 1)))
+          ]
 
-  it "parses x.emli" $ 
-    parseEmliFile "examples/basic-module/x.emli" `shouldParseSigAs` TySig 
-      [ ValDecl "x" (TyLit TyInt)
-      ]
+      it "parses x.emli" $ 
+        parseEmliFile "examples/basic-module/x.emli" `shouldParseSigAs` TySig 
+          [ ValDecl "x" (TyLit TyInt)
+          ]
+
+    -- describe "ForAll" $ do
+    --   it "parses Example0.eml"
+

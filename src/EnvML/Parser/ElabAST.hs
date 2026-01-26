@@ -74,8 +74,8 @@ elabIntfE :: Ctx -> N.IntfE -> D.IntfE
 elabIntfE ctx ie = case ie of
   N.TyDef _ t -> D.TyDef (elabTyp ctx t)
   N.ValDecl _ t -> D.ValDecl (elabTyp ctx t)
-  N.ModDecl _ s -> D.ModDecl (D.TyVar $ lookupVar s ctx)
-  N.SigDecl _ mt -> D.SigDecl (elabModuleTyp ctx mt)
+  N.ModDecl _ s -> D.ModDecl (elabTyp ctx s)
+  N.SigDecl _ mt -> D.SigDecl (elabTyp ctx mt)
 
 elabLitTyp :: N.TyLit -> D.TyLit
 elabLitTyp N.TyInt = D.TyInt
@@ -94,6 +94,8 @@ elabEnvE ctx e =
   case e of
     N.ExpE ex -> D.ExpE (elabExp ctx ex)
     N.TypE t -> D.TypE (elabTyp ctx t)
+    N.ModExpE m -> D.ModExpE (elabExp ctx m)
+    N.ModTypE mt -> D.ModTypE (elabTyp ctx mt)
 
 elabModule :: Ctx -> N.Module -> D.Module
 elabModule ctx (N.Functor n t m) =
