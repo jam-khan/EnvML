@@ -62,9 +62,11 @@ data EnvE
   deriving (Eq)
 
 data Module
-  = Functor FunArgs Module -- functor (x : A) ->
+  = VarM Name -- module variable
+  | Functor FunArgs Module -- functor (x : A) ->
   | Struct Imports Env -- struct type a = int; x = 1 end
-  | MApp Module Module -- M1 M2
+  | MApp Module Module -- M1 ^ M2
+  | MAppt Module Typ -- M1 ^ @A
   | MLink Module Module -- link(M1, M2)
   deriving (Eq)
 
@@ -89,8 +91,8 @@ data Exp
 type FunArgs = [(Name, FunArg)]
 
 data FunArg
-  = TyArg 
-  | TmArg 
+  = TyArg
+  | TmArg
   deriving (Eq)
 
 data BinOp
@@ -240,11 +242,16 @@ instance Show Module where
   show (MApp m1 m2) =
     let sM1 = show m1
         sM2 = show m2
-     in "(" ++ sM1 ++ ") (" ++ sM2 ++ ")"
+     in sM1 ++ " ^ " ++ sM2
   show (MLink m1 m2) =
     let sM1 = show m1
         sM2 = show m2
-     in "(" ++ sM1 ++ ") |><| (" ++ sM2 ++ ")"
+     in "link(" ++ sM1 ++ ", " ++ sM2 ++ ")"
+  show (MAppt m t) =
+    let sM = show m
+        sT = show t
+     in sM ++ " ^@ " ++ sT
+  show (VarM n) = n
 
 instance Show Exp where
   show :: Exp -> String

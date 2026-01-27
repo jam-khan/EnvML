@@ -66,7 +66,7 @@ data Module
   | Functort Module          -- functor (t : type) struct x end ~~> Big Lambda
   | Struct   Env             -- struct type a = int; x = 1 end  ~~> Env
   | MApp     Module Module   -- M1 ^ M2                         ~~> e1 e2
-  | MAppt    Module Typ      -- M1 ^ @A                         ~~> e1 @A
+  | MAppt    Module Typ      -- M1 ^@ A                         ~~> e1 @A
   deriving (Show, Eq)
 
 data Exp

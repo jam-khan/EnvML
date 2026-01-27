@@ -6,7 +6,7 @@ module EnvML.Parser.HappyAlex.Lexer (Token(..), lexer) where
 
 $digit = 0-9
 $alpha = [a-zA-Z]
-$alphanum = [a-zA-Z0-9]
+$alphanum = [a-zA-Z0-9_]
 
 tokens :-
   $white+     ;

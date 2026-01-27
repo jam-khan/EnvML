@@ -127,14 +127,16 @@ Exp :: { Exp }
   | Term '::' Typ                     { Anno $1 $3 }
   | Exp '+' Exp                       { BinOp (Add $1 $3) }
   | Exp '-' Exp                       { BinOp (Sub $1 $3) }
+  | Term                              { $1 } -- Regular Var take precedence over VarM when parsing Exp
   | ModuleExp                         { ModE $1 }
-  | Term                              { $1 }
 
 ModuleExp :: { Module }
   : struct ModuleImports ModuleEnv end { Struct $2 $3 }
-  | ModuleExp '(' ModuleExp ')'        { MApp $1 $3 }
+  | ModuleExp '(' ModuleExp ')'         { MApp $1 $3 }
+  | ModuleExp '<' Typ '>'        { MAppt $1 $3 }
   | link '(' ModuleExp ',' ModuleExp ')' { MLink $3 $5 }
   | functor FunArgs '->' ModuleExp      { Functor $2 $4 }
+  | id                                { VarM $1 }
   | '(' ModuleExp ')'                  { $2 }
 
 Term :: { Exp }

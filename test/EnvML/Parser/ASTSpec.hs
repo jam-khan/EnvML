@@ -80,14 +80,14 @@ prettyExpTests =
             (Functor [("X", TmArg)] (Struct [] []))
             (Struct [] [])
         ),
-      "(functor (X) -> struct  end) (struct  end)"
+      "functor (X) -> struct  end ^ struct  end"
     ),
     ( ModE
         ( MLink
             (Struct [] [])
             (Struct [] [])
         ),
-      "(struct  end) |><| (struct  end)"
+      "link(struct  end, struct  end)"
     ),
     ( RProj (ModE (Struct [] [])) "x",
       "struct  end.x"

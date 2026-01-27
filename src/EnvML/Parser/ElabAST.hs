@@ -98,23 +98,27 @@ elabEnvE ctx e =
     N.ModTypE mt -> D.ModTypE (elabTyp ctx mt)
 
 elabModule :: Ctx -> N.Module -> D.Module
--- elabModule ctx (N.Functor args m) =
---     let names = reverse $ map fst args
---         ctx' = names ++ ctx
---         f :: (N.Name, N.FunArg) -> D.Module -> D.Module
---         f (_, arg) acc = -- args cannot be dependent on each other for now
---           case arg of
---             N.TyArg -> D.Functort acc
---             N.TmArg -> D.Functor acc
---      in foldr f (elabModule ctx' m) args
--- elabModule ctx (N.Struct imps env) =
---     let binds = map fst imps
---         ctx' = reverse binds ++ ctx
---         structMod = D.Struct (elabEnv ctx' env)
---     in
---     foldr (\(_, t) modl -> D.Functor modl) structMod imps
--- elabModule ctx (N.MApp m1 m2) =
---   D.MApp (elabModule ctx m1) (elabModule ctx m2)
+elabModule ctx (N.Functor args m) =
+    let names = reverse $ map fst args
+        ctx' = names ++ ctx
+        f :: (N.Name, N.FunArg) -> D.Module -> D.Module
+        f (_, arg) acc = -- TODO: args cannot be dependent on each other for now
+          case arg of
+            N.TyArg -> D.Functort acc
+            N.TmArg -> D.Functor acc
+     in foldr f (elabModule ctx' m) args
+elabModule ctx (N.Struct imps env) =
+    let binds = map fst imps
+        ctx' = reverse binds ++ ctx
+        structMod = D.Struct (elabEnv ctx' env)
+    in
+    foldr (\(_, t) modl -> D.Functor modl) structMod imps -- TODO: users have to give explicit annotations for now (inference not implemented); import types not used
+elabModule ctx (N.MApp m1 m2) =
+  D.MApp (elabModule ctx m1) (elabModule ctx m2)
+elabModule ctx (N.MAppt m1 t) =
+  D.MAppt (elabModule ctx m1) (elabTyp ctx t)
+elabModule ctx (N.VarM x) =
+  D.VarM (lookupVar x ctx)
 elabModule _ _ = error "elabModule: Unsupported module form"
 
 elabBinOp :: Ctx -> N.BinOp -> D.BinOp
