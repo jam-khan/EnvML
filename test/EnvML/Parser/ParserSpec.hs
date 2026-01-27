@@ -46,7 +46,7 @@ spec = do
               [ ("x", ExpE (Lit (LitInt 1))),
                 ("t", TypE (TyLit TyInt)),
                 ("y", ModExpE (ModE (Struct [] []))),
-                ("m", ModTypE (TyModule (TySig []))) 
+                ("m", ModTypE (TyModule (TySig [])))
               ]
       parseModule (lexer input) `shouldBe` expected
 
@@ -235,12 +235,12 @@ spec = do
 
     it "parses functor definition" $ do
       let input = "functor (x) -> struct end"
-      let expected = ModE $ Functor [("x", TmArg )] (Struct [] [])
+      let expected = ModE $ Functor [("x", TmArg)] (Struct [] [])
       parseExp (lexer input) `shouldBe` expected
 
     it "parses module application" $ do
       let input = "(functor (x) -> struct end) (struct end)"
-      let expected = ModE $ MApp (Functor [("x", TmArg )] (Struct [] [])) (Struct [] [])
+      let expected = ModE $ MApp (Functor [("x", TmArg)] (Struct [] [])) (Struct [] [])
       parseExp (lexer input) `shouldBe` expected
 
     it "parses module linking" $ do
@@ -252,7 +252,7 @@ spec = do
       let input = "1 + 2"
       let expected = BinOp (Add (Lit (LitInt 1)) (Lit (LitInt 2)))
       parseExp (lexer input) `shouldBe` expected
-    
+
     it "parses binary subtraction" $ do
       let input = "1 - 2"
       let expected = BinOp (Sub (Lit (LitInt 1)) (Lit (LitInt 2)))
@@ -343,6 +343,6 @@ spec = do
       parseTyp (lexer input) `shouldBe` expected
 
     it "parses module type arrows" $ do
-        let input = "int ->m sig end"
-        let expected = TyModule $ TyArrowM (TyLit TyInt) (TySig [])
-        parseTyp (lexer input) `shouldBe` expected
+      let input = "int ->m sig end"
+      let expected = TyModule $ TyArrowM (TyLit TyInt) (TySig [])
+      parseTyp (lexer input) `shouldBe` expected

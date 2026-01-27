@@ -137,35 +137,59 @@ expPrec e = case e of
   ModE _ -> 5
   _ -> 4 -- TODO: Extensions
 
+class Pretty a where
+  pretty :: a -> String
+
+instance Pretty Typ where
+  pretty = prettyTyp
+
+instance Pretty Exp where
+  pretty = prettyExp
+
+instance Pretty Module where
+  pretty = prettyModule
+
+instance Pretty Literal where
+  pretty = prettyLiteral
+
+instance Pretty TyLit where
+  pretty = prettyTyLit
+
+instance Pretty TyEnvE where
+  pretty = prettyTyEnvE
+
+instance Pretty IntfE where
+  pretty = prettyIntfE
+
 parensIf :: Bool -> String -> String
-parensIf True s  = "(" ++ s ++ ")"
+parensIf True s = "(" ++ s ++ ")"
 parensIf False s = s
 
 prettyTyBind :: (Name, TyEnvE) -> String
-prettyTyBind (n, Type t)   = n ++ " : " ++ prettyTyp t
-prettyTyBind (n, Kind)     = n ++ " : Type"
+prettyTyBind (n, Type t) = n ++ " : " ++ prettyTyp t
+prettyTyBind (n, Kind) = n ++ " : Type"
 prettyTyBind (n, TypeEq t) = n ++ " = " ++ prettyTyp t
 
 prettyEnvBind :: (Name, EnvE) -> String
-prettyEnvBind (n, ExpE e)    = n ++ " = " ++ prettyExp e
-prettyEnvBind (n, TypE t)    = "type " ++ n ++ " = " ++ prettyTyp t
+prettyEnvBind (n, ExpE e) = n ++ " = " ++ prettyExp e
+prettyEnvBind (n, TypE t) = "type " ++ n ++ " = " ++ prettyTyp t
 prettyEnvBind (n, ModExpE e) = "module " ++ n ++ " = " ++ prettyExp e
-prettyEnvBind (n, ModTypE t)= "module type " ++ n ++ " = " ++ prettyTyp t
+prettyEnvBind (n, ModTypE t) = "module type " ++ n ++ " = " ++ prettyTyp t
 
 prettyEnv :: Env -> String
-prettyEnv []     = ""
-prettyEnv [b]    = prettyEnvBind b
-prettyEnv (b:bs) = prettyEnvBind b ++ ", " ++ prettyEnv bs
+prettyEnv [] = ""
+prettyEnv [b] = prettyEnvBind b
+prettyEnv (b : bs) = prettyEnvBind b ++ ", " ++ prettyEnv bs
 
 prettyIntf :: Intf -> String
-prettyIntf []     = ""
-prettyIntf [e]    = prettyIntfE e
-prettyIntf (e:es) = prettyIntfE e ++ "; " ++ prettyIntf es
+prettyIntf [] = ""
+prettyIntf [e] = prettyIntfE e
+prettyIntf (e : es) = prettyIntfE e ++ "; " ++ prettyIntf es
 
 prettyFunArgs :: FunArgs -> String
 prettyFunArgs [] = ""
 prettyFunArgs [arg] = "(" ++ prettyFunArg arg ++ ")"
-prettyFunArgs (arg:args) = "(" ++ prettyFunArg arg ++ ") " ++ prettyFunArgs args
+prettyFunArgs (arg : args) = "(" ++ prettyFunArg arg ++ ") " ++ prettyFunArgs args
 
 prettyFunArg :: (Name, FunArg) -> String
 prettyFunArg (n, TyArg) = n ++ " : Type"
@@ -173,23 +197,23 @@ prettyFunArg (n, TmArg) = n
 
 prettyModuleTyp :: ModuleTyp -> String
 prettyModuleTyp (TyArrowM t m) = "(" ++ prettyTyp t ++ " ->m " ++ prettyModuleTyp m ++ ")"
-prettyModuleTyp (TySig mt)     = "sig " ++ prettyIntf mt ++ " end"
+prettyModuleTyp (TySig mt) = "sig " ++ prettyIntf mt ++ " end"
 
 prettyTyEnv :: TyEnv -> String
-prettyTyEnv []     = ""
-prettyTyEnv [b]    = prettyTyBind b
-prettyTyEnv (b:bs) = prettyTyBind b ++ ", " ++ prettyTyEnv bs
+prettyTyEnv [] = ""
+prettyTyEnv [b] = prettyTyBind b
+prettyTyEnv (b : bs) = prettyTyBind b ++ ", " ++ prettyTyEnv bs
 
 prettyTyEnvE :: TyEnvE -> String
-prettyTyEnvE (Type t)   = prettyTyp t
-prettyTyEnvE Kind       = "Type"
+prettyTyEnvE (Type t) = prettyTyp t
+prettyTyEnvE Kind = "Type"
 prettyTyEnvE (TypeEq t) = "(" ++ prettyTyp t ++ ") ="
 
 prettyIntfE :: IntfE -> String
-prettyIntfE (TyDef n t)   = "type " ++ n ++ " = " ++ prettyTyp t
+prettyIntfE (TyDef n t) = "type " ++ n ++ " = " ++ prettyTyp t
 prettyIntfE (ValDecl n t) = "val " ++ n ++ " : " ++ prettyTyp t
 prettyIntfE (ModDecl n mt) = "module " ++ n ++ " : " ++ prettyTyp mt
-prettyIntfE (SigDecl n mt)= "module type " ++ n ++ " = " ++ prettyTyp mt
+prettyIntfE (SigDecl n mt) = "module type " ++ n ++ " = " ++ prettyTyp mt
 
 prettyTyp :: Typ -> String
 prettyTyp (TyLit l) = prettyTyLit l
@@ -203,23 +227,23 @@ prettyTyp (TyAll x t) =
    in "forall " ++ x ++ ". " ++ s
 prettyTyp (TyBoxT bs t) =
   let sBinds = prettyTyEnv bs
-      sTyp   = parensIf (typPrec t < typPrec (TyBoxT bs t)) (prettyTyp t)
+      sTyp = parensIf (typPrec t < typPrec (TyBoxT bs t)) (prettyTyp t)
    in "[" ++ sBinds ++ "] ===> " ++ sTyp
 prettyTyp (TyEnvt bs) = "[" ++ prettyTyEnv bs ++ "]"
 prettyTyp (TyRcd label t) = "{" ++ label ++ " : " ++ prettyTyp t ++ "}"
 prettyTyp (TyModule mt) = prettyModuleTyp mt
 
 prettyTyLit :: TyLit -> String
-prettyTyLit TyInt  = "int"
+prettyTyLit TyInt = "int"
 prettyTyLit TyBool = "bool"
-prettyTyLit TyStr  = "string"
+prettyTyLit TyStr = "string"
 
 prettyModule :: Module -> String
 prettyModule (Functor args e) =
   "functor " ++ prettyFunArgs args ++ " -> " ++ prettyModule e
 prettyModule (Struct imports env) =
   let sEnv = prettyEnv env
-      sImports = concatMap (\(n,t) -> "import " ++ n ++ " : " ++ prettyTyp t ++ "; ") imports
+      sImports = concatMap (\(n, t) -> "import " ++ n ++ " : " ++ prettyTyp t ++ "; ") imports
    in "struct " ++ sImports ++ sEnv ++ " end"
 prettyModule (MApp m1 m2) = prettyModule m1 ++ " ^ " ++ prettyModule m2
 prettyModule (MLink m1 m2) = "link(" ++ prettyModule m1 ++ ", " ++ prettyModule m2 ++ ")"
