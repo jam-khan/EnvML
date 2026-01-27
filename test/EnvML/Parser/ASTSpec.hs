@@ -3,7 +3,26 @@ module EnvML.Parser.ASTSpec (spec) where
 import EnvML.Parser.AST
 import Test.Hspec
 
--- Shorthands
+spec :: Spec
+spec = do
+  describe "prettyExp" $ do
+    mapM_ mkExpTest prettyExpTests
+
+  describe "prettyTyp" $ do
+    mapM_ mkTypTest prettyTypTests
+
+mkExpTest :: (Exp, String) -> SpecWith ()
+mkExpTest (input, expected) =
+  it ("pretty prints " ++ show input) $ do
+    let actual = prettyExp input
+    actual `shouldBe` expected
+
+mkTypTest :: (Typ, String) -> SpecWith ()
+mkTypTest (input, expected) =
+  it ("pretty prints " ++ show input) $ do
+    let actual = prettyTyp input
+    actual `shouldBe` expected
+
 int :: Typ
 int = TyLit TyInt
 
@@ -14,212 +33,50 @@ z = Var "z"
 
 prettyExpTests :: [(Exp, String)]
 prettyExpTests =
-  [ -- Literals
-    (Lit (LitInt 0), "0"),
-    (Lit (LitInt 42), "42"),
-    -- Variables
-    (Var "x", "x"),
-    -- Application
-    (App x y, "x(y)"),
-    (App (App x y) z, "x(y)(z)"),
-    (App x (App y z), "x(y(z))"),
-    -- Lambdas
-    (Lam [("x", TmArg)] x, "fun (x) -> x"),
-    (Lam [("x", TmArg)] (App x y), "fun (x) -> x(y)"),
-    ( App (Lam [("x", TmArg)] x) y,
-      "(fun (x) -> x)(y)"
-    ),
-    -- Type abstraction
-    (Lam [("a", TyArg)] x, "fun (a : Type) -> x"),
-    ( Lam [("x", TmArg)] (Lam [("a", TyArg)] x),
-      "fun (x) -> fun (a : Type) -> x"
-    ),
-    -- Type application
-    (TApp x int, "x<int>"),
-    (TApp (App x y) int, "x(y)<int>"),
-    (App (TApp x int) y, "x<int>(y)"),
-    -- Annotations
-    (Anno x int, "x :: int"),
-    (Anno (App x y) int, "x(y) :: int"),
-    (App (Anno x int) y, "(x :: int)(y)"),
-    -- Boxes
-    (Box [] x, "box [] in x"),
-    (Box [] (App x y), "box [] in x(y)"),
-    (App (Box [] x) y, "(box [] in x)(y)"),
-    -- Closures
-    (Clos [] "x" x, "clos [] (x) -> x"),
-    (App (Clos [] "x" x) y, "(clos [] (x) -> x)(y)"),
-    ( Clos [("x", ExpE x)] "y" (App x y),
-      "clos [x = x] (y) -> x(y)"
-    ),
-    -- Records
-    (Rec "x" (Lit (LitInt 42)), "{x = 42}"),
-    (RProj x "x", "x.x"),
-    (RProj (App x y) "x", "x(y).x"),
-    -- Environments
-    (FEnv [], "[]"),
-    (FEnv [("x", ExpE x)], "[x = x]"),
-    ( FEnv [("t", TypE int), ("x", ExpE (Lit (LitInt 42)))],
-      "[type t = int, x = 42]"
-    ),
-    -- Precedence tests
-    (App (RProj x "x") y, "x.x(y)"),
-    (Anno (RProj x "x") int, "x.x :: int"),
-    -- Module expressions
-    ( ModE (Struct [] []),
-      "struct  end"
-    ),
-    ( ModE (Struct [] [("x", ExpE (Lit (LitInt 1)))]),
-      "struct x = 1 end"
-    ),
-    ( ModE (Functor [("X", TmArg)] (Struct [] [])),
-      "functor (X) -> struct  end"
-    ),
-    ( ModE
-        ( MApp
-            (Functor [("X", TmArg)] (Struct [] []))
-            (Struct [] [])
-        ),
-      "functor (X) -> struct  end ^ struct  end"
-    ),
-    ( ModE
-        ( MLink
-            (Struct [] [])
-            (Struct [] [])
-        ),
-      "link(struct  end, struct  end)"
-    ),
-    ( RProj (ModE (Struct [] [])) "x",
-      "struct  end.x"
-    ),
-    ( Anno (ModE (Struct [] [])) (TyModule (TySig [])),
-      "struct  end :: sig  end"
-    ),
-    -- Precedence tests
-    ( App (Lam [("x", TmArg)] x) (Lam [("y", TmArg)] y),
-      "(fun (x) -> x)(fun (y) -> y)"
-    ),
-    ( App (Box [] (Lam [("x", TmArg)] x)) y,
-      "(box [] in fun (x) -> x)(y)"
-    ),
-    ( RProj (TApp x (TyVar "A")) "l",
-      "x<A>.l"
-    ),
-    ( Anno (App (TApp x int) y) int,
-      "x<int>(y) :: int"
-    ),
-    ( App (Anno x int) (Anno y int),
-      "(x :: int)(y :: int)"
-    )
+  [ (Lit (LitInt 0), "0")
+  , (Lit (LitInt 42), "42")
+  , (Var "x", "x")
+  , (App x y, "x(y)")
+  , (App (App x y) z, "x(y)(z)")
+  , (App x (App y z), "x(y(z))")
+  , (Lam [("x", TmArg)] x, "fun (x) -> x")
+  , (Lam [("x", TmArg)] (App x y), "fun (x) -> x(y)")
+  , (App (Lam [("x", TmArg)] x) y, "(fun (x) -> x)(y)")
+  , (Lam [("a", TyArg)] x, "fun (a : Type) -> x")
+  , (Lam [("x", TmArg)] (Lam [("a", TyArg)] x), "fun (x) -> fun (a : Type) -> x")
+  , (TApp x int, "x<int>")
+  , (TApp (App x y) int, "x(y)<int>")
+  , (App (TApp x int) y, "x<int>(y)")
+  , (Anno x int, "x :: int")
+  , (Anno (App x y) int, "x(y) :: int")
+  , (App (Anno x int) y, "(x :: int)(y)")
+  , (Box [] x, "box [] in x")
+  , (Box [] (App x y), "box [] in x(y)")
+  , (App (Box [] x) y, "(box [] in x)(y)")
+  , (Clos [] "x" x, "clos [] (x) -> x")
+  , (App (Clos [] "x" x) y, "(clos [] (x) -> x)(y)")
+  , (Clos [("x", ExpE x)] "y" (App x y), "clos [x = x] (y) -> x(y)")
+  , (Rec "x" (Lit (LitInt 42)), "{x = 42}")
+  , (RProj x "x", "x.x")
+  , (RProj (App x y) "x", "x(y).x")
+  , (FEnv [], "[]")
+  , (FEnv [("x", ExpE x)], "[x = x]")
+  , (FEnv [("t", TypE int), ("x", ExpE (Lit (LitInt 42)))], "[type t = int, x = 42]")
   ]
-
-a, b, c :: Typ
-a = TyVar "a"
-b = TyVar "b"
-c = TyVar "c"
 
 prettyTypTests :: [(Typ, String)]
 prettyTypTests =
-  [ -- Base types
-    (int, "int"),
-    (TyVar "x", "x"),
-    -- Arrow types
-    (TyArr int int, "(int -> int)"),
-    (TyArr a b, "(a -> b)"),
-    (TyArr int (TyArr int int), "(int -> (int -> int))"),
-    (TyArr (TyArr int int) int, "((int -> int) -> int)"),
-    ( TyArr a (TyArr b c),
-      "(a -> (b -> c))"
-    ),
-    ( TyArr (TyArr a b) c,
-      "((a -> b) -> c)"
-    ),
-    -- Forall types
-    ( TyAll "a" a,
-      "forall a. a"
-    ),
-    ( TyAll "a" (TyArr a a),
-      "forall a. (a -> a)"
-    ),
-    ( TyAll "a" (TyAll "b" (TyArr a b)),
-      "forall a. forall b. (a -> b)"
-    ),
-    ( TyArr (TyAll "a" a) int,
-      "((forall a. a) -> int)"
-    ),
-    ( TyAll "a" (TyArr int a),
-      "forall a. (int -> a)"
-    ),
-    -- Record types
-    ( TyRcd "x" int,
-      "{x : int}"
-    ),
-    ( TyRcd "f" (TyArr int int),
-      "{f : (int -> int)}"
-    ),
-    ( TyRcd "r" (TyAll "a" a),
-      "{r : forall a. a}"
-    ),
-    -- Environment types
-    ( TyEnvt [],
-      "[]"
-    ),
-    ( TyEnvt [("x", Type int)],
-      "[x : int]"
-    ),
-    ( TyEnvt [("A", Kind)],
-      "[A : Type]"
-    ),
-    ( TyEnvt [("T", TypeEq a)],
-      "[T = a]"
-    ),
-    ( TyEnvt [("x", Type int), ("y", Type a)],
-      "[x : int, y : a]"
-    ),
-    ( TyEnvt [("A", Kind), ("T", TypeEq b), ("x", Type int)],
-      "[A : Type, T = b, x : int]"
-    ),
-    -- Box types
-    ( TyBoxT [] int,
-      "[] ===> int"
-    ),
-    ( TyBoxT [("x", Type int)] a,
-      "[x : int] ===> a"
-    ),
-    ( TyBoxT [("x", Type int), ("y", Type b)] c,
-      "[x : int, y : b] ===> c"
-    ),
-    ( TyArr (TyBoxT [] int) int,
-      "(([] ===> int) -> int)"
-    ),
-    ( TyBoxT [] (TyArr int int),
-      "[] ===> (int -> int)"
-    ),
-    -- Module types
-    ( TyModule (TySig []),
-      "sig  end"
-    ),
-    ( TyModule (TySig [TyDef "t" int]),
-      "sig type t = int end"
-    ),
-    ( TyModule (TyArrowM int (TySig [])),
-      "(int ->m sig  end)"
-    ),
-    ( TyModule (TyArrowM (TyArr int int) (TySig [])),
-      "((int -> int) ->m sig  end)"
-    ),
-    ( TyArr int (TyModule (TyArrowM int (TySig []))),
-      "(int -> (int ->m sig  end))"
-    )
+  [ (int, "int")
+  , (TyVar "x", "x")
+  , (TyArr int int, "(int -> int)")
+  , (TyArr int (TyArr int int), "(int -> (int -> int))")
+  , (TyArr (TyArr int int) int, "((int -> int) -> int)")
+  , (TyAll "a" a, "forall a. a")
+  , (TyAll "a" (TyArr a a), "forall a. (a -> a)")
+  , (TyRcd "x" int, "{x : int}")
+  , (TyEnvt [("x", Type int)], "[x : int]")
+  , (TyBoxT [] int, "[] ===> int")
+  , (TyModule (TySig []), "sig  end")
   ]
-
-spec :: Spec
-spec = do
-  describe "Pretty.show" $
-    mapM_ mkTest prettyExpTests
-  describe "Pretty.show" $
-    mapM_ mkTest prettyTypTests
   where
-    mkTest (x, expected) =
-      it ("prints " ++ show x) $
-        show x `shouldBe` expected
+    a = TyVar "a"
