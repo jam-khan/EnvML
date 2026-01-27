@@ -1,4 +1,4 @@
-(* Example 2: Manifest types and Type Equalities *)
+-- Example 2: Manifest types and Type Equalities
 
 module type ENV = 
   sig 
@@ -6,16 +6,23 @@ module type ENV =
     inc : t -> t;;
   end;;
 
-functor env (i : int) : ENV =
-  struct
-    type t = int;;
-    inc (x : int) = x + i;;
-  end;;
+--functor env (i : int) : ENV =
+--  struct
+--    type t = int;;
+--    inc (x : int) = x + i;;
+--  end;;
+
+module let env : int ->m ENV = 
+    functor (i : int) ->
+        struct 
+            type t = int;;
+            let inc (x : t) = x + i;;
+        end;;
 
 let id1 : int -> int =
-  with env (0) in
+  box env (0) in
     fun (x : t) -> inc (x);;
 
 let id2 : ENV |> int -> int =
-  with env (0) in
+  box env (0) in
     fun (x : t) -> inc (x);;
