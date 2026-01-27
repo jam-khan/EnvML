@@ -98,18 +98,23 @@ elabEnvE ctx e =
     N.ModTypE mt -> D.ModTypE (elabTyp ctx mt)
 
 elabModule :: Ctx -> N.Module -> D.Module
--- elabModule ctx (N.Functor n t m) =
---   D.Functor (elabTyp ctx t) (elabModule (n : ctx) m)
+-- elabModule ctx (N.Functor args m) =
+--     let names = reverse $ map fst args
+--         ctx' = names ++ ctx
+--         f :: (N.Name, N.FunArg) -> D.Module -> D.Module
+--         f (_, arg) acc = -- args cannot be dependent on each other for now
+--           case arg of
+--             N.TyArg -> D.Functort acc
+--             N.TmArg -> D.Functor acc
+--      in foldr f (elabModule ctx' m) args
 -- elabModule ctx (N.Struct imps env) =
 --     let binds = map fst imps
 --         ctx' = reverse binds ++ ctx
 --         structMod = D.Struct (elabEnv ctx' env)
 --     in
---     foldr (\(_, t) modl -> D.Functor (elabTyp ctx t) modl) structMod imps
+--     foldr (\(_, t) modl -> D.Functor modl) structMod imps
 -- elabModule ctx (N.MApp m1 m2) =
 --   D.MApp (elabModule ctx m1) (elabModule ctx m2)
--- elabModule ctx (N.MLink m1 m2) =
---   D.MLink (elabModule ctx m1) (elabModule ctx m2)
 elabModule _ _ = error "elabModule: Unsupported module form"
 
 elabBinOp :: Ctx -> N.BinOp -> D.BinOp
@@ -124,14 +129,19 @@ elabExp _ (N.Lit l) =
     N.LitBool b -> D.Lit (D.LitBool b)
     N.LitStr s -> D.Lit (D.LitStr s)
 elabExp ctx (N.Var x) = D.Var (lookupVar x ctx)
-elabExp ctx (N.Lam a e) =
-  D.Lam (elabExp (a : ctx) e)
+elabExp ctx (N.Lam args e) =
+    let names = reverse $ map fst args
+        e' = elabExp (names ++ ctx) e
+        f :: (N.Name, N.FunArg) -> D.Exp -> D.Exp
+        f (_, arg) acc = -- args cannot be dependent on each other for now
+          case arg of
+            N.TyArg -> D.TLam acc
+            N.TmArg -> D.Lam acc
+     in foldr f e' args
 elabExp ctx (N.Clos env a e) =
   D.Clos (elabEnv ctx env) (elabExp (a : ctx) e)
 elabExp ctx (N.App e1 e2) =
   D.App (elabExp ctx e1) (elabExp ctx e2)
-elabExp ctx (N.TLam a e) =
-  D.TLam (elabExp (a : ctx) e)
 elabExp ctx (N.TClos env a e) =
   D.TClos (elabEnv ctx env) (elabExp (a : ctx) e)
 elabExp ctx (N.TApp e t) =

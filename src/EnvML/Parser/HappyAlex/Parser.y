@@ -120,9 +120,8 @@ IntfE :: { IntfE }
 -------------------------------------------------------------------------
 
 Exp :: { Exp }
-  : fun '(' id ')' '->' Exp   { Lam $3 $6 }
+  : fun FunArgs '->' Exp   { Lam $2 $4 }
   | clos '[' Env ']' '(' id ')' '->' Exp  { Clos $3 $6 $9 }
-  | fun type id '->' Exp              { TLam $3 $5 }
   | clos '[' Env ']' type id '->' Exp  { TClos $3 $6 $8 }
   | box '[' Env ']' in Exp            { Box $3 $6 }
   | Term '::' Typ                     { Anno $1 $3 }
@@ -135,7 +134,7 @@ ModuleExp :: { Module }
   : struct ModuleImports ModuleEnv end { Struct $2 $3 }
   | ModuleExp '(' ModuleExp ')'        { MApp $1 $3 }
   | link '(' ModuleExp ',' ModuleExp ')' { MLink $3 $5 }
-  | functor '(' id ':' Typ ')' '->' ModuleExp  { Functor $3 $5 $8 }
+  | functor FunArgs '->' ModuleExp      { Functor $2 $4 }
   | '(' ModuleExp ')'                  { $2 }
 
 Term :: { Exp }
@@ -153,6 +152,14 @@ Atom :: { Exp }
   | '{' id '=' Exp '}'                { Rec $2 $4 }
   | '[' Env ']'                       { FEnv $2 }
   | '(' Exp ')'                       { $2 }
+
+FunArgs :: { FunArgs }
+  : '(' FunArg ')' ',' FunArgs                 { $2 : $5 }
+  | '(' FunArg ')'                             { [$2] }
+
+FunArg :: { (Name, FunArg) }
+  : id ':' Type                       { ($1, TyArg)    }
+  | id                                { ($1, TmArg)    }
 
 Env :: { Env }
   : EnvElem ',' Env  { $1 : $3 }

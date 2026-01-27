@@ -62,7 +62,7 @@ data EnvE
   deriving (Eq)
 
 data Module
-  = Functor Name Typ Module -- functor (x : A) ->
+  = Functor FunArgs Module -- functor (x : A) ->
   | Struct Imports Env -- struct type a = int; x = 1 end
   | MApp Module Module -- M1 M2
   | MLink Module Module -- link(M1, M2)
@@ -71,10 +71,9 @@ data Module
 data Exp
   = Lit Literal -- Literals: int, double, bool, string
   | Var Name -- Var x, y, hello
-  | Lam Name Exp -- fun (x: A) -> x + 1
+  | Lam FunArgs Exp -- fun (x: A) (y : B) -> x + 1
   | Clos Env Name Exp -- clos [type t = int, x = 1] (y: t) -> x + y
   | App Exp Exp -- f(x)
-  | TLam Name Exp -- fun type a' -> fun (x: a') -> x
   | TClos Env Name Exp -- clos [type t = int, x = 1] ->
   | TApp Exp Typ -- f<t>
   | Box Env Exp -- box [type t = int, x = 1] in e
@@ -85,6 +84,13 @@ data Exp
   | ModE Module -- functor or struct
   -- Extensions
   | BinOp BinOp
+  deriving (Eq)
+
+type FunArgs = [(Name, FunArg)]
+
+data FunArg
+  = TyArg 
+  | TmArg 
   deriving (Eq)
 
 data BinOp
@@ -119,7 +125,6 @@ expPrec e = case e of
   Clos {} -> 1
   TClos {} -> 1
   Lam {} -> 2
-  TLam {} -> 2
   App _ _ -> 3
   TApp _ _ -> 3
   RProj _ _ -> 3
@@ -158,6 +163,15 @@ showIntf :: Intf -> String
 showIntf [] = ""
 showIntf [e] = show e
 showIntf (e : es) = show e ++ "; " ++ showIntf es
+
+showFunArgs :: FunArgs -> String
+showFunArgs [] = ""
+showFunArgs [arg] = "(" ++ showFunArg arg ++ ")"
+showFunArgs (arg : args) = "(" ++ showFunArg arg ++ ") " ++ showFunArgs args
+
+showFunArg :: (Name, FunArg) -> String
+showFunArg (n, TyArg) = n ++ " : Type"
+showFunArg (n, TmArg) = n
 
 instance Show ModuleTyp where
   show :: ModuleTyp -> String
@@ -214,10 +228,10 @@ instance Show TyLit where
 
 instance Show Module where
   show :: Module -> String
-  show (Functor n t m) =
-    let sT = show t
-        sM = show m
-     in "functor (" ++ n ++ " : " ++ sT ++ ") " ++ sM
+  show (Functor args e) =
+    let sArgs = showFunArgs args
+        sE = show e
+     in "functor " ++ sArgs ++ " -> " ++ sE
   show (Struct imports env) =
     let sEnv = showEnv env
         showImport (n, t) = "import " ++ n ++ " : " ++ show t ++ "; "
@@ -236,9 +250,10 @@ instance Show Exp where
   show :: Exp -> String
   show (Lit l) = show l
   show (Var n) = n
-  show (Lam n e) =
-    let sE = show e
-     in "fun (" ++ n ++ ") -> " ++ sE
+  show (Lam args e) =
+    let sArgs = showFunArgs args
+        sE = parensIf (expPrec e < expPrec (Lam args e)) (show e)
+     in "fun " ++ sArgs ++ " -> " ++ sE
   show (Box env e) =
     let sCets = showEnv env
         sE = parensIf (expPrec e < expPrec (Box env e)) (show e)
@@ -247,9 +262,6 @@ instance Show Exp where
     let s1 = parensIf (expPrec e1 < expPrec (App e1 e2)) (show e1)
         s2 = show e2
      in s1 ++ "(" ++ s2 ++ ")"
-  show (TLam n e) =
-    let sE = show e
-     in "fun type " ++ n ++ " -> " ++ sE
   show (Clos cetList n e) =
     let sCets = showEnv cetList
         sE = parensIf (expPrec e < expPrec (Clos cetList n e)) (show e)

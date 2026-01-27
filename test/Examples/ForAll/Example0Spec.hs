@@ -34,7 +34,7 @@ spec = do
                         ( "inc",
                           ExpE
                             ( Anno
-                                (Lam "n" (BinOp $ Add (Var "n") (Lit (LitInt 1))))
+                                (Lam [("n", TmArg)] (BinOp $ Add (Var "n") (Lit (LitInt 1))))
                                 (TyArr (TyVar "t") (TyVar "t"))
                             )
                         )

@@ -118,12 +118,12 @@ spec = do
 
     it "parses lambda functions" $ do
       let input = "fun (x) -> x"
-      let expected = Lam "x" (Var "x")
+      let expected = Lam [("x", TmArg)] (Var "x")
       parseExp (lexer input) `shouldBe` expected
 
     it "parses nested lambda functions" $ do
       let input = "fun (x) -> fun (y) -> y"
-      let expected = Lam "x" (Lam "y" (Var "y"))
+      let expected = Lam [("x", TmArg)] (Lam [("y", TmArg)] (Var "y"))
       parseExp (lexer input) `shouldBe` expected
 
     it "parses closure" $ do
@@ -157,13 +157,13 @@ spec = do
       parseExp (lexer input) `shouldBe` expected
 
     it "parses type lambda functions" $ do
-      let input = "fun type a -> x"
-      let expected = TLam "a" (Var "x")
+      let input = "fun (a : Type) -> x"
+      let expected = Lam [("a", TyArg)] (Var "x")
       parseExp (lexer input) `shouldBe` expected
 
     it "parses nested type lambda functions" $ do
-      let input = "fun type x -> fun type y -> y"
-      let expected = TLam "x" (TLam "y" (Var "y"))
+      let input = "fun (x : Type) -> fun (y : Type) -> y"
+      let expected = Lam [("x", TyArg)] (Lam [("y", TyArg)] (Var "y"))
       parseExp (lexer input) `shouldBe` expected
 
     it "parses type closure" $ do
@@ -230,17 +230,17 @@ spec = do
               [ ("t", TypE (TyLit TyInt)),
                 ("x", ExpE (Lit (LitInt 1)))
               ]
-              (Lam "y" (Var "x"))
+              (Lam [("y", TmArg)] (Var "x"))
       parseExp (lexer input) `shouldBe` expected
 
     it "parses functor definition" $ do
-      let input = "functor (x : sig end) -> struct end"
-      let expected = ModE $ Functor "x" (TyModule (TySig [])) (Struct [] [])
+      let input = "functor (x) -> struct end"
+      let expected = ModE $ Functor [("x", TmArg )] (Struct [] [])
       parseExp (lexer input) `shouldBe` expected
 
     it "parses module application" $ do
-      let input = "(functor (x : sig end) -> struct end) (struct end)"
-      let expected = ModE $ MApp (Functor "x" (TyModule (TySig [])) (Struct [] [])) (Struct [] [])
+      let input = "(functor (x) -> struct end) (struct end)"
+      let expected = ModE $ MApp (Functor [("x", TmArg )] (Struct [] [])) (Struct [] [])
       parseExp (lexer input) `shouldBe` expected
 
     it "parses module linking" $ do
