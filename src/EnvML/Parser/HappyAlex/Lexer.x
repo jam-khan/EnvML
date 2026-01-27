@@ -52,6 +52,7 @@ tokens :-
   ";"         { \_ -> TokSemi     }
   ";;"        { \_ -> TokSemiSemi }
   "::"        { \_ -> TokDoubleColon}
+  "@"         { \_ -> TokTypeApp  }
   "->"        { \_ -> TokArrow    }
   "->m"       { \_ -> TokArrowM   }
   "===>"      { \_ -> TokTripleArrow}
@@ -109,6 +110,7 @@ data Token
   | TokArrowM
   | TokTripleArrow
   | TokDoubleColon
+  | TokTypeApp
   | TokColonEqual
   | TokLink
   | TokPlus

@@ -27,6 +27,7 @@ import EnvML.Parser.AST
   id        { TokVar $$ }
   num       { TokInt $$ }
   fun       { TokFun   }
+  typeApp   { TokTypeApp }
   clos      { TokClos  }
   box       { TokBox   }
   in        { TokIn    }
@@ -131,11 +132,13 @@ Exp :: { Exp }
   | Term                              { $1 }
 
 ModuleExp :: { Module }
-  : struct ModuleImports ModuleEnv end { Struct $2 $3 }
-  | ModuleExp '(' ModuleExp ')'        { MApp $1 $3 }
-  | link '(' ModuleExp ',' ModuleExp ')' { MLink $3 $5 }
-  | functor FunArgs '->' ModuleExp      { Functor $2 $4 }
-  | '(' ModuleExp ')'                  { $2 }
+  : id                                    { VarM $1 } -- Add this
+  | struct ModuleImports ModuleEnv end    { Struct $2 $3  }
+  | ModuleExp '(' ModuleExp ')'           { MApp $1 $3    }
+  | ModuleExp '(' typeApp Type ')'        { MAppt $1 $4   }
+  | link '(' ModuleExp ',' ModuleExp ')'  { MLink $3 $5   }
+  | functor FunArgs '->' ModuleExp        { Functor $2 $4 }
+  | '(' ModuleExp ')'                     { $2 }
 
 Term :: { Exp }
   : Term '(' Atom ')'                   { App $1 $3 }
@@ -147,7 +150,7 @@ Atom :: { Exp }
   : num                               { Lit (LitInt $1) }
   | str                               { Lit (LitStr $1) }
   | true                              { Lit (LitBool True) }
-  | false                              { Lit (LitBool False) }
+  | false                             { Lit (LitBool False) }
   | id                                { Var $1 }
   | '{' id '=' Exp '}'                { Rec $2 $4 }
   | '[' Env ']'                       { FEnv $2 }
