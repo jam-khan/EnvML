@@ -1,5 +1,4 @@
 (* Safe module concatenation *)
-
 module type M = 
   sig
     type t = bool;;
@@ -16,21 +15,15 @@ module m : M =
     choose : t -> t -> t = fun l r -> if l then r else l;;
   end;;
 
-module type N =
-  sig
-    type l = int;;
-    inc : l -> l;;
-  end;;
+type INC = int -> int;;
+let inc  : INC = fun x -> x + 1;;
 
-module n : N =
-  struct
-    type l = int;;
-    inc : l -> l = fun x -> x + 1;;
-  end;;
+type M3 = ctx M, INC;;
+let m3 : M3 = env m, inc;;
 
-let M_N : ctx M, N |> (bool -> (int -> int)) =
-    box env m, n in
+let M_N : M3 |> (bool -> INC) =
+    box m3 in
       (fun b ->
         (fun x -> if b == Yes then inc(x) else x
-        ):: (l -> l)
-      ) :: (bool -> (l -> l));;
+        ):: INC
+      ) :: (bool -> INC);;
