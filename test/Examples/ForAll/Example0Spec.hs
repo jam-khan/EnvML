@@ -5,12 +5,12 @@
 module Examples.ForAll.Example0Spec where
 
 import qualified CoreForAll.Syntax as C
-import Data.Either (isLeft, isRight)
 import qualified EnvML.Elab as ElabD
-import qualified EnvML.Parser.AST as N
-import qualified EnvML.Parser.ElabAST as ElabN
-import EnvML.Parser.Parse (parseEmlFile)
 import qualified EnvML.Syntax as D
+import qualified EnvML.Parser.ElabAST as ElabN
+import qualified EnvML.Parser.AST as N
+import Data.Either (isLeft, isRight)
+import EnvML.Parser.Parse (parseEmlFile)
 import Test.Hspec
 
 examplePath :: String
@@ -25,7 +25,7 @@ spec = do
 
     it "pre-processes (de-bruijn transform + de-sugar) successfully" $ do
       let astElabExpr = ElabN.elabModule [] parsedData
-      astElabExpr `shouldBe` (expectedEnvMLExpr)
+      astElabExpr `shouldBe` expectedEnvMLExpr
 
     it "elaborates successfully" $ do
       let envMLElabExpr = ElabD.elabM expectedEnvMLExpr
