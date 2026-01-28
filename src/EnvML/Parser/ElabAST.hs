@@ -97,13 +97,12 @@ elabEnvE ctx e =
 
 elabModule :: Ctx -> N.Module -> D.Module
 elabModule ctx (N.Functor n t m) =
-  D.Functor (elabTyp ctx t) (elabModule (n : ctx) m)
+  D.Functor (elabModule (n : ctx) m)
 elabModule ctx (N.Struct env) =
   D.Struct (elabEnv ctx env)
 elabModule ctx (N.MApp m1 m2) =
   D.MApp (elabModule ctx m1) (elabModule ctx m2)
-elabModule ctx (N.MLink m1 m2) =
-  D.MLink (elabModule ctx m1) (elabModule ctx m2)
+
 
 elabExp :: Ctx -> N.Exp -> D.Exp
 elabExp _ (N.Lit l) =
