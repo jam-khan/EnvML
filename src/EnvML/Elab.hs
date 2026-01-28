@@ -1,131 +1,138 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
 module EnvML.Elab where
 
-import qualified  CoreForAll.Syntax as Core
-import qualified  EnvML.Syntax as EnvML
+import qualified CoreForAll.Syntax as Core
+import qualified EnvML.Syntax as EnvML
+
 -- import            Control.Monad (unless)
 
 type ElabError = String
 
 elabTyEnv ::
-  EnvML.TyEnv
-  -> Either ElabError Core.TyEnv
-elabTyEnv []     = pure []
-elabTyEnv (x:xs)  = do
-  x'  <- elabTyEnvE x
+  EnvML.TyEnv ->
+  Either ElabError Core.TyEnv
+elabTyEnv [] = pure []
+elabTyEnv (x : xs) = do
+  x' <- elabTyEnvE x
   xs' <- elabTyEnv xs
-  Right $ x':xs'
+  Right $ x' : xs'
 
 elabTyEnvE ::
-  EnvML.TyEnvE
-  -> Either ElabError Core.TyEnvE
-elabTyEnvE (EnvML.Type t)   = 
-  Core.Type   <$> elabTyp t
-elabTyEnvE EnvML.Kind      = 
+  EnvML.TyEnvE ->
+  Either ElabError Core.TyEnvE
+elabTyEnvE (EnvML.Type t) =
+  Core.Type <$> elabTyp t
+elabTyEnvE EnvML.Kind =
   pure Core.Kind
-elabTyEnvE (EnvML.TypeEq t) = 
+elabTyEnvE (EnvML.TypeEq t) =
   Core.TypeEq <$> elabTyp t
 
 elabModTyp ::
-  EnvML.ModuleTyp
-  -> Either ElabError Core.Typ
-elabModTyp (EnvML.TySig intf)       = 
+  EnvML.ModuleTyp ->
+  Either ElabError Core.Typ
+elabModTyp (EnvML.TySig intf) =
   Core.TyEnvt <$> elabIntf intf
-elabModTyp (EnvML.TyArrowM a sigB)  = 
+elabModTyp (EnvML.TyArrowM a sigB) =
   Core.TyArr <$> elabTyp a <*> elabModTyp sigB
 
 elabIntf ::
-  EnvML.Intf
-  -> Either ElabError Core.TyEnv
+  EnvML.Intf ->
+  Either ElabError Core.TyEnv
 elabIntf = mapM elabIntfE
 
 elabIntfE ::
-  EnvML.IntfE
-  -> Either ElabError Core.TyEnvE
-elabIntfE (EnvML.TyDef t)       = Core.Type <$> elabTyp t
-elabIntfE (EnvML.ValDecl ty)    = Core.Type <$> elabTyp ty
-elabIntfE (EnvML.ModDecl intf)  = Core.Type <$> elabTyp intf
-elabIntfE (EnvML.SigDecl mty)   = Core.Type <$> elabTyp mty
+  EnvML.IntfE ->
+  Either ElabError Core.TyEnvE
+elabIntfE (EnvML.TyDef t) = Core.Type <$> elabTyp t
+elabIntfE (EnvML.ValDecl ty) = Core.Type <$> elabTyp ty
+elabIntfE (EnvML.ModDecl intf) = Core.Type <$> elabTyp intf
+elabIntfE (EnvML.SigDecl mty) = Core.Type <$> elabTyp mty
 
 elabTyp ::
-  EnvML.Typ
-  -> Either ElabError Core.Typ
-elabTyp (EnvML.TyLit i)         =
+  EnvML.Typ ->
+  Either ElabError Core.Typ
+elabTyp (EnvML.TyLit i) =
   pure $ Core.TyLit (elabTyLit i)
-elabTyp (EnvML.TyVar n)         =
+elabTyp (EnvML.TyVar n) =
   pure $ Core.TyVar n
-elabTyp (EnvML.TyArr a1 a2)     =
+elabTyp (EnvML.TyArr a1 a2) =
   Core.TyArr <$> elabTyp a1 <*> elabTyp a2
-elabTyp (EnvML.TyAll a)         =
+elabTyp (EnvML.TyAll a) =
   Core.TyAll <$> elabTyp a
-elabTyp (EnvML.TyBoxT g1 a)     =
+elabTyp (EnvML.TyBoxT g1 a) =
   Core.TyBoxT <$> elabTyEnv g1 <*> elabTyp a
-elabTyp (EnvML.TySubstT a1 a2)  =
+elabTyp (EnvML.TySubstT a1 a2) =
   Core.TySubstT <$> elabTyp a1 <*> elabTyp a2
-elabTyp (EnvML.TyRcd l a)       =
+elabTyp (EnvML.TyRcd l a) =
   Core.TyRcd l <$> elabTyp a
-elabTyp (EnvML.TyEnvt bs)       =
+elabTyp (EnvML.TyEnvt bs) =
   Core.TyEnvt <$> elabTyEnv bs
-elabTyp (EnvML.TyModule mt) = 
-    elabModTyp mt
+elabTyp (EnvML.TyModule mt) =
+  elabModTyp mt
 
 elabTyLit ::
-  EnvML.TyLit
-  -> Core.TyLit
-elabTyLit EnvML.TyInt   = Core.TyInt
-elabTyLit EnvML.TyBool  = Core.TyBool
-elabTyLit EnvML.TyStr   = Core.TyStr
+  EnvML.TyLit ->
+  Core.TyLit
+elabTyLit EnvML.TyInt = Core.TyInt
+elabTyLit EnvML.TyBool = Core.TyBool
+elabTyLit EnvML.TyStr = Core.TyStr
 
 elabEnv ::
-  EnvML.Env
-  -> Either ElabError Core.Env
-elabEnv []      = pure []
-elabEnv (x:xs)  = do
+  EnvML.Env ->
+  Either ElabError Core.Env
+elabEnv [] = pure []
+elabEnv (x : xs) = do
   etm <- elabEnvE x
   xs' <- elabEnv xs
-  Right $ etm:xs'
+  Right $ etm : xs'
 
-elabM :: 
-  EnvML.Module
-  -> Either ElabError Core.Exp
-elabM (EnvML.VarM     i)  = pure $ Core.Var i
-elabM (EnvML.Functor  m)  = Core.Lam    <$> elabM m
-elabM (EnvML.Functort m)  = Core.TLam   <$> elabM m
-elabM (EnvML.Struct env)  = Core.FEnv   <$> elabEnv env
-elabM (EnvML.MApp m1 m2)  = Core.App    <$> elabM m1 <*> elabM m2
-elabM (EnvML.MAppt m t)   = Core.TApp   <$> elabM m  <*> elabTyp t
-
+elabM ::
+  EnvML.Module ->
+  Either ElabError Core.Exp
+elabM (EnvML.VarM i) = pure $ Core.Var i
+elabM (EnvML.Functor m) = Core.Lam <$> elabM m
+elabM (EnvML.Functort m) = Core.TLam <$> elabM m
+elabM (EnvML.Struct env) = Core.FEnv <$> elabEnv env
+elabM (EnvML.MApp m1 m2) = Core.App <$> elabM m1 <*> elabM m2
+elabM (EnvML.MAppt m t) = Core.TApp <$> elabM m <*> elabTyp t
 
 elabEnvE ::
-  EnvML.EnvE
-  -> Either ElabError Core.EnvE
+  EnvML.EnvE ->
+  Either ElabError Core.EnvE
 elabEnvE (EnvML.ExpE e) = Core.ExpE <$> elabExp e
 elabEnvE (EnvML.TypE t) = Core.TypE <$> elabTyp t
+elabEnvE (EnvML.ModExpE e) = Core.ExpE <$> elabExp e
+elabEnvE (EnvML.ModTypE t) = Core.TypE <$> elabTyp t
 
 elabLit ::
-  EnvML.Literal
-  -> Core.Literal
-elabLit (EnvML.LitInt i)  = Core.LitInt i
+  EnvML.Literal ->
+  Core.Literal
+elabLit (EnvML.LitInt i) = Core.LitInt i
 elabLit (EnvML.LitBool b) = Core.LitBool b
-elabLit (EnvML.LitStr s)  = Core.LitStr s
+elabLit (EnvML.LitStr s) = Core.LitStr s
 
 elabExp ::
-  EnvML.Exp
-  -> Either ElabError Core.Exp
-elabExp (EnvML.Lit lit)     = pure $ Core.Lit $ elabLit lit
-elabExp (EnvML.Var i)       = pure $ Core.Var i
-elabExp (EnvML.Lam e)       = Core.Lam    <$> elabExp e
-elabExp (EnvML.Clos e1 e2)  = Core.Clos   <$> elabEnv e1 <*> elabExp e2
-elabExp (EnvML.App  e1 e2)  = Core.App    <$> elabExp e1 <*> elabExp e2
-elabExp (EnvML.TLam e)      = Core.TLam   <$> elabExp e
-elabExp (EnvML.TClos env e) = Core.TClos  <$> elabEnv env <*> elabExp e
-elabExp (EnvML.TApp e ty)   = Core.TApp   <$> elabExp e   <*> elabTyp ty
-elabExp (EnvML.Box  env ty) = Core.Box    <$> elabEnv env <*> elabExp ty
-elabExp (EnvML.Rec  x e)    = Core.Rec x  <$> elabExp e
-elabExp (EnvML.RProj e l)   = Core.RProj  <$> elabExp e <*> pure l
-elabExp (EnvML.FEnv env)    = Core.FEnv   <$> elabEnv env
-elabExp (EnvML.Anno e ty)   = Core.Anno   <$> elabExp e <*> elabTyp ty
-elabExp (EnvML.ModE m)      = elabM m
+  EnvML.Exp ->
+  Either ElabError Core.Exp
+elabExp (EnvML.Lit lit) = pure $ Core.Lit $ elabLit lit
+elabExp (EnvML.Var i) = pure $ Core.Var i
+elabExp (EnvML.Lam e) = Core.Lam <$> elabExp e
+elabExp (EnvML.Clos e1 e2) = Core.Clos <$> elabEnv e1 <*> elabExp e2
+elabExp (EnvML.App e1 e2) = Core.App <$> elabExp e1 <*> elabExp e2
+elabExp (EnvML.TLam e) = Core.TLam <$> elabExp e
+elabExp (EnvML.TClos env e) = Core.TClos <$> elabEnv env <*> elabExp e
+elabExp (EnvML.TApp e ty) = Core.TApp <$> elabExp e <*> elabTyp ty
+elabExp (EnvML.Box env ty) = Core.Box <$> elabEnv env <*> elabExp ty
+elabExp (EnvML.Rec x e) = Core.Rec x <$> elabExp e
+elabExp (EnvML.RProj e l) = Core.RProj <$> elabExp e <*> pure l
+elabExp (EnvML.FEnv env) = Core.FEnv <$> elabEnv env
+elabExp (EnvML.Anno e ty) = Core.Anno <$> elabExp e <*> elabTyp ty
+elabExp (EnvML.ModE m) = elabM m
+elabExp (EnvML.BinOp op) = case op of
+  EnvML.Add e1 e2 -> fmap Core.BinOp (Core.Add <$> elabExp e1 <*> elabExp e2)
+  EnvML.Sub e1 e2 -> fmap Core.BinOp (Core.Sub <$> elabExp e1 <*> elabExp e2)
+  EnvML.Mul e1 e2 -> fmap Core.BinOp (Core.Mul <$> elabExp e1 <*> elabExp e2)
 
 -- elabExpCheck ::
 --   EnvML.TyEnv
@@ -145,7 +152,7 @@ elabExp (EnvML.ModE m)      = elabM m
 --   e' <- elabExpCheck (EnvML.Type a : g1) e b
 --   pure $ Core.Clos d' e'
 -- elabExpCheck env (EnvML.TClos d e) (EnvML.TyBoxT g1 (EnvML.TyAll a)) = do
---   unless (lvalue d) $ 
+--   unless (lvalue d) $
 --     Left "Type Closure environment is not all values"
 --   e' <- elabExpCheck (EnvML.Kind : g1) e a
 --   d' <- elabExpCheck env (EnvML.FEnv d) (EnvML.TyEnvt g1)
@@ -158,7 +165,6 @@ elabExp (EnvML.ModE m)      = elabM m
 --   if teq env ty' ty env
 --     then Right e'
 --     else Left $ "Type mismatch in elaboration check: expected " ++ show ty ++ ", got " ++ show ty'
-
 
 -- elabExpInfer ::
 --   EnvML.TyEnv
@@ -227,7 +233,7 @@ elabExp (EnvML.ModE m)      = elabM m
 --         Right (EnvML.TyEnvt g1, Core.FEnv d') -> do
 --           t' <- elabTyp (g1 ++ g) t
 --           Right (EnvML.TyEnvt (EnvML.TypeEq t : g1), Core.FEnv (Core.TypE t' : d'))
---         _ -> Left "Expected environment type in FEnv"  
+--         _ -> Left "Expected environment type in FEnv"
 -- elabExpInfer g (EnvML.Anno e t)   = do
 --     e' <- elabExpCheck g e t
 --     t' <- elabTyp g t
@@ -249,7 +255,7 @@ elabExp (EnvML.ModE m)      = elabM m
 --     (EnvML.TyArrowM t11 t12) -> do
 --       unless (elabModCheck g m2 t11) $
 --         Left "M1 must be functor to link with M2."
---       (t2, e2) <- elabModInfer g m2 
+--       (t2, e2) <- elabModInfer g m2
 --       pure $ (t12, Core.App e1 e2)
 --     _ -> Left "M1 must be functor to link with M2."
 
@@ -276,14 +282,14 @@ elabExp (EnvML.ModE m)      = elabM m
 --   EnvML.TypeEq (tshift (keyLen bs + x) a) : tshiftBinds x bs
 
 -- tshift ::
---   Int 
---   -> EnvML.Typ 
+--   Int
 --   -> EnvML.Typ
--- tshift _ (EnvML.TyLit i)        
+--   -> EnvML.Typ
+-- tshift _ (EnvML.TyLit i)
 --   = EnvML.TyLit i
--- tshift x (EnvML.TyVar y)        
---   = if x <= y 
---       then EnvML.TyVar (1 + y) 
+-- tshift x (EnvML.TyVar y)
+--   = if x <= y
+--       then EnvML.TyVar (1 + y)
 --       else EnvML.TyVar y
 -- tshift x (EnvML.TyArr a1 a2)
 --   = EnvML.TyArr (tshift x a1) (tshift x a2)
@@ -306,23 +312,23 @@ elabExp (EnvML.ModE m)      = elabM m
 --   -> EnvML.ModuleTyp
 -- tshiftM x (EnvML.TySig m)
 --   = error "TODO."
--- tshiftM x (EnvML.TyArrowM ty mty) 
+-- tshiftM x (EnvML.TyArrowM ty mty)
 --   = EnvML.TyArrowM (tshift x ty) (tshiftM x mty)
 
--- lookt :: 
---   EnvML.TyEnv 
---   -> Int 
+-- lookt ::
+--   EnvML.TyEnv
+--   -> Int
 --   -> Either ElabError EnvML.Typ
 -- lookt [] _ = Left "Unbound type variable"
--- lookt (EnvML.Type _ : t) x    = 
+-- lookt (EnvML.Type _ : t) x    =
 --   lookt t x
--- lookt (EnvML.TypeEq a : _) 0  = 
+-- lookt (EnvML.TypeEq a : _) 0  =
 --   pure (tshift 0 a)
--- lookt (EnvML.TypeEq _ : t) x  = 
+-- lookt (EnvML.TypeEq _ : t) x  =
 --   tshift 0 <$> lookt t (x - 1)
--- lookt (EnvML.Kind : _) 0      = 
+-- lookt (EnvML.Kind : _) 0      =
 --   Left "Kind found when looking for type"
--- lookt (EnvML.Kind : t) x      = 
+-- lookt (EnvML.Kind : t) x      =
 --   tshift 0 <$> lookt t (x - 1)
 
 -- getVar :: EnvML.TyEnv -> Int -> Either ElabError EnvML.Typ
@@ -351,7 +357,7 @@ elabExp (EnvML.ModE m)      = elabM m
 --   -> Bool
 -- teqM g1 _ _ g2 = error "TODO."
 
--- teqEnv :: 
+-- teqEnv ::
 --   EnvML.TyEnv
 --   -> EnvML.TyEnv
 --   -> EnvML.TyEnv
@@ -366,7 +372,7 @@ elabExp (EnvML.ModE m)      = elabM m
 --   teqEnv g1 e1 e2 g2 && teq (e1 ++ g1) a b (e2 ++ g2)
 -- teqEnv _ _ _ _ = False
 
--- teq :: 
+-- teq ::
 --   EnvML.TyEnv
 --   -> EnvML.Typ
 --   -> EnvML.Typ
@@ -403,7 +409,7 @@ elabExp (EnvML.ModE m)      = elabM m
 --   l1 == l2 && teq g1 a b g2
 -- teq _ _ _ _ = False
 
--- value :: 
+-- value ::
 --   EnvML.Exp
 --   -> Bool
 -- value (EnvML.Lit _) = True
@@ -413,7 +419,7 @@ elabExp (EnvML.ModE m)      = elabM m
 -- value (EnvML.Rec _ v) = value v
 -- value _ = False
 
--- lvalue :: 
+-- lvalue ::
 --   EnvML.Env
 --   -> Bool
 -- lvalue [] = True
