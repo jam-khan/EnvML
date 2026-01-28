@@ -65,18 +65,22 @@ eval env = go
         Clos env' e1 <- eval env e
         let v_fix = Clos (ExpE v_fix : env') e1
         pure v_fix
-    go (Sub e1 e2) = do
-      Lit (LitInt n1) <- eval env e1
-      Lit (LitInt n2) <- eval env e2
-      pure $ Lit (LitInt (n1 - n2))
-    go (Mul e1 e2) = do
-      Lit (LitInt n1) <- eval env e1
-      Lit (LitInt n2) <- eval env e2
-      pure $ Lit (LitInt (n1 * n2))
-    go (If e1 e2 e3) = do
-      Lit (LitBool b) <- eval env e1
-      if b then eval env e2 else eval env e3
-    go (Eq e1 e2) = do
-      v1 <- eval env e1
-      v2 <- eval env e2
-      pure $ Lit (LitBool (v1 == v2))
+    go (If cond e1 e2) = do
+        Lit (LitBool b) <- eval env cond
+        eval env (if b then e1 else e2)
+    go (BinOp (Add e1 e2)) = do
+        Lit (LitInt v1) <- eval env e1
+        Lit (LitInt v2) <- eval env e2
+        pure $ Lit (LitInt (v1 + v2))
+    go (BinOp (Sub e1 e2)) = do
+        Lit (LitInt v1) <- eval env e1
+        Lit (LitInt v2) <- eval env e2
+        pure $ Lit (LitInt (v1 - v2))
+    go (BinOp (Mul e1 e2)) = do
+        Lit (LitInt v1) <- eval env e1
+        Lit (LitInt v2) <- eval env e2
+        pure $ Lit (LitInt (v1 * v2))
+    go (BinOp (EqEq e1 e2)) = do
+        v1 <- eval env e1
+        v2 <- eval env e2
+        pure $ Lit (LitBool (v1 == v2))

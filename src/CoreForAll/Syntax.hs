@@ -52,12 +52,17 @@ data Exp
   | -- First-class Environment
     FEnv Env
   | Anno Exp Typ
-   -- Extensions
-  | Fix Exp
+  | -- Extensions
+    Fix Exp
+  | If Exp Exp Exp
+  | BinOp BinOp
+  deriving (Eq, Show)
+
+data BinOp
+  = Add Exp Exp
   | Sub Exp Exp
   | Mul Exp Exp
-  | If Exp Exp Exp
-  | Eq Exp Exp
+  | EqEq Exp Exp
   deriving (Eq, Show)
 
 data Literal
@@ -65,4 +70,3 @@ data Literal
   | LitBool Bool -- false, true
   | LitStr String -- "hello"
   deriving (Eq, Show)
-

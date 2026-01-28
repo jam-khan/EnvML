@@ -17,21 +17,21 @@ data TyEnvE
   = Type Typ -- A
   | Kind -- Type
   | TypeEq Typ -- A=
-  deriving (Eq)
+  deriving (Show, Eq)
 
 data ModuleTyp
   = TyArrowM Typ ModuleTyp -- (A ->m I)
   | TySig Intf -- (sig .. end)
-  deriving (Eq)
+  deriving (Show, Eq)
 
 type Intf = [IntfE] -- (sig ... end) .eli
 
 data IntfE
   = TyDef Name Typ -- (type t = ...)
   | ValDecl Name Typ -- (val x : t)
-  | ModDecl Name Name -- (module M : S)
-  | SigDecl Name ModuleTyp -- (module type S = ...)
-  deriving (Eq)
+  | ModDecl Name Typ -- (module M : S)
+  | SigDecl Name Typ -- (module type S = ...)
+  deriving (Show, Eq)
 
 data Typ
   = TyLit TyLit -- int, bool, or string
@@ -42,13 +42,13 @@ data Typ
   | TyRcd String Typ -- {l : A}
   | TyEnvt TyEnv -- [t : A, t1 : Type, t2 : A=]
   | TyModule ModuleTyp -- Note: First-class modules
-  deriving (Eq)
+  deriving (Show, Eq)
 
 data TyLit
   = TyInt -- int
   | TyBool -- bool
   | TyStr -- string
-  deriving (Eq)
+  deriving (Show, Eq)
 
 -- Environment
 type Env = [(Name, EnvE)]
@@ -57,22 +57,25 @@ type Env = [(Name, EnvE)]
 data EnvE
   = ExpE Exp
   | TypE Typ
-  deriving (Eq)
+  | ModExpE Exp
+  | ModTypE Typ
+  deriving (Show, Eq)
 
 data Module
-  = Functor Name Typ Module -- functor (x : A) ->
+  = VarM Name -- module variable
+  | Functor FunArgs Module -- functor (x : A) ->
   | Struct Imports Env -- struct type a = int; x = 1 end
-  | MApp Module Module -- M1 M2
-  | MLink Module Module -- M1 |><| M2
-  deriving (Eq)
+  | MApp Module Module -- M1 ^ M2
+  | MAppt Module Typ -- M1 ^ @A
+  | MLink Module Module -- link(M1, M2)
+  deriving (Show, Eq)
 
 data Exp
   = Lit Literal -- Literals: int, double, bool, string
   | Var Name -- Var x, y, hello
-  | Lam Name Exp -- fun (x: A) -> x + 1
+  | Lam FunArgs Exp -- fun (x: A) (y : B) -> x + 1
   | Clos Env Name Exp -- clos [type t = int, x = 1] (y: t) -> x + y
   | App Exp Exp -- f(x)
-  | TLam Name Exp -- fun type a' -> fun (x: a') -> x
   | TClos Env Name Exp -- clos [type t = int, x = 1] ->
   | TApp Exp Typ -- f<t>
   | Box Env Exp -- box [type t = int, x = 1] in e
@@ -81,13 +84,28 @@ data Exp
   | FEnv Env -- [type a = int, x = 1]
   | Anno Exp Typ -- (e::A)
   | ModE Module -- functor or struct
-  deriving (Eq)
+  -- Extensions
+  | BinOp BinOp
+  deriving (Show, Eq)
+
+type FunArgs = [(Name, FunArg)]
+
+data FunArg
+  = TyArg
+  | TmArg
+  deriving (Show, Eq)
+
+data BinOp
+  = Add Exp Exp
+  | Sub Exp Exp
+  | Mul Exp Exp
+  deriving (Show, Eq)
 
 data Literal
   = LitInt Int -- 1, 2, etc.
   | LitBool Bool -- false, true
   | LitStr String -- "hello"
-  deriving (Eq)
+  deriving (Show, Eq)
 
 type Precedence = Int
 
@@ -109,7 +127,6 @@ expPrec e = case e of
   Clos {} -> 1
   TClos {} -> 1
   Lam {} -> 2
-  TLam {} -> 2
   App _ _ -> 3
   TApp _ _ -> 3
   RProj _ _ -> 3
@@ -118,154 +135,143 @@ expPrec e = case e of
   Rec _ _ -> 5
   FEnv _ -> 5
   ModE _ -> 5
+  _ -> 4 -- TODO: Extensions
+
+class Pretty a where
+  pretty :: a -> String
+
+instance Pretty Typ where
+  pretty = prettyTyp
+
+instance Pretty Exp where
+  pretty = prettyExp
+
+instance Pretty Module where
+  pretty = prettyModule
+
+instance Pretty Literal where
+  pretty = prettyLiteral
+
+instance Pretty TyLit where
+  pretty = prettyTyLit
+
+instance Pretty TyEnvE where
+  pretty = prettyTyEnvE
+
+instance Pretty IntfE where
+  pretty = prettyIntfE
 
 parensIf :: Bool -> String -> String
 parensIf True s = "(" ++ s ++ ")"
 parensIf False s = s
 
-parens :: Bool -> String -> String
-parens True s = "(" ++ s ++ ")"
-parens _ s = s
+prettyTyBind :: (Name, TyEnvE) -> String
+prettyTyBind (n, Type t) = n ++ " : " ++ prettyTyp t
+prettyTyBind (n, Kind) = n ++ " : Type"
+prettyTyBind (n, TypeEq t) = n ++ " = " ++ prettyTyp t
 
-showTyBind :: (Name, TyEnvE) -> String
-showTyBind (n, Type t) = n ++ " : " ++ show t
-showTyBind (n, Kind) = n ++ " : Type"
-showTyBind (n, TypeEq t) = n ++ " = " ++ show t
+prettyEnvBind :: (Name, EnvE) -> String
+prettyEnvBind (n, ExpE e) = n ++ " = " ++ prettyExp e
+prettyEnvBind (n, TypE t) = "type " ++ n ++ " = " ++ prettyTyp t
+prettyEnvBind (n, ModExpE e) = "module " ++ n ++ " = " ++ prettyExp e
+prettyEnvBind (n, ModTypE t) = "module type " ++ n ++ " = " ++ prettyTyp t
 
-showEnvBind :: (Name, EnvE) -> String
-showEnvBind (n, ExpE e) = n ++ " = " ++ show e
-showEnvBind (n, TypE t) = "type " ++ n ++ " = " ++ show t
+prettyEnv :: Env -> String
+prettyEnv [] = ""
+prettyEnv [b] = prettyEnvBind b
+prettyEnv (b : bs) = prettyEnvBind b ++ ", " ++ prettyEnv bs
 
-showEnv :: Env -> String
-showEnv [] = ""
-showEnv [b] = showEnvBind b
-showEnv (b : bs) = showEnvBind b ++ ", " ++ showEnv bs
+prettyIntf :: Intf -> String
+prettyIntf [] = ""
+prettyIntf [e] = prettyIntfE e
+prettyIntf (e : es) = prettyIntfE e ++ "; " ++ prettyIntf es
 
-showIntf :: Intf -> String
-showIntf [] = ""
-showIntf [e] = show e
-showIntf (e : es) = show e ++ "; " ++ showIntf es
+prettyFunArgs :: FunArgs -> String
+prettyFunArgs [] = ""
+prettyFunArgs [arg] = "(" ++ prettyFunArg arg ++ ")"
+prettyFunArgs (arg : args) = "(" ++ prettyFunArg arg ++ ") " ++ prettyFunArgs args
 
-instance Show ModuleTyp where
-  show :: ModuleTyp -> String
-  show (TyArrowM t m) =
-    let sT = show t
-        sM = show m
-     in "(" ++ sT ++ " ->m " ++ sM ++ ")"
-  show (TySig mt) =
-    let sIntf = showIntf mt
-     in "sig " ++ sIntf ++ " end"
+prettyFunArg :: (Name, FunArg) -> String
+prettyFunArg (n, TyArg) = n ++ " : Type"
+prettyFunArg (n, TmArg) = n
 
-showTyEnv :: TyEnv -> String
-showTyEnv [] = ""
-showTyEnv [b] = showTyBind b
-showTyEnv (b : bs) = showTyBind b ++ ", " ++ showTyEnv bs
+prettyModuleTyp :: ModuleTyp -> String
+prettyModuleTyp (TyArrowM t m) = "(" ++ prettyTyp t ++ " ->m " ++ prettyModuleTyp m ++ ")"
+prettyModuleTyp (TySig mt) = "sig " ++ prettyIntf mt ++ " end"
 
-instance Show TyEnvE where
-  show :: TyEnvE -> String
-  show (Type t) = show t
-  show Kind = "Type"
-  show (TypeEq t) = "(" ++ show t ++ ")="
+prettyTyEnv :: TyEnv -> String
+prettyTyEnv [] = ""
+prettyTyEnv [b] = prettyTyBind b
+prettyTyEnv (b : bs) = prettyTyBind b ++ ", " ++ prettyTyEnv bs
 
-instance Show IntfE where
-  show :: IntfE -> String
-  show (TyDef n t) = "type " ++ n ++ " = " ++ show t
-  show (ValDecl n t) = "val " ++ n ++ " :  " ++ show t
-  show (ModDecl n1 n2) = "module " ++ n1 ++ " :  " ++ n2
-  show (SigDecl n mt) = "module type " ++ n ++ " = " ++ show mt
+prettyTyEnvE :: TyEnvE -> String
+prettyTyEnvE (Type t) = prettyTyp t
+prettyTyEnvE Kind = "Type"
+prettyTyEnvE (TypeEq t) = "(" ++ prettyTyp t ++ ") ="
 
-instance Show Typ where
-  show :: Typ -> String
-  show (TyLit l) = show l
-  show (TyVar s) = s
-  show (TyArr t1 t2) =
-    let s1 = parensIf (typPrec t1 < typPrec (TyArr t1 t2)) (show t1)
-        s2 = show t2
-     in "(" ++ s1 ++ " -> " ++ s2 ++ ")"
-  show (TyAll x t) =
-    let s = parensIf (typPrec t < typPrec (TyAll x t)) (show t)
-     in "forall " ++ x ++ ". " ++ s
-  show (TyBoxT bs t) =
-    let sBinds = showTyEnv bs
-        sTyp = parensIf (typPrec t < typPrec (TyBoxT bs t)) (show t)
-     in "[" ++ sBinds ++ "] ===> " ++ sTyp
-  show (TyEnvt bs) = "[" ++ showTyEnv bs ++ "]"
-  show (TyRcd label t) = "{" ++ label ++ " : " ++ show t ++ "}"
-  show (TyModule mt) = show mt
+prettyIntfE :: IntfE -> String
+prettyIntfE (TyDef n t) = "type " ++ n ++ " = " ++ prettyTyp t
+prettyIntfE (ValDecl n t) = "val " ++ n ++ " : " ++ prettyTyp t
+prettyIntfE (ModDecl n mt) = "module " ++ n ++ " : " ++ prettyTyp mt
+prettyIntfE (SigDecl n mt) = "module type " ++ n ++ " = " ++ prettyTyp mt
 
-instance Show TyLit where
-  show :: TyLit -> String
-  show TyInt = "int"
-  show TyBool = "bool"
-  show TyStr = "string"
+prettyTyp :: Typ -> String
+prettyTyp (TyLit l) = prettyTyLit l
+prettyTyp (TyVar s) = s
+prettyTyp (TyArr t1 t2) =
+  let s1 = parensIf (typPrec t1 < typPrec (TyArr t1 t2)) (prettyTyp t1)
+      s2 = prettyTyp t2
+   in "(" ++ s1 ++ " -> " ++ s2 ++ ")"
+prettyTyp (TyAll x t) =
+  let s = parensIf (typPrec t < typPrec (TyAll x t)) (prettyTyp t)
+   in "forall " ++ x ++ ". " ++ s
+prettyTyp (TyBoxT bs t) =
+  let sBinds = prettyTyEnv bs
+      sTyp = parensIf (typPrec t < typPrec (TyBoxT bs t)) (prettyTyp t)
+   in "[" ++ sBinds ++ "] ===> " ++ sTyp
+prettyTyp (TyEnvt bs) = "[" ++ prettyTyEnv bs ++ "]"
+prettyTyp (TyRcd label t) = "{" ++ label ++ " : " ++ prettyTyp t ++ "}"
+prettyTyp (TyModule mt) = prettyModuleTyp mt
 
-instance Show Module where
-  show :: Module -> String
-  show (Functor n t m) =
-    let sT = show t
-        sM = show m
-     in "functor (" ++ n ++ " : " ++ sT ++ ") " ++ sM
-  show (Struct imports env) =
-    let sEnv = showEnv env
-        showImport (n, t) = "import " ++ n ++ " : " ++ show t ++ "; "
-        sImports = concatMap showImport imports
-     in "struct " ++ sImports ++ sEnv ++ " end"
-  show (MApp m1 m2) =
-    let sM1 = show m1
-        sM2 = show m2
-     in "(" ++ sM1 ++ ") (" ++ sM2 ++ ")"
-  show (MLink m1 m2) =
-    let sM1 = show m1
-        sM2 = show m2
-     in "(" ++ sM1 ++ ") |><| (" ++ sM2 ++ ")"
+prettyTyLit :: TyLit -> String
+prettyTyLit TyInt = "int"
+prettyTyLit TyBool = "bool"
+prettyTyLit TyStr = "string"
 
-instance Show Exp where
-  show :: Exp -> String
-  show (Lit l) = show l
-  show (Var n) = n
-  show (Lam n e) =
-    let sE = show e
-     in "fun (" ++ n ++ ") -> " ++ sE
-  show (Box env e) =
-    let sCets = showEnv env
-        sE = parensIf (expPrec e < expPrec (Box env e)) (show e)
-     in "box [" ++ sCets ++ "] in " ++ sE
-  show (App e1 e2) =
-    let s1 = parensIf (expPrec e1 < expPrec (App e1 e2)) (show e1)
-        s2 = show e2
-     in s1 ++ "(" ++ s2 ++ ")"
-  show (TLam n e) =
-    let sE = show e
-     in "fun type " ++ n ++ " -> " ++ sE
-  show (Clos cetList n e) =
-    let sCets = showEnv cetList
-        sE = parensIf (expPrec e < expPrec (Clos cetList n e)) (show e)
-     in "clos [" ++ sCets ++ "] (" ++ n ++ ") -> " ++ sE
-  show (TClos cetList n e) =
-    let sCets = showEnv cetList
-        sE = parensIf (expPrec e < expPrec (TClos cetList n e)) (show e)
-     in "clos [" ++ sCets ++ "] type " ++ n ++ "-> " ++ sE
-  show (TApp e t) =
-    let sE = parensIf (expPrec e < expPrec (TApp e t)) (show e)
-        sT = show t
-     in sE ++ "<" ++ sT ++ ">"
-  show (FEnv env) =
-    let sEnv = showEnv env
-     in "[" ++ sEnv ++ "]"
-  show (Rec label e) =
-    let sE = show e
-     in "{" ++ label ++ " = " ++ sE ++ "}"
-  show (RProj e label) =
-    let sE = parensIf (expPrec e < expPrec (RProj e label)) (show e)
-     in sE ++ "." ++ label
-  show (Anno e t) =
-    let sE = parensIf (expPrec e < expPrec (Anno e t)) (show e)
-        sT = show t
-     in sE ++ " :: " ++ sT
-  show (ModE m) = show m
+prettyModule :: Module -> String
+prettyModule (Functor args e) =
+  "functor " ++ prettyFunArgs args ++ " -> " ++ prettyModule e
+prettyModule (Struct imports env) =
+  let sEnv = prettyEnv env
+      sImports = concatMap (\(n, t) -> "import " ++ n ++ " : " ++ prettyTyp t ++ "; ") imports
+   in "struct " ++ sImports ++ sEnv ++ " end"
+prettyModule (MApp m1 m2) = prettyModule m1 ++ " ^ " ++ prettyModule m2
+prettyModule (MLink m1 m2) = "link(" ++ prettyModule m1 ++ ", " ++ prettyModule m2 ++ ")"
+prettyModule (MAppt m t) = prettyModule m ++ " ^@ " ++ prettyTyp t
+prettyModule (VarM n) = n
 
-instance Show Literal where
-  show :: Literal -> String
-  show (LitInt i) = show i
-  show (LitBool b) = if b then "true" else "false"
-  show (LitStr s) = show s
+prettyExp :: Exp -> String
+prettyExp (Lit l) = prettyLiteral l
+prettyExp (Var n) = n
+prettyExp (Lam args e) = "fun " ++ prettyFunArgs args ++ " -> " ++ parensIf (expPrec e < expPrec (Lam args e)) (prettyExp e)
+prettyExp (Box env e) = "box [" ++ prettyEnv env ++ "] in " ++ parensIf (expPrec e < expPrec (Box env e)) (prettyExp e)
+prettyExp (App e1 e2) = parensIf (expPrec e1 < expPrec (App e1 e2)) (prettyExp e1) ++ "(" ++ prettyExp e2 ++ ")"
+prettyExp (Clos cetList n e) = "clos [" ++ prettyEnv cetList ++ "] (" ++ n ++ ") -> " ++ parensIf (expPrec e < expPrec (Clos cetList n e)) (prettyExp e)
+prettyExp (TClos cetList n e) = "clos [" ++ prettyEnv cetList ++ "] type " ++ n ++ " -> " ++ parensIf (expPrec e < expPrec (TClos cetList n e)) (prettyExp e)
+prettyExp (TApp e t) = parensIf (expPrec e < expPrec (TApp e t)) (prettyExp e) ++ "<" ++ prettyTyp t ++ ">"
+prettyExp (FEnv env) = "[" ++ prettyEnv env ++ "]"
+prettyExp (Rec label e) = "{" ++ label ++ " = " ++ prettyExp e ++ "}"
+prettyExp (RProj e label) = parensIf (expPrec e < expPrec (RProj e label)) (prettyExp e) ++ "." ++ label
+prettyExp (Anno e t) = parensIf (expPrec e < expPrec (Anno e t)) (prettyExp e) ++ " :: " ++ prettyTyp t
+prettyExp (ModE m) = prettyModule m
+prettyExp (BinOp op) = prettyBinOp op
+
+prettyBinOp :: BinOp -> String
+prettyBinOp (Add e1 e2) = prettyExp e1 ++ " + " ++ prettyExp e2
+prettyBinOp (Sub e1 e2) = prettyExp e1 ++ " - " ++ prettyExp e2
+prettyBinOp _ = "<binop> not implemented"
+
+prettyLiteral :: Literal -> String
+prettyLiteral (LitInt i) = show i
+prettyLiteral (LitBool b) = if b then "true" else "false"
+prettyLiteral (LitStr s) = show s

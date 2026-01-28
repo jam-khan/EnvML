@@ -6,7 +6,7 @@ module EnvML.Parser.HappyAlex.Lexer (Token(..), lexer) where
 
 $digit = 0-9
 $alpha = [a-zA-Z]
-$alphanum = [a-zA-Z0-9]
+$alphanum = [a-zA-Z0-9_]
 
 tokens :-
   $white+     ;
@@ -51,10 +51,13 @@ tokens :-
   ","         { \_ -> TokComma    }
   ";"         { \_ -> TokSemi     }
   ";;"        { \_ -> TokSemiSemi }
-  "::"        { \_ -> TokDoubleColon     }
+  "::"        { \_ -> TokDoubleColon}
   "->"        { \_ -> TokArrow    }
-  "->m"       { \_ -> TokArrowM    }
-  "===>"      { \_ -> TokTripleArrow    }
+  "->m"       { \_ -> TokArrowM   }
+  "===>"      { \_ -> TokTripleArrow}
+  "+"         { \_ -> TokPlus     }
+  "-"         { \_ -> TokDash     }
+  "*"         { \_ -> TokStar     }
 
   -- Literals and Identifiers
   $digit+             { \s -> TokInt (read s) }
@@ -108,6 +111,9 @@ data Token
   | TokDoubleColon
   | TokColonEqual
   | TokLink
+  | TokPlus
+  | TokDash
+  | TokStar
   deriving (Eq, Show)
 
 lexer :: String -> [Token]

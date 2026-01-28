@@ -57,6 +57,9 @@ import EnvML.Parser.AST
   '}'       { TokRBrace }
   '<'       { TokLAngle }
   '>'       { TokRAngle }
+  '+'       { TokPlus   }
+  '-'       { TokDash   }
+  '*'       { TokStar   }
 
 %right '->'
 
@@ -76,7 +79,11 @@ ModuleEnv :: { Env }
 
 ModuleEnvElem :: { (Name, EnvE) }
   : let id '=' Exp ';;'   { ($2, ExpE $4) }
+  | let id ':' Typ '=' Exp ';;' { ($2, ExpE (Anno $6 $4)) }
   | type id '=' Typ ';;'  { ($2, TypE $4) }
+  | module let id '=' Exp ';;' { ($3, ModExpE $5) }
+  | module let id ':' Typ '=' Exp ';;' { ($3, ModExpE (Anno $7 $5)) }
+  | module type id '=' Typ ';;' { ($3, ModTypE $5) }
 
 ModuleImports :: { Imports }
   : import ImportList ';;'    { $2 }  
@@ -96,7 +103,6 @@ ImportItem :: { (Name, Typ) }
 -- An interface file is implicitly a TySig containing a list of Intf elements
 InterfaceBody :: { ModuleTyp }
   : Intf { TySig $1 }
-  | sig Intf end {TySig $2 } -- allow explicit sig ... end
   | Typ '->m' InterfaceBody { TyArrowM $1 $3 }
 
 Intf :: { Intf }
@@ -106,28 +112,31 @@ Intf :: { Intf }
 IntfE :: { IntfE }
   : val id ':' Typ ';;'  { ValDecl $2 $4 }
   | type id '=' Typ ';;' { TyDef $2 $4 }
-  | module id ':' id ';;' { ModDecl $2 $4 }  
-  | module type id '=' InterfaceBody ';;' { SigDecl $3 $5 }
+  | module id ':' Typ ';;' { ModDecl $2 $4 }  
+  | module type id '=' Typ ';;' { SigDecl $3 $5 }
 
 -------------------------------------------------------------------------
 -- Core Expressions and Types
 -------------------------------------------------------------------------
 
 Exp :: { Exp }
-  : fun '(' id ')' '->' Exp   { Lam $3 $6 }
+  : fun FunArgs '->' Exp   { Lam $2 $4 }
   | clos '[' Env ']' '(' id ')' '->' Exp  { Clos $3 $6 $9 }
-  | fun type id '->' Exp              { TLam $3 $5 }
   | clos '[' Env ']' type id '->' Exp  { TClos $3 $6 $8 }
   | box '[' Env ']' in Exp            { Box $3 $6 }
   | Term '::' Typ                     { Anno $1 $3 }
+  | Exp '+' Exp                       { BinOp (Add $1 $3) }
+  | Exp '-' Exp                       { BinOp (Sub $1 $3) }
+  | Term                              { $1 } -- Regular Var take precedence over VarM when parsing Exp
   | ModuleExp                         { ModE $1 }
-  | Term                              { $1 }
 
 ModuleExp :: { Module }
   : struct ModuleImports ModuleEnv end { Struct $2 $3 }
-  | ModuleExp '(' ModuleExp ')'        { MApp $1 $3 }
+  | ModuleExp '(' ModuleExp ')'         { MApp $1 $3 }
+  | ModuleExp '<' Typ '>'        { MAppt $1 $3 }
   | link '(' ModuleExp ',' ModuleExp ')' { MLink $3 $5 }
-  | functor '(' id ':' Typ ')' '->' ModuleExp  { Functor $3 $5 $8 }
+  | functor FunArgs '->' ModuleExp      { Functor $2 $4 }
+  | id                                { VarM $1 }
   | '(' ModuleExp ')'                  { $2 }
 
 Term :: { Exp }
@@ -146,6 +155,14 @@ Atom :: { Exp }
   | '[' Env ']'                       { FEnv $2 }
   | '(' Exp ')'                       { $2 }
 
+FunArgs :: { FunArgs }
+  : '(' FunArg ')' ',' FunArgs                 { $2 : $5 }
+  | '(' FunArg ')'                             { [$2] }
+
+FunArg :: { (Name, FunArg) }
+  : id ':' Type                       { ($1, TyArg)    }
+  | id                                { ($1, TmArg)    }
+
 Env :: { Env }
   : EnvElem ',' Env  { $1 : $3 }
   | EnvElem                  { [$1] }
@@ -154,6 +171,8 @@ Env :: { Env }
 EnvElem :: { (Name, EnvE) }
   : id '=' Exp            { ($1, ExpE $3) }
   | type id '=' Typ       { ($2, TypE $4) }
+  | module id '=' Exp     { ($2, ModExpE $4) }
+  | module type id '=' Typ { ($3, ModTypE $5) }
 
 Typ :: { Typ }
    : BaseTyp '->' Typ                  { TyArr $1 $3 }

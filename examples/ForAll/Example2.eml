@@ -1,22 +1,28 @@
-(* Example 2: Interesting Sandboxing *)
+-- Example 2: Manifest types and Type Equalities
 
-let SECRET : INT = 3141;;
-
-module type POLICY = 
-  sig (t: type) log : t -> () end;;
-
-module guest_policy : POLICY =
-  struct (t: type)
-    log : t -> () = 
-        fun (msg : t) -> print msg
+module type ENV = 
+  sig 
+    type t = int;;
+    inc : t -> t;;
   end;;
 
-(* Type check: Pass *)
-let result : () =
-  box guest_policy @string in 
-    log("Printing...");;
+--functor env (i : int) : ENV =
+--  struct
+--    type t = int;;
+--    inc (x : int) = x + i;;
+--  end;;
 
-(* Type check: Fail *)
-let leak : () =
-  box guest_policy @int in
-    log(SECRET);;
+module let env : int ->m ENV = 
+    functor (i : int) ->
+        struct 
+            type t = int;;
+            let inc (x : t) = x + i;;
+        end;;
+
+let id1 : int -> int =
+  box env (0) in
+    fun (x : t) -> inc (x);;
+
+let id2 : ENV |> int -> int =
+  box env (0) in
+    fun (x : t) -> inc (x);;

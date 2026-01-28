@@ -8,17 +8,45 @@ import Test.Hspec
 spec :: Spec
 spec = do
   describe "EnvML.Parser (.eml / Modules)" $ do
-    it "parses a simple let binding" $ do
+    it "parses let binding" $ do
       let input = "let x = 1;;"
       let expected = Struct [] [("x", ExpE (Lit (LitInt 1)))]
       parseModule (lexer input) `shouldBe` expected
 
-    it "parses multiple bindings (let and type)" $ do
-      let input = "let x = 1;; type t = int;;"
+    it "parses let binding with explicit type annotation" $ do
+      let input = "let x : int = 1;;"
+      let expected = Struct [] [("x", ExpE (Anno (Lit (LitInt 1)) (TyLit TyInt)))]
+      parseModule (lexer input) `shouldBe` expected
+
+    it "parses type binding" $ do
+      let input = "type t = int;;"
+      let expected = Struct [] [("t", TypE (TyLit TyInt))]
+      parseModule (lexer input) `shouldBe` expected
+
+    it "parses module let binding" $ do
+      let input = "module let x = struct end;;"
+      let expected = Struct [] [("x", ModExpE (ModE (Struct [] [])))]
+      parseModule (lexer input) `shouldBe` expected
+
+    it "parses module let binding with explicit type annotation" $ do
+      let input = "module let x : sig end = struct end;;"
+      let expected = Struct [] [("x", ModExpE (Anno (ModE (Struct [] [])) (TyModule (TySig []))))]
+      parseModule (lexer input) `shouldBe` expected
+
+    it "parses module type binding" $ do
+      let input = "module type x = sig end;;"
+      let expected = Struct [] [("x", ModTypE (TyModule (TySig [])))]
+      parseModule (lexer input) `shouldBe` expected
+
+    it "parses multiple bindings" $ do
+      let input = "let x = 1;; type t = int;; module let y = struct end;; module type m = sig end;;"
       let expected =
-            Struct []
+            Struct
+              []
               [ ("x", ExpE (Lit (LitInt 1))),
-                ("t", TypE (TyLit TyInt))
+                ("t", TypE (TyLit TyInt)),
+                ("y", ModExpE (ModE (Struct [] []))),
+                ("m", ModTypE (TyModule (TySig [])))
               ]
       parseModule (lexer input) `shouldBe` expected
 
@@ -26,7 +54,7 @@ spec = do
       let input = ""
       let expected = Struct [] []
       parseModule (lexer input) `shouldBe` expected
-    
+
     it "parses single import" $ do
       let input = "import M : sig end;;"
       let expected = Struct [("M", TyModule (TySig []))] []
@@ -38,6 +66,11 @@ spec = do
       parseModule (lexer input) `shouldBe` expected
 
   describe "EnvML.Parser (.emli / Interfaces)" $ do
+    it "parses empty interface" $ do
+      let input = ""
+      let expected = TySig []
+      parseModuleTyp (lexer input) `shouldBe` expected
+
     it "parses a simple val declaration" $ do
       let input = "val x : int;;"
       let expected = TySig [ValDecl "x" (TyLit TyInt)]
@@ -59,17 +92,12 @@ spec = do
 
     it "parses module declarations inside signatures" $ do
       let input = "module M : S;;"
-      let expected = TySig [ModDecl "M" "S"]
+      let expected = TySig [ModDecl "M" (TyVar "S")]
       parseModuleTyp (lexer input) `shouldBe` expected
 
     it "parses module type definitions" $ do
       let input = "module type S = sig end;;"
-      let expected = TySig [SigDecl "S" (TySig [])]
-      parseModuleTyp (lexer input) `shouldBe` expected
-
-    it "parses module type arrows" $ do
-      let input = "int ->m sig end"
-      let expected = TyArrowM (TyLit TyInt) (TySig [])
+      let expected = TySig [SigDecl "S" (TyModule (TySig []))]
       parseModuleTyp (lexer input) `shouldBe` expected
 
   describe "EnvML.Parser (Expressions)" $ do
@@ -90,12 +118,12 @@ spec = do
 
     it "parses lambda functions" $ do
       let input = "fun (x) -> x"
-      let expected = Lam "x" (Var "x")
+      let expected = Lam [("x", TmArg)] (Var "x")
       parseExp (lexer input) `shouldBe` expected
 
     it "parses nested lambda functions" $ do
       let input = "fun (x) -> fun (y) -> y"
-      let expected = Lam "x" (Lam "y" (Var "y"))
+      let expected = Lam [("x", TmArg)] (Lam [("y", TmArg)] (Var "y"))
       parseExp (lexer input) `shouldBe` expected
 
     it "parses closure" $ do
@@ -129,13 +157,13 @@ spec = do
       parseExp (lexer input) `shouldBe` expected
 
     it "parses type lambda functions" $ do
-      let input = "fun type a -> x"
-      let expected = TLam "a" (Var "x")
+      let input = "fun (a : Type) -> x"
+      let expected = Lam [("a", TyArg)] (Var "x")
       parseExp (lexer input) `shouldBe` expected
 
     it "parses nested type lambda functions" $ do
-      let input = "fun type x -> fun type y -> y"
-      let expected = TLam "x" (TLam "y" (Var "y"))
+      let input = "fun (x : Type) -> fun (y : Type) -> y"
+      let expected = Lam [("x", TyArg)] (Lam [("y", TyArg)] (Var "y"))
       parseExp (lexer input) `shouldBe` expected
 
     it "parses type closure" $ do
@@ -180,11 +208,13 @@ spec = do
       parseExp (lexer input) `shouldBe` expected
 
     it "parses first-class environment" $ do
-      let input = "[type t = int, x = 1]"
+      let input = "[type t = int, x = 1, module type M = sig end, module N = struct end]"
       let expected =
             FEnv
               [ ("t", TypE (TyLit TyInt)),
-                ("x", ExpE (Lit (LitInt 1)))
+                ("x", ExpE (Lit (LitInt 1))),
+                ("M", ModTypE (TyModule (TySig []))),
+                ("N", ModExpE (ModE (Struct [] [])))
               ]
       parseExp (lexer input) `shouldBe` expected
 
@@ -200,22 +230,32 @@ spec = do
               [ ("t", TypE (TyLit TyInt)),
                 ("x", ExpE (Lit (LitInt 1)))
               ]
-              (Lam "y" (Var "x"))
+              (Lam [("y", TmArg)] (Var "x"))
       parseExp (lexer input) `shouldBe` expected
 
     it "parses functor definition" $ do
-      let input = "functor (x : sig end) -> struct end"
-      let expected = ModE $ Functor "x" (TyModule (TySig [])) (Struct [] [])
+      let input = "functor (x) -> struct end"
+      let expected = ModE $ Functor [("x", TmArg)] (Struct [] [])
       parseExp (lexer input) `shouldBe` expected
 
     it "parses module application" $ do
-      let input = "(functor (x : sig end) -> struct end) (struct end)"
-      let expected = ModE $ MApp (Functor "x" (TyModule (TySig [])) (Struct [] [])) (Struct [] [])
+      let input = "(functor (x) -> struct end) (struct end)"
+      let expected = ModE $ MApp (Functor [("x", TmArg)] (Struct [] [])) (Struct [] [])
       parseExp (lexer input) `shouldBe` expected
 
     it "parses module linking" $ do
       let input = "link(struct end, struct end)"
       let expected = ModE $ MLink (Struct [] []) (Struct [] [])
+      parseExp (lexer input) `shouldBe` expected
+
+    it "parses binary addition" $ do
+      let input = "1 + 2"
+      let expected = BinOp (Add (Lit (LitInt 1)) (Lit (LitInt 2)))
+      parseExp (lexer input) `shouldBe` expected
+
+    it "parses binary subtraction" $ do
+      let input = "1 - 2"
+      let expected = BinOp (Sub (Lit (LitInt 1)) (Lit (LitInt 2)))
       parseExp (lexer input) `shouldBe` expected
 
   describe "EnvML.Parser (Types)" $ do
@@ -283,12 +323,12 @@ spec = do
 
     it "parses sig types (ModDecl)" $ do
       let input = "sig module M : S;; end"
-      let expected = TyModule (TySig [ModDecl "M" "S"])
+      let expected = TyModule (TySig [ModDecl "M" (TyVar "S")])
       parseTyp (lexer input) `shouldBe` expected
 
     it "parses sig types (SigDecl)" $ do
       let input = "sig module type S = sig end;; end"
-      let expected = TyModule (TySig [SigDecl "S" (TySig [])])
+      let expected = TyModule (TySig [SigDecl "S" (TyModule (TySig []))])
       parseTyp (lexer input) `shouldBe` expected
 
     it "parses sig types with multiple declarations" $ do
@@ -303,6 +343,6 @@ spec = do
       parseTyp (lexer input) `shouldBe` expected
 
     it "parses module type arrows" $ do
-        let input = "int ->m sig end"
-        let expected = TyModule $ TyArrowM (TyLit TyInt) (TySig [])
-        parseTyp (lexer input) `shouldBe` expected
+      let input = "int ->m sig end"
+      let expected = TyModule $ TyArrowM (TyLit TyInt) (TySig [])
+      parseTyp (lexer input) `shouldBe` expected

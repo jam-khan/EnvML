@@ -1,20 +1,22 @@
-(* Contextual Polymorphism with first-class modules *)
+(* Example 3: Interesting Sandboxing *)
 
-module type ENV = 
-  sig (t : type)
-    val x : t
+let SECRET : INT = 3141;;
+
+module type POLICY = 
+  forall t. sig log : t -> () end;;
+
+module guest_policy : POLICY =
+  struct (t: type)
+    log : t -> () = 
+      fun msg -> print msg;;
   end;;
 
-let get_x_int : ENV @int -> int =
-  fun (env : ENV @int) ->
-    box env in (x :: t');;
+(* Type check: Pass *)
+let result : () =
+  box guest_policy @string in 
+    log("Printing...");;
 
-let get_x_bool : ENV @bool -> bool =
-  fun (env : ENV @bool) ->
-    box env in (x :: bool);;
-
-let env_int  : ENV @int  = struct let x = 42 end;;
-let env_bool : ENV @bool = struct let x = true end;;
-
-let res1 : int  = (get_x_int env_int);;  (* 42 *)
-let res2 : bool = (get_x_bool env_bool);; (* true *)
+(* Type check: Fail *)
+let leak : () =
+  box guest_policy @int in
+    log(SECRET);;

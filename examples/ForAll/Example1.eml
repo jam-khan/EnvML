@@ -1,17 +1,14 @@
-(* Example 1: Basic Sandboxing *)
+-- Example 1: Contextual Polymorphism with first-class modules
 
-module type SAFE_ENV = 
-  sig
-    val pi : int;;
-    val r  : int;;
-  end;;
+type ENV = forall t. sig val id : t -> t;; end;;
 
-module safe_env : SAFE_ENV =
-  struct
-    let pi = 3.14;;
-    let r  = 1;;
-  end;;
+module let env : ENV =
+  functor (t : Type) -> 
+      struct
+        let id : t -> t = fun (x) -> x;;
+      end;;
 
-let secret : int = 17;;
-let x : int     = with safe_env in secret;;        (* Does not type checks *)
-let y : double  = with safe_env in pi * (r ** 2);; (* Pass *)
+let int_result : int    = 
+  box [x = env<int>] in x.id(1);;
+let bool_result : bool  =
+  box [x = env<bool>] in x.id(true);;

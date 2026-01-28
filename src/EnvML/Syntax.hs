@@ -25,8 +25,9 @@ type Intf = [IntfE]         -- (sig ... end) .eli
 data IntfE 
   = TyDef    Typ       -- (type t = ...)   
   | ValDecl  Typ       -- (val x : t)
+-- Note: ModDecl and SigDecl accept Typ because they can refer to variables
   | ModDecl  Typ       -- (module M : S)
-  | SigDecl  ModuleTyp -- (module type S = ...)
+  | SigDecl  Typ       -- (module type S = ...)
   deriving (Show, Eq)
 
 data Typ
@@ -54,13 +55,18 @@ type Env = [EnvE]
 data EnvE 
   = ExpE Exp 
   | TypE Typ
+-- Note: ModExpE and TypExpE accept Exp and Typ respectively because they can refer to variables
+  | ModExpE Exp
+  | ModTypE Typ
   deriving (Show, Eq)
 
 data Module
-  = Functor Typ Module      -- functor (x : A) struct x end
-  | Struct  Env             -- struct type a = int; x = 1 end
-  | MApp    Module Module   -- M1 M2
-  | MLink   Module Module   -- M1 |><| M2    
+  = VarM     Int             -- module variable
+  | Functor  Module          -- functor (x : A) struct x end    ~~> lambda
+  | Functort Module          -- functor (t : type) struct x end ~~> Big Lambda
+  | Struct   Env             -- struct type a = int; x = 1 end  ~~> Env
+  | MApp     Module Module   -- M1 ^ M2                         ~~> e1 e2
+  | MAppt    Module Typ      -- M1 ^@ A                         ~~> e1 @A
   deriving (Show, Eq)
 
 data Exp
@@ -78,6 +84,14 @@ data Exp
   | FEnv  Env               -- [type a = int, x = 1]
   | Anno  Exp Typ           -- (e::A)
   | ModE  Module            -- functor or struct
+-- Extensions
+  | BinOp BinOp
+  deriving (Show, Eq)
+
+data BinOp
+  = Add Exp Exp
+  | Sub Exp Exp
+  | Mul Exp Exp
   deriving (Show, Eq)
 
 data Literal 

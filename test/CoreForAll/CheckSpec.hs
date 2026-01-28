@@ -11,11 +11,11 @@ typeCheckTests =
       TyLit TyInt
     ),
     ( "sub operation produces int",
-      Sub (Lit (LitInt 5)) (Lit (LitInt 3)),
+      BinOp $ Sub (Lit (LitInt 5)) (Lit (LitInt 3)),
       TyLit TyInt
     ),
     ( "mul operation produces int",
-      Mul (Lit (LitInt 4)) (Lit (LitInt 2)),
+      BinOp $ Mul (Lit (LitInt 4)) (Lit (LitInt 2)),
       TyLit TyInt
     ),
     ( "if expression with int branches",
@@ -23,16 +23,16 @@ typeCheckTests =
       TyLit TyInt
     ),
     ( "equality produces bool",
-      Eq (Lit (LitInt 1)) (Lit (LitInt 2)),
+      BinOp $ EqEq (Lit (LitInt 1)) (Lit (LitInt 2)),
       TyLit TyBool
     ),
     ( "int -> int function has correct type",
-      Lam (Sub (Var 0) (Lit (LitInt 1))),
+      Lam (BinOp $ Sub (Var 0) (Lit (LitInt 1))),
       TyArr (TyLit TyInt) (TyLit TyInt)
     ),
     ( "int -> int application returns int",
       App
-        (Anno (Lam (Sub (Var 0) (Lit (LitInt 1)))) (TyArr (TyLit TyInt) (TyLit TyInt)))
+        (Anno (Lam (BinOp $ Sub (Var 0) (Lit (LitInt 1)))) (TyArr (TyLit TyInt) (TyLit TyInt)))
         (Lit (LitInt 5)),
       TyLit TyInt
     ),
@@ -41,11 +41,11 @@ typeCheckTests =
             Fix
               ( Lam
                   ( If
-                      (Eq (Var 0) (Lit (LitInt 0)))
+                      (BinOp $ EqEq (Var 0) (Lit (LitInt 0)))
                       (Lit (LitInt 1))
-                      ( Mul
+                      ( BinOp $ Mul
                           (Var 0)
-                          (App (Var 1) (Sub (Var 0) (Lit (LitInt 1))))
+                          (App (Var 1) (BinOp $ Sub (Var 0) (Lit (LitInt 1))))
                       )
                   )
               )
@@ -57,11 +57,11 @@ typeCheckTests =
             Fix
               ( Lam
                   ( If
-                      (Eq (Var 0) (Lit (LitInt 0)))
+                      (BinOp $ EqEq (Var 0) (Lit (LitInt 0)))
                       (Lit (LitInt 1))
-                      ( Mul
+                      ( BinOp $ Mul
                           (Var 0)
-                          (App (Var 1) (Sub (Var 0) (Lit (LitInt 1))))
+                          (App (Var 1) (BinOp $ Sub (Var 0) (Lit (LitInt 1))))
                       )
                   )
               )
@@ -73,11 +73,11 @@ typeCheckTests =
             Fix
               ( Lam
                   ( If
-                      (Eq (Var 0) (Lit (LitInt 0)))
+                      (BinOp $ EqEq (Var 0) (Lit (LitInt 0)))
                       (Var 2)
-                      ( Mul
+                      ( BinOp $ Mul
                           (Var 0)
-                          (App (Var 1) (Sub (Var 0) (Lit (LitInt 1))))
+                          (App (Var 1) (BinOp $ Sub (Var 0) (Lit (LitInt 1))))
                       )
                   )
               )

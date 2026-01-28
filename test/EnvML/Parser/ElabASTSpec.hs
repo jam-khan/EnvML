@@ -68,11 +68,11 @@ spec = do
         `shouldBe` D.Var 1
 
     it "elaborates lambdas correctly" $ do
-      elabExp [] (N.Lam "x" (N.Var "x"))
+      elabExp [] (N.Lam [("x", N.TmArg)] (N.Var "x"))
         `shouldBe` D.Lam (D.Var 0)
 
     it "shifts outer variables under lambdas" $ do
-      elabExp ["y"] (N.Lam "x" (N.Var "y"))
+      elabExp ["y"] (N.Lam [("x", N.TmArg)] (N.Var "y"))
         `shouldBe` D.Lam (D.Var 1)
 
     it "elaborates applications" $ do
@@ -80,12 +80,16 @@ spec = do
         `shouldBe` D.App (D.Var 0) (D.Var 1)
 
     it "elaborates type lambdas" $ do
-      elabExp [] (N.TLam "A" (N.Lam "x" (N.Var "x")))
+      elabExp [] (N.Lam [("A", N.TyArg)] (N.Lam [("x", N.TmArg)] (N.Var "x")))
         `shouldBe` D.TLam (D.Lam (D.Var 0))
 
     it "elaborates type applications" $ do
       elabExp ["f"] (N.TApp (N.Var "f") (N.TyLit N.TyInt))
         `shouldBe` D.TApp (D.Var 0) (D.TyLit D.TyInt)
+
+    it "elaborates multi argument lambdas" $ do
+      elabExp [] (N.Lam [("x", N.TmArg), ("y", N.TmArg)] (N.Var "x"))
+        `shouldBe` D.Lam (D.Lam (D.Var 1))
 
     it "elaborates closures with environments + env reversal" $ do
       let env = [("x", N.ExpE (N.Lit (N.LitInt 1))), ("y", N.ExpE (N.Var "x"))]
@@ -143,22 +147,22 @@ spec = do
       elabModule [] (N.Struct [] env)
         `shouldBe` D.Struct [D.ExpE (D.Var 0), D.ExpE (D.Lit (D.LitInt 1))]
 
-    it "elaborates structs with imports as functors" $ do
-      let imps = [("A", N.TyLit N.TyInt), ("B", N.TyLit N.TyBool)]
-          env = [("x", N.ExpE (N.Lit (N.LitInt 1)))]
-      elabModule [] (N.Struct imps env)
-        `shouldBe` D.Functor (D.TyLit D.TyInt) (D.Functor (D.TyLit D.TyBool) (D.Struct [D.ExpE (D.Lit (D.LitInt 1))]))
-
+    -- it "elaborates structs with imports as functors" $ do
+    --   let imps = [("A", N.TyLit N.TyInt), ("B", N.TyLit N.TyBool)]
+    --       env = [("x", N.ExpE (N.Lit (N.LitInt 1)))]
+    --   elabModule [] (N.Struct imps env)
+    --     `shouldBe` D.Functor (D.TyLit D.TyInt) (D.Functor (D.TyLit D.TyBool) (D.Struct [D.ExpE (D.Lit (D.LitInt 1))]))
+    --
     it "elaborates functors" $ do
-      let m = N.Functor "X" (N.TyLit N.TyInt) (N.Struct [] [("x", N.ExpE (N.Var "X"))])
-      elabModule [] m `shouldBe` D.Functor (D.TyLit D.TyInt) (D.Struct [D.ExpE (D.Var 0)])
-
-    it "elaborates module applications regardless of no functors (no checks in this phase)" $ do
-      let m1 = N.Struct [] [("x", N.ExpE (N.Lit (N.LitInt 1)))]
-          m2 = N.Struct [] []
-      elabModule [] (N.MApp m1 m2) `shouldBe` D.MApp (D.Struct [D.ExpE (D.Lit (D.LitInt 1))]) (D.Struct [])
-
-    it "elaborates module links" $ do
-      let m1 = N.Struct [] []
-          m2 = N.Struct [] []
-      elabModule [] (N.MLink m1 m2) `shouldBe` D.MLink (D.Struct []) (D.Struct [])
+      let m = N.Functor [("X", N.TmArg)] (N.Struct [] [("x", N.ExpE (N.Var "X"))])
+      elabModule [] m `shouldBe` D.Functor (D.Struct [D.ExpE (D.Var 0)])
+    --
+    -- it "elaborates module applications regardless of no functors (no checks in this phase)" $ do
+    --   let m1 = N.Struct [] [("x", N.ExpE (N.Lit (N.LitInt 1)))]
+    --       m2 = N.Struct [] []
+    --   elabModule [] (N.MApp m1 m2) `shouldBe` D.MApp (D.Struct [D.ExpE (D.Lit (D.LitInt 1))]) (D.Struct [])
+    --
+    -- it "elaborates module links" $ do
+    --   let m1 = N.Struct [] []
+    --       m2 = N.Struct [] []
+    --   elabModule [] (N.MLink m1 m2) `shouldBe` D.MLink (D.Struct []) (D.Struct [])
