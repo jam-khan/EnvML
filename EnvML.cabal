@@ -28,6 +28,10 @@ library
                         CoreForAll.Eval
                         CoreForAll.Check
                         CoreForAll.Syntax
+                        CoreForAll.Pretty
+                        CoreForAll.Repl
+                        CoreForAll.Parser.Parser
+                        CoreForAll.Parser.Lexer
     
     build-depends:    base >= 4.17 && < 5,
                       QuickCheck,

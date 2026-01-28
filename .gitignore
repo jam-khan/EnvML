@@ -80,3 +80,5 @@ src/EnvML/Parser/Happy.info
 
 src/EnvML/Parser/HappyAlex/Lexer.hs
 src/EnvML/Parser/HappyAlex/Parser.hs
+src/CoreForAll/Parser/Lexer.hs
+src/CoreForAll/Parser/Parser.hs
