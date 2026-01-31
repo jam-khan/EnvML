@@ -1,15 +1,15 @@
-module CoreForAll.Repl where
+module Core.Repl where
 
 import System.IO (hFlush, stdout)
 import Control.Exception (try, SomeException)
 
 -- Your Project Modules
-import CoreForAll.Syntax
-import CoreForAll.Parser.Lexer (lexer)
-import CoreForAll.Parser.Parser (parseExp)
-import CoreForAll.Pretty
-import CoreForAll.Eval (eval)
-import CoreForAll.Check (infer)
+import Core.Syntax
+import Core.Parser.Lexer (lexer)
+import Core.Parser.Parser (parseExp)
+import Core.Pretty
+import Core.Eval (eval)
+import Core.Check (infer)
 
 main :: IO ()
 main = do

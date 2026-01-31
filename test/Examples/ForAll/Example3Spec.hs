@@ -1,6 +1,6 @@
 module Examples.ForAll.Example3Spec where
 
-import qualified CoreForAll.Syntax as C
+import qualified Core.Syntax as C
 import Data.Either (isLeft, isRight)
 import EnvML.Parser.AST
 import Test.Hspec

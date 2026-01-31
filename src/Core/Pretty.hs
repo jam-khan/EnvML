@@ -1,6 +1,6 @@
-module CoreForAll.Pretty where
+module Core.Pretty where
 
-import CoreForAll.Syntax
+import Core.Syntax
 
 parensIf :: Bool -> String -> String
 parensIf True  s = "(" ++ s ++ ")"

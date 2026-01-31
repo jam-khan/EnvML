@@ -17,13 +17,13 @@ library
                         EnvML.Parser.HappyAlex.Parser
                         EnvML.Parser.HappyAlex.Lexer
                         EnvML.Parser.ElabAST
-                        CoreForAll.Eval
-                        CoreForAll.Check
-                        CoreForAll.Syntax
-                        CoreForAll.Pretty
-                        CoreForAll.Repl
-                        CoreForAll.Parser.Parser
-                        CoreForAll.Parser.Lexer
+                        Core.Eval
+                        Core.Check
+                        Core.Syntax
+                        Core.Pretty
+                        Core.Repl
+                        Core.Parser.Parser
+                        Core.Parser.Lexer
     
     build-depends:    base >= 4.17 && < 5,
                       QuickCheck,

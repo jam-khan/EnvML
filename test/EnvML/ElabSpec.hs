@@ -1,6 +1,6 @@
 module EnvML.ElabSpec where
 
-import qualified CoreForAll.Syntax as C
+import qualified Core.Syntax as C
 import Data.Either (isLeft, isRight)
 import EnvML.Elab
 import qualified EnvML.Syntax as S

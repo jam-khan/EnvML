@@ -4,7 +4,7 @@
 
 module Examples.ForAll.Example0Spec where
 
-import qualified CoreForAll.Syntax as C
+import qualified Core.Syntax as C
 import qualified EnvML.Elab as ElabD
 import qualified EnvML.Syntax as D
 import qualified EnvML.Parser.ElabAST as ElabN

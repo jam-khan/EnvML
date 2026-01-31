@@ -1,7 +1,7 @@
-module CoreForAll.CheckSpec (spec) where
+module Core.CheckSpec (spec) where
 
-import CoreForAll.Check
-import CoreForAll.Syntax
+import Core.Check
+import Core.Syntax
 import Test.Hspec
 
 typeCheckTests :: [(String, Exp, Typ)]
@@ -88,7 +88,7 @@ typeCheckTests =
 
 spec :: Spec
 spec =
-  describe "CoreForAll.Check.check" $
+  describe "Core.Check.check" $
     mapM_ mkTest typeCheckTests
   where
     mkTest (name, e, t) =

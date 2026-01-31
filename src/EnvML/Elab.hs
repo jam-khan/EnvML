@@ -2,7 +2,7 @@
 
 module EnvML.Elab where
 
-import qualified CoreForAll.Syntax as Core
+import qualified Core.Syntax as Core
 import qualified EnvML.Syntax as EnvML
 
 -- import            Control.Monad (unless)

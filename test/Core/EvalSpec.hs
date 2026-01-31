@@ -1,8 +1,8 @@
-module CoreForAll.EvalSpec (spec) where
+module Core.EvalSpec (spec) where
 
 --
-import CoreForAll.Eval (eval)
-import CoreForAll.Syntax
+import Core.Eval (eval)
+import Core.Syntax
 import Test.Hspec
 
 eval0 :: Exp -> Maybe Exp
@@ -94,7 +94,7 @@ evalTests =
 
 spec :: Spec
 spec =
-  describe "CoreForAll.Eval.eval" $
+  describe "Core.Eval.eval" $
     mapM_ mkTest evalTests
   where
     mkTest (name, e, expected) =

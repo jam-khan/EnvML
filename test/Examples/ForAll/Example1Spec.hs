@@ -1,6 +1,6 @@
 module Examples.ForAll.Example1Spec where
 
-import qualified CoreForAll.Syntax as C
+import qualified Core.Syntax as C
 import Data.Either (isLeft, isRight)
 import qualified EnvML.Elab as ElabD
 import qualified EnvML.Parser.AST as N

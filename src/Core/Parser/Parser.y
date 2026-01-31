@@ -1,8 +1,8 @@
 {
-module CoreForAll.Parser.Parser (parseTyp, parseEnv, parseExp) where
+module Core.Parser.Parser (parseTyp, parseEnv, parseExp) where
 
-import CoreForAll.Parser.Lexer (Token(..))
-import CoreForAll.Syntax
+import Core.Parser.Lexer (Token(..))
+import Core.Syntax
 }
 
 %name parseTyp Typ

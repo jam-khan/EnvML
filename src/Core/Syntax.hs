@@ -1,4 +1,4 @@
-module CoreForAll.Syntax where
+module Core.Syntax where
 
 type TyEnv = [TyEnvE]
 
