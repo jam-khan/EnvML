@@ -1,10 +1,9 @@
 module EnvML.Parser.DesugarSpec (spec) where
 
 import EnvML.Parser.AST
-import EnvML.Parser.HappyAlex.Lexer (lexer)
-import EnvML.Parser.HappyAlex.Parser (parseExp, parseModule, parseModuleTyp, parseTyp)
+import EnvML.Parser.Lexer (lexer)
+import EnvML.Parser.Parser (parseExp, parseModule, parseModuleTyp, parseTyp)
 import EnvML.Desugar
-import EnvML.Parser.Pretty
 import Test.Hspec
 
 spec :: Spec

@@ -1,5 +1,5 @@
 {
-module EnvML.Parser.HappyAlex.Lexer (Token(..), lexer) where
+module EnvML.Parser.Lexer (Token(..), lexer) where
 }
 
 %wrapper "basic"

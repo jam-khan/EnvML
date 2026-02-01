@@ -1,7 +1,7 @@
 {
-module EnvML.Parser.HappyAlex.Parser where
+module EnvML.Parser.Parser where
 
-import EnvML.Parser.HappyAlex.Lexer
+import EnvML.Parser.Lexer
 import EnvML.Parser.AST
 }
 

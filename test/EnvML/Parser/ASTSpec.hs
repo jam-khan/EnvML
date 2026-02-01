@@ -1,8 +1,6 @@
 module EnvML.Parser.ASTSpec (spec) where
 
 import EnvML.Parser.AST
-import EnvML.Parser.Pretty
-
 import Test.Hspec
 
 spec :: Spec

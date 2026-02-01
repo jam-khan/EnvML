@@ -1,11 +1,13 @@
 {-# LANGUAGE LambdaCase #-}
 module EnvML.DeBruijn where
 
-import Data.List (elemIndex)
 import qualified EnvML.Parser.AST as S  -- Source (Named, Desugared)
 import qualified EnvML.Syntax as T      -- Target (Nameless, Core EnvML)
 
-type Ctx = [S.Name]
+data CtxEntry = TermEntry S.Name | TypeEntry S.Name
+  deriving (Show, Eq)
+
+type Ctx = [CtxEntry]
 
 toDeBruijn :: S.Exp -> T.Exp
 toDeBruijn = convExp []
@@ -16,11 +18,25 @@ typToDeBruijn = convTyp []
 modToDeBruijn :: S.Module -> T.Module
 modToDeBruijn = convModule []
 
+-- Lookup term variable (skips TypeEntry, counts TermEntry)
 lookupVar :: S.Name -> Ctx -> Int
-lookupVar x ctx =
-  case elemIndex x ctx of
-    Just i -> i
-    Nothing -> error $ "Unbound variable: " ++ x
+lookupVar x ctx = go ctx 0
+  where
+    go [] _ = error $ "Unbound variable: " ++ x
+    go (TermEntry n : ns) i
+      | n == x    = i
+      | otherwise = go ns (i + 1)
+    go (TypeEntry _ : ns) i = go ns i  -- skip type entries
+
+-- Lookup type variable (skips TermEntry, counts TypeEntry)
+lookupTyVar :: S.Name -> Ctx -> Int
+lookupTyVar x ctx = go ctx 0
+  where
+    go [] _ = error $ "Unbound type variable: " ++ x
+    go (TypeEntry n : ns) i
+      | n == x    = i
+      | otherwise = go ns (i + 1)
+    go (TermEntry _ : ns) i = go ns i
 
 -- Expression Conversion
 convExp :: Ctx -> S.Exp -> T.Exp
@@ -28,11 +44,11 @@ convExp ctx = \case
   S.Lit l -> T.Lit (convLit l)
   S.Var x -> T.Var (lookupVar x ctx)
   S.Lam [(x, _arg)] body ->
-    T.Lam (convExp (x : ctx) body)
+    T.Lam (convExp (TermEntry x : ctx) body)
   S.Lam _ _ -> 
     error "Multi-arg lambda should be desugared already!"
   S.TLam [(x, S.TyArg)] body ->
-    T.TLam (convExp (x : ctx) body)
+    T.TLam (convExp (TypeEntry x : ctx) body)
   S.TLam _ _ ->
     error "Multi-arg TLam should be desugared already!"  
   S.App e1 e2 ->
@@ -84,11 +100,11 @@ convLit = \case
 convTyp :: Ctx -> S.Typ -> T.Typ
 convTyp ctx = \case
   S.TyLit l -> T.TyLit (convTyLit l)
-  S.TyVar x -> T.TyVar (lookupVar x ctx)
+  S.TyVar x -> T.TyVar (lookupTyVar x ctx)
   S.TyArr t1 t2 ->
     T.TyArr (convTyp ctx t1) (convTyp ctx t2)
   S.TyAll x t ->
-    T.TyAll (convTyp (x : ctx) t)
+    T.TyAll (convTyp (TypeEntry x : ctx) t)
   -- Must reverse environment!
   S.TyBoxT tyCtx t ->
     let tyEnv = convTyCtx ctx tyCtx
@@ -120,20 +136,13 @@ convTyCtx outerCtx tyCtx =
 extractTyCtxNamesForward :: S.TyCtx -> Ctx
 extractTyCtxNamesForward = concatMap getName
   where
-    getName (S.TypeN n _) = [n]
+    getName (S.TypeN n _) = [TypeEntry n]   -- type annotation
     getName (S.Type _) = []
-    getName (S.KindN n) = [n]
+    getName (S.KindN n) = [TypeEntry n]     -- kind (abstract type)
     getName S.Kind = []
-    getName (S.TypeEqN n _) = [n]
-    getName (S.TyMod n _) = [n]
-    getName (S.TypeEqM n _) = [n]
-
-convTyCtxHelper :: Ctx -> S.TyCtx -> T.TyEnv
-convTyCtxHelper _ [] = []
-convTyCtxHelper ctx (e : es) =
-  let e' = convTyCtxE ctx e
-      ctx' = extendCtxWithTyCtxE e ctx
-  in e' : convTyCtxHelper ctx' es
+    getName (S.TypeEqN n _) = [TypeEntry n] -- type equation
+    getName (S.TyMod n _) = [TermEntry n]   -- module is a term
+    getName (S.TypeEqM n _) = [TypeEntry n] -- module type is a type
 
 convTyCtxE :: Ctx -> S.TyCtxE -> T.TyEnvE
 convTyCtxE ctx = \case
@@ -147,16 +156,6 @@ convTyCtxE ctx = \case
 
 extractTyCtxNames :: S.TyCtx -> Ctx
 extractTyCtxNames = reverse . extractTyCtxNamesForward
-
-extendCtxWithTyCtxE :: S.TyCtxE -> Ctx -> Ctx
-extendCtxWithTyCtxE e ctx = case e of
-  S.TypeN   n _ -> n : ctx
-  S.Type      _ -> ctx
-  S.KindN   n   -> n : ctx
-  S.Kind        -> ctx
-  S.TypeEqN n _ -> n : ctx
-  S.TyMod   n _ -> n : ctx
-  S.TypeEqM n _ -> n : ctx
 
 convEnv :: Ctx -> S.Env -> T.Env  
 convEnv outerCtx env =
@@ -172,19 +171,12 @@ convEnv outerCtx env =
 extractEnvNamesForward :: S.Env -> Ctx
 extractEnvNamesForward = concatMap getName
   where
-    getName (S.ExpEN n _) = [n]
+    getName (S.ExpEN n _) = [TermEntry n]
     getName (S.ExpE _) = []
-    getName (S.TypEN n _) = [n]
+    getName (S.TypEN n _) = [TypeEntry n]
     getName (S.TypE _) = []
-    getName (S.ModE n _) = [n]
-    getName (S.ModTypE n _) = [n]
-
-convEnvHelper :: Ctx -> S.Env -> T.Env
-convEnvHelper _ [] = []
-convEnvHelper ctx (e : es) =
-  let e' = convEnvE ctx e
-      ctx' = extendCtxWithEnvE e ctx
-  in e' : convEnvHelper ctx' es
+    getName (S.ModE n _) = [TermEntry n]      -- modules are terms
+    getName (S.ModTypE n _) = [TypeEntry n]
 
 convEnvE :: Ctx -> S.EnvE -> T.EnvE
 convEnvE ctx = \case
@@ -195,14 +187,6 @@ convEnvE ctx = \case
   S.ModE _n m     -> T.ModExpE (T.ModE (convModule ctx m))  
   S.ModTypE _n mt -> T.ModTypE (convTyp ctx (S.TyModule mt))
 
-extendCtxWithEnvE :: S.EnvE -> Ctx -> Ctx
-extendCtxWithEnvE e ctx = case e of
-  S.ExpEN n _   -> n : ctx
-  S.ExpE    _   -> ctx
-  S.TypEN n _   -> n : ctx
-  S.TypE    _   -> ctx
-  S.ModE  n _   -> n : ctx
-  S.ModTypE n _ -> n : ctx
 
 -- Extract all names from environment (REVERSED to match conversion)
 extractEnvNames :: S.Env -> Ctx
@@ -213,7 +197,7 @@ convModuleTyp ctx = \case
   S.TyArrowM t mt ->
     T.TyArrowM (convTyp ctx t) (convModuleTyp ctx mt)  
   S.ForallM x mt ->
-    convModuleTyp (x : ctx) mt
+    convModuleTyp (TypeEntry x : ctx) mt
   S.TySig intf ->
     T.TySig (convIntf ctx intf)
 
@@ -230,18 +214,11 @@ convIntf outerCtx intf =
 extractIntfNamesForward :: S.Intf -> Ctx
 extractIntfNamesForward = concatMap getName
   where
-    getName (S.TyDef n _) = [n]
-    getName (S.ValDecl n _) = [n]
-    getName (S.ModDecl n _) = [n]
-    getName (S.FunctorDecl n _ _) = [n]
-    getName (S.SigDecl n _) = [n]
-
-convIntfHelper :: Ctx -> S.Intf -> T.Intf
-convIntfHelper _ [] = []
-convIntfHelper ctx (e : es) =
-  let e' = convIntfE ctx e
-      ctx' = extendCtxWithIntfE e ctx
-  in e' : convIntfHelper ctx' es
+    getName (S.TyDef n _) = [TypeEntry n]       -- type definition
+    getName (S.ValDecl n _) = [TermEntry n]     -- value declaration
+    getName (S.ModDecl n _) = [TermEntry n]     -- module is a term
+    getName (S.FunctorDecl n _ _) = [TermEntry n]
+    getName (S.SigDecl n _) = [TypeEntry n]     -- signature is a type
 
 convIntfE :: Ctx -> S.IntfE -> T.IntfE
 convIntfE ctx = \case
@@ -252,23 +229,14 @@ convIntfE ctx = \case
     error "FunctorDecl should be desugared to ModDecl!"  
   S.SigDecl _n intf -> T.SigDecl (convTyp ctx (S.TyModule (S.TySig intf)))
 
--- | Extend context with names from IntfE
-extendCtxWithIntfE :: S.IntfE -> Ctx -> Ctx
-extendCtxWithIntfE e ctx = case e of
-  S.TyDef n _ -> n : ctx
-  S.ValDecl n _ -> n : ctx
-  S.ModDecl n _ -> n : ctx
-  S.FunctorDecl n _ _ -> n : ctx
-  S.SigDecl n _ -> n : ctx
-
 -- Module Conversion
 convModule :: Ctx -> S.Module -> T.Module
 convModule ctx = \case
   S.VarM x -> T.VarM (lookupVar x ctx)
   S.Functor [(x, S.TyArg)] body ->
-    T.Functort (convModule (x : ctx) body)  
+    T.Functort (convModule (TypeEntry x : ctx) body)  
   S.Functor [(x, _)] body ->
-    T.Functor (convModule (x : ctx) body)
+    T.Functor (convModule (TermEntry x : ctx) body)
   S.Functor _ _ ->
     error "Multi-arg functor should be desugared!"
   S.Struct _imports env ->

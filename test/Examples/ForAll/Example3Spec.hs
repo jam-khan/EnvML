@@ -4,7 +4,7 @@ import qualified Core.Syntax as C
 import Data.Either (isLeft, isRight)
 import EnvML.Parser.AST
 import Test.Hspec
-import EnvML.Parser.Parse (parseEmlFile)
+import EnvML.Parse (parseEmlFile)
 
 
 examplePath :: String

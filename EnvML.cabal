@@ -10,16 +10,15 @@ library
     
     exposed-modules:    Utils 
                         Syntax
+                        WASM
                         EnvML.Elab
                         EnvML.Syntax
                         EnvML.Desugar
                         EnvML.DeBruijn
                         EnvML.Parser.AST
-                        EnvML.Parser.Pretty
-                        EnvML.Parser.Parse
-                        EnvML.Parser.HappyAlex.Parser
-                        EnvML.Parser.HappyAlex.Lexer
-                        EnvML.Parser.ElabAST
+                        EnvML.Parse
+                        EnvML.Parser.Parser
+                        EnvML.Parser.Lexer
                         Core.Eval
                         Core.Check
                         Core.Syntax

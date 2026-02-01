@@ -1,7 +1,7 @@
 module EnvML.Examples.BasicModuleSpec (spec) where
 
 import Test.Hspec
-import EnvML.Parser.Parse
+import EnvML.Parse
 import EnvML.Parser.AST
 
 shouldParseAs :: IO Module -> Module -> Expectation

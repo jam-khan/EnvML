@@ -76,9 +76,8 @@ proofs/Makefile.conf
 proofs/Makefile
 src/EnvML/Parser/Happy.info
 .vscode/*
-.vscode
 
-src/EnvML/Parser/HappyAlex/Lexer.hs
-src/EnvML/Parser/HappyAlex/Parser.hs
+src/EnvML/Parser/Lexer.hs
+src/EnvML/Parser/Parser.hs
 src/Core/Parser/Lexer.hs
 src/Core/Parser/Parser.hs

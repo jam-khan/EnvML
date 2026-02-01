@@ -1,8 +1,8 @@
 module EnvML.Parser.ParserSpec (spec) where
 
 import EnvML.Parser.AST
-import EnvML.Parser.HappyAlex.Lexer (lexer)
-import EnvML.Parser.HappyAlex.Parser (parseExp, parseModule, parseModuleTyp, parseTyp)
+import EnvML.Parser.Lexer (lexer)
+import EnvML.Parser.Parser (parseExp, parseModule, parseModuleTyp, parseTyp)
 import Test.Hspec
 
 spec :: Spec

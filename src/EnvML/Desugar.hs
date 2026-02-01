@@ -1,7 +1,6 @@
 module EnvML.Desugar where
 
 import EnvML.Parser.AST as N
-import EnvML.Parser.Pretty
 
 desugarExp :: N.Exp -> N.Exp
 desugarExp e = case e of

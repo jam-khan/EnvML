@@ -1,8 +1,8 @@
 module EnvML.Parser.DeBruijnSpec (spec) where
 
 import EnvML.Parser.AST as S
-import EnvML.Parser.HappyAlex.Lexer (lexer)
-import EnvML.Parser.HappyAlex.Parser (parseExp, parseModule, parseTyp)
+import EnvML.Parser.Lexer (lexer)
+import EnvML.Parser.Parser (parseExp, parseModule, parseTyp)
 import EnvML.Desugar (desugarExp, desugarModule, desugarTyp)
 import EnvML.DeBruijn
 import qualified EnvML.Syntax as T
@@ -137,8 +137,7 @@ typeLambdaTests =
   
   , -- Type variable reference in type annotation
     ( "fun (type a) -> fun (x : a) -> (x :: a)"
-    , T.TLam (T.Lam (T.Anno (T.Var 0) (T.TyVar 1)))
-    --                                          ^-- 'a' at index 1
+    , T.TLam (T.Lam (T.Anno (T.Var 0) (T.TyVar 0)))  -- was TyVar 1
     )
   ]
 
@@ -162,8 +161,7 @@ nestedScopeTests =
   
   , -- Mixed type and term
     ( "fun (type t) -> fun (x : int) -> fun (type u) -> fun (y : int) -> x"
-    , T.TLam (T.Lam (T.TLam (T.Lam (T.Var 2))))
-    --                                      ^-- skip y, u, to get x
+    , T.TLam (T.Lam (T.TLam (T.Lam (T.Var 1))))  -- was Var 2
     )
   ]
 

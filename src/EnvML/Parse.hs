@@ -1,13 +1,13 @@
 
-module EnvML.Parser.Parse
+module EnvML.Parse
   ( parseEmlFile
   , parseEmliFile
   , module EnvML.Parser.AST
   ) where
 
 import EnvML.Parser.AST
-import EnvML.Parser.HappyAlex.Lexer (lexer)
-import EnvML.Parser.HappyAlex.Parser (parseModule, parseModuleTyp)
+import EnvML.Parser.Lexer (lexer)
+import EnvML.Parser.Parser (parseModule, parseModuleTyp)
 
 parseEmlFile :: FilePath -> IO Module
 parseEmlFile path = parseModule . lexer <$> readFile path

@@ -6,7 +6,7 @@ module type ENV =
     val inc : t -> t;;
   end;;
 
-module let env : ENV =
+module env : ENV =
   struct
     type t = int;;
     let inc : t -> t = fun (n) -> n + 1;;

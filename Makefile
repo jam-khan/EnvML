@@ -7,10 +7,10 @@ CORE_LEXER_OUT	= src/Core/Parser/Lexer.hs
 CORE_PARSER_IN 	= src/Core/Parser/Parser.y
 CORE_PARSER_OUT = src/Core/Parser/Parser.hs
 
-ENVML_LEXER_IN  = src/EnvML/Parser/HappyAlex/Lexer.x
-ENVML_LEXER_OUT = src/EnvML/Parser/HappyAlex/Lexer.hs
-ENVML_PARSER_IN = src/EnvML/Parser/HappyAlex/Parser.y
-ENVML_PARSER_OUT= src/EnvML/Parser/HappyAlex/Parser.hs
+ENVML_LEXER_IN  = src/EnvML/Parser/Lexer.x
+ENVML_LEXER_OUT = src/EnvML/Parser/Lexer.hs
+ENVML_PARSER_IN = src/EnvML/Parser/Parser.y
+ENVML_PARSER_OUT= src/EnvML/Parser/Parser.hs
 
 GEN_FILES = $(CORE_LEXER_OUT) $(ENVML_LEXER_OUT) $(CORE_PARSER_OUT) $(ENVML_PARSER_OUT)
 
