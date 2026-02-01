@@ -69,21 +69,20 @@ import EnvML.Parser.AST
 -- .eml Files (Structs)
 -------------------------------------------------------------------------
 
--- A program file is implicitly a Struct containing a list of Env elements
 ModuleBody :: { Module }
   : ModuleImports ModuleEnv { Struct $1 $2 }
 
 ModuleEnv :: { Env }
   : ModuleEnvElem ModuleEnv     { $1 : $2 }
-  |                       { [] }
+  |                              { [] }
 
-ModuleEnvElem :: { (Name, EnvE) }
-  : let id '=' Exp ';;'   { ($2, ExpE $4) }
-  | let id ':' Typ '=' Exp ';;' { ($2, ExpE (Anno $6 $4)) }
-  | type id '=' Typ ';;'  { ($2, TypE $4) }
-  | module let id '=' Exp ';;' { ($3, ModExpE $5) }
-  | module let id ':' Typ '=' Exp ';;' { ($3, ModExpE (Anno $7 $5)) }
-  | module type id '=' Typ ';;' { ($3, ModTypE $5) }
+ModuleEnvElem :: { EnvE }
+  : let id '=' Exp ';;'                    { ExpEN $2 $4 }
+  | let id ':' Typ '=' Exp ';;'            { ExpEN $2 (Anno $6 $4) }
+  | type id '=' Typ ';;'                   { TypEN $2 $4 }
+  | module id '=' ModuleExp ';;'           { ModE $2 $4 }
+  | module id ':' ModuleTyp '=' ModuleExp ';;' { ModE $2 $6 }
+  | module type id '=' ModuleTyp ';;'      { ModTypE $3 $5 }
 
 ModuleImports :: { Imports }
   : import ImportList ';;'    { $2 }  
@@ -100,110 +99,129 @@ ImportItem :: { (Name, Typ) }
 -- .emli Files (Signatures)
 -------------------------------------------------------------------------
 
--- An interface file is implicitly a TySig containing a list of Intf elements
 InterfaceBody :: { ModuleTyp }
-  : Intf { TySig $1 }
-  | Typ '->m' InterfaceBody { TyArrowM $1 $3 }
+  : Intf                         { TySig $1 }
+  | forall id '.' InterfaceBody  { ForallM $2 $4 }
+  | Typ '->m' InterfaceBody      { TyArrowM $1 $3 }
 
 Intf :: { Intf }
   : IntfE Intf          { $1 : $2 }
   |                     { [] }
 
 IntfE :: { IntfE }
-  : val id ':' Typ ';;'  { ValDecl $2 $4 }
-  | type id '=' Typ ';;' { TyDef $2 $4 }
-  | module id ':' Typ ';;' { ModDecl $2 $4 }  
-  | module type id '=' Typ ';;' { SigDecl $3 $5 }
+  : val id ':' Typ ';;'                      { ValDecl $2 $4 }
+  | type id '=' Typ ';;'                     { TyDef $2 $4 }
+  | module id ':' ModuleTyp ';;'             { ModDecl $2 $4 }
+  | functor id FunArgs ':' ModuleTyp ';;'    { FunctorDecl $2 $3 $5 }
+  | module type id '=' Intf ';;'             { SigDecl $3 $5 }
 
 -------------------------------------------------------------------------
 -- Core Expressions and Types
 -------------------------------------------------------------------------
 
 Exp :: { Exp }
-  : fun FunArgs '->' Exp   { Lam $2 $4 }
-  | clos '[' Env ']' '(' id ')' '->' Exp  { Clos $3 $6 $9 }
-  | clos '[' Env ']' type id '->' Exp  { TClos $3 $6 $8 }
-  | box '[' Env ']' in Exp            { Box $3 $6 }
-  | Term '::' Typ                     { Anno $1 $3 }
-  | Exp '+' Exp                       { BinOp (Add $1 $3) }
-  | Exp '-' Exp                       { BinOp (Sub $1 $3) }
-  | Term                              { $1 } -- Regular Var take precedence over VarM when parsing Exp
-  | ModuleExp                         { ModE $1 }
+  : fun FunArgs '->' Exp                  { Lam $2 $4 }
+  | clos '[' Env ']' FunArgs '->' Exp     { Clos $3 $5 $7 }
+  | box '[' Env ']' in Exp                { Box $3 $6 }
+  | Term '::' Typ                         { Anno $1 $3 }
+  | Exp '+' Exp                           { BinOp (Add $1 $3) }
+  | Exp '-' Exp                           { BinOp (Sub $1 $3) }
+  | Exp '*' Exp                           { BinOp (Mul $1 $3) }
+  | Term                                  { $1 }
 
 ModuleExp :: { Module }
-  : struct ModuleImports ModuleEnv end { Struct $2 $3 }
-  | ModuleExp '(' ModuleExp ')'         { MApp $1 $3 }
-  | ModuleExp '<' Typ '>'        { MAppt $1 $3 }
-  | link '(' ModuleExp ',' ModuleExp ')' { MLink $3 $5 }
-  | functor FunArgs '->' ModuleExp      { Functor $2 $4 }
-  | id                                { VarM $1 }
-  | '(' ModuleExp ')'                  { $2 }
+  : struct ModuleImports ModuleEnv end      { Struct $2 $3 }
+  | ModuleExp '(' ModuleExp ')'             { MApp $1 $3 }
+  | ModuleExp '<' Typ '>'                   { MAppt $1 $3 }
+  | link '(' ModuleExp ',' ModuleExp ')'    { MLink $3 $5 }
+  | functor FunArgs '->' ModuleExp          { Functor $2 $4 }
+  | id                                      { VarM $1 }
+  | '(' ModuleExp ')'                       { $2 }
 
 Term :: { Exp }
-  : Term '(' Atom ')'                   { App $1 $3 }
-  | Term '<' Typ '>'                  { TApp $1 $3 }
-  | Term '.' id                       { RProj $1 $3 }
-  | Atom                              { $1 }
+  : Term '(' Atom ')'    { App $1 $3 }
+  | Term '<' Typ '>'     { TApp $1 $3 }
+  | Term '.' id          { RProj $1 $3 }
+  | Atom                 { $1 }
 
 Atom :: { Exp }
-  : num                               { Lit (LitInt $1) }
-  | str                               { Lit (LitStr $1) }
-  | true                              { Lit (LitBool True) }
-  | false                              { Lit (LitBool False) }
-  | id                                { Var $1 }
-  | '{' id '=' Exp '}'                { Rec $2 $4 }
-  | '[' Env ']'                       { FEnv $2 }
-  | '(' Exp ')'                       { $2 }
+  : num                  { Lit (LitInt $1) }
+  | str                  { Lit (LitStr $1) }
+  | true                 { Lit (LitBool True) }
+  | false                { Lit (LitBool False) }
+  | id                   { Var $1 }
+  | '{' RecFields '}'    { Rec $2 }
+  | '[' Env ']'          { FEnv $2 }
+  | '(' Exp ')'          { $2 }
+  | ModuleExp            { Mod $1 }
+
+RecFields :: { [(Name, Exp)] }
+  : id '=' Exp ',' RecFields  { ($1, $3) : $5 }
+  | id '=' Exp                { [($1, $3)] }
+  |                           { [] }
 
 FunArgs :: { FunArgs }
-  : '(' FunArg ')' ',' FunArgs                 { $2 : $5 }
-  | '(' FunArg ')'                             { [$2] }
+  : '(' FunArg ')' FunArgs    { $2 : $4 }
+  | '(' FunArg ')'            { [$2] }
 
 FunArg :: { (Name, FunArg) }
-  : id ':' Type                       { ($1, TyArg)    }
-  | id                                { ($1, TmArg)    }
+  : type id             { ($2, TyArg) }
+  | id ':' Typ          { ($1, TmArgType $3) }
+  | id                  { ($1, TmArg) }
 
 Env :: { Env }
   : EnvElem ',' Env  { $1 : $3 }
-  | EnvElem                  { [$1] }
-  |                                  { [] }
+  | EnvElem          { [$1] }
+  |                  { [] }
 
-EnvElem :: { (Name, EnvE) }
-  : id '=' Exp            { ($1, ExpE $3) }
-  | type id '=' Typ       { ($2, TypE $4) }
-  | module id '=' Exp     { ($2, ModExpE $4) }
-  | module type id '=' Typ { ($3, ModTypE $5) }
+EnvElem :: { EnvE }
+  : id '=' Exp                    { ExpEN $1 $3 }
+  | Exp                           { ExpE $1 }
+  | type id '=' Typ               { TypEN $2 $4 }
+  | Typ                           { TypE $1 }
+  | module id '=' ModuleExp       { ModE $2 $4 }
+  | module type id '=' ModuleTyp  { ModTypE $3 $5 }
 
 Typ :: { Typ }
-   : BaseTyp '->' Typ                  { TyArr $1 $3 }
-   | forall id '.' Typ                 { TyAll $2 $4 }
-   | '[' TyEnv ']' '===>' Typ          { TyBoxT $2 $5 }
-   | ModuleTyp                         { TyModule $1 }
-   | BaseTyp                           { $1 }
+  : BaseTyp '->' Typ                  { TyArr $1 $3 }
+  | forall id '.' Typ                 { TyAll $2 $4 }
+  | '[' TyCtx ']' '===>' Typ          { TyBoxT $2 $5 }
+  | ModuleTyp                         { TyModule $1 }
+  | BaseTyp                           { $1 }
 
 BaseTyp :: { Typ }
-  : int                               { TyLit TyInt }
-  | bool                              { TyLit TyBool }
-  | stringt                           { TyLit TyStr }
-  | id                                { TyVar $1 }
-  | '{' id ':' Typ '}'                { TyRcd $2 $4 }
-  | '[' TyEnv ']'                     { TyEnvt $2 }
-  | '(' Typ ')'                       { $2 }
+  : int                    { TyLit TyInt }
+  | bool                   { TyLit TyBool }
+  | stringt                { TyLit TyStr }
+  | id                     { TyVar $1 }
+  | '{' TyRcdFields '}'    { TyRcd $2 }
+  | '[' TyCtx ']'          { TyCtx $2 }
+  | '(' Typ ')'            { $2 }
+
+TyRcdFields :: { [(Name, Typ)] }
+  : id ':' Typ ',' TyRcdFields  { ($1, $3) : $5 }
+  | id ':' Typ                  { [($1, $3)] }
+  |                             { [] }
 
 ModuleTyp :: { ModuleTyp }
-  : sig Intf end                      { TySig $2 }
-  | Typ '->m' ModuleTyp               { TyArrowM $1 $3 }
-  | '(' ModuleTyp ')'                 { $2 }
+  : sig Intf end                { TySig $2 }
+  | forall id '.' ModuleTyp     { ForallM $2 $4 }
+  | Typ '->m' ModuleTyp         { TyArrowM $1 $3 }
+  | '(' ModuleTyp ')'           { $2 }
 
-TyEnv :: { TyEnv }
-  : TyEnvElem ',' TyEnv               { $1 : $3 }
-  | TyEnvElem                         { [$1] }
-  |                                   { [] }
+TyCtx :: { TyCtx }
+  : TyCtxElem ',' TyCtx  { $1 : $3 }
+  | TyCtxElem            { [$1] }
+  |                      { [] }
 
-TyEnvElem :: { (Name, TyEnvE) }
-  : id ':' Type                       { ($1, Kind) }
-  | id ':' Typ                        { ($1, Type $3) }
-  | id ':' '(' Typ ')' '='           { ($1, TypeEq $4) }
+TyCtxElem :: { TyCtxE }
+  : id ':' Type                         { KindN $1 }
+  | Type                                { Kind }
+  | id ':' Typ                          { TypeN $1 $3 }
+  | Typ                                 { Type $1 }
+  | type id '=' Typ                     { TypeEqN $2 $4 }
+  | module id ':' ModuleTyp             { TyMod $2 $4 }
+  | module type id '=' ModuleTyp        { TypeEqM $3 $5 }
 
 {
 parseError :: [Token] -> a
