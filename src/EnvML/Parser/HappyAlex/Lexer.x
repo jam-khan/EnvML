@@ -24,6 +24,7 @@ tokens :-
   Type        { \_ -> TokBType }
   fun         { \_ -> TokFun  }
   clos        { \_ -> TokClos }
+  tclos       { \_ -> TokTClos}
   box         { \_ -> TokBox  }
   in          { \_ -> TokIn  }
   forall      { \_ -> TokForall }
@@ -81,6 +82,7 @@ data Token
   | TokVal
   | TokFun
   | TokClos
+  | TokTClos
   | TokBox
   | TokIn
   | TokForall

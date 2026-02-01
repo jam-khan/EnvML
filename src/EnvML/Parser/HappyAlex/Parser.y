@@ -28,6 +28,7 @@ import EnvML.Parser.AST
   num       { TokInt $$ }
   fun       { TokFun   }
   clos      { TokClos  }
+  tclos     { TokTClos }
   box       { TokBox   }
   in        { TokIn    }
   forall    { TokForall }
@@ -122,6 +123,7 @@ IntfE :: { IntfE }
 Exp :: { Exp }
   : fun FunArgs '->' Exp                  { Lam $2 $4 }
   | clos '[' Env ']' FunArgs '->' Exp     { Clos $3 $5 $7 }
+  | tclos '[' Env ']' FunArgs '->' Exp    { TClos $3 $5 $7 }
   | box '[' Env ']' in Exp                { Box $3 $6 }
   | Term '::' Typ                         { Anno $1 $3 }
   | Exp '+' Exp                           { BinOp (Add $1 $3) }
