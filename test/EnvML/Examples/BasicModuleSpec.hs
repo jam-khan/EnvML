@@ -28,7 +28,7 @@ spec = do
 
       it "parses x.eml" $ 
         parseEmlFile "examples/rest/basic-module/x.eml" `shouldParseAs` Struct []
-          [ ("x", ExpE (Lit (LitInt 1)))
+          [ ExpEN "x" (Lit (LitInt 1))
           ]
 
       it "parses x.emli" $ 

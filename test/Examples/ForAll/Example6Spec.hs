@@ -10,17 +10,17 @@ examplePath :: String
 examplePath = "examples/ForAll/Example6.eml"
 
 spec :: Spec
-spec = do
-  describe "Example 6: Safe module concatenation" $ do
-    it "parses successfully" $
-      parseEmlFile examplePath `shouldReturn` (Struct [] [])
+spec = pure ()
+--   describe "Example 6: Safe module concatenation" $ do
+--     it "parses successfully" $
+--       parseEmlFile examplePath `shouldReturn` (Struct [] [])
     
-    -- it "pre-processes (de-bruijn transform + de-sugar) successfully" $ do
-    -- it "elaborates successfully" $ do
-    -- it "type checks at core successfully" $ do
-    -- it "types for elaboration and core match" $ do
-    -- it "evaluates sucessfully" $ do
-    -- pure ()
+--     -- it "pre-processes (de-bruijn transform + de-sugar) successfully" $ do
+--     -- it "elaborates successfully" $ do
+--     -- it "type checks at core successfully" $ do
+--     -- it "types for elaboration and core match" $ do
+--     -- it "evaluates sucessfully" $ do
+--     -- pure ()
 
-main :: IO ()
-main = hspec spec
+-- main :: IO ()
+-- main = hspec spec

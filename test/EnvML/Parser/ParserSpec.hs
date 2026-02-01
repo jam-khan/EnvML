@@ -10,43 +10,43 @@ spec = do
   describe "EnvML.Parser (.eml / Modules)" $ do
     it "parses let binding" $ do
       let input = "let x = 1;;"
-      let expected = Struct [] [("x", ExpE (Lit (LitInt 1)))]
+      let expected = Struct [] [ExpEN "x" (Lit (LitInt 1))]
       parseModule (lexer input) `shouldBe` expected
 
     it "parses let binding with explicit type annotation" $ do
       let input = "let x : int = 1;;"
-      let expected = Struct [] [("x", ExpE (Anno (Lit (LitInt 1)) (TyLit TyInt)))]
+      let expected = Struct [] [ExpEN "x" (Anno (Lit (LitInt 1)) (TyLit TyInt))]
       parseModule (lexer input) `shouldBe` expected
 
     it "parses type binding" $ do
       let input = "type t = int;;"
-      let expected = Struct [] [("t", TypE (TyLit TyInt))]
+      let expected = Struct [] [TypEN "t" (TyLit TyInt)]
       parseModule (lexer input) `shouldBe` expected
 
     it "parses module let binding" $ do
-      let input = "module let x = struct end;;"
-      let expected = Struct [] [("x", ModExpE (ModE (Struct [] [])))]
+      let input = "module x = struct end;;"
+      let expected = Struct [] [ModE "x" (Struct [] [])]
       parseModule (lexer input) `shouldBe` expected
 
     it "parses module let binding with explicit type annotation" $ do
-      let input = "module let x : sig end = struct end;;"
-      let expected = Struct [] [("x", ModExpE (Anno (ModE (Struct [] [])) (TyModule (TySig []))))]
+      let input = "module x : sig end = struct end;;"
+      let expected = Struct [] [ModE "x" (Struct [] [])]
       parseModule (lexer input) `shouldBe` expected
 
     it "parses module type binding" $ do
       let input = "module type x = sig end;;"
-      let expected = Struct [] [("x", ModTypE (TyModule (TySig [])))]
+      let expected = Struct [] [ModTypE "x" (TySig [])]
       parseModule (lexer input) `shouldBe` expected
 
     it "parses multiple bindings" $ do
-      let input = "let x = 1;; type t = int;; module let y = struct end;; module type m = sig end;;"
+      let input = "let x = 1;; type t = int;; module y = struct end;; module type m = sig end;;"
       let expected =
             Struct
               []
-              [ ("x", ExpE (Lit (LitInt 1))),
-                ("t", TypE (TyLit TyInt)),
-                ("y", ModExpE (ModE (Struct [] []))),
-                ("m", ModTypE (TyModule (TySig [])))
+              [ ExpEN "x" (Lit (LitInt 1)),
+                TypEN "t" (TyLit TyInt),
+                ModE "y" (Struct [] []),
+                ModTypE "m" (TySig [])
               ]
       parseModule (lexer input) `shouldBe` expected
 
@@ -91,13 +91,18 @@ spec = do
       parseModuleTyp (lexer input) `shouldBe` expected
 
     it "parses module declarations inside signatures" $ do
-      let input = "module M : S;;"
-      let expected = TySig [ModDecl "M" (TyVar "S")]
+      let input = "module M : sig end;;"
+      let expected = TySig [ModDecl "M" (TySig [])]
       parseModuleTyp (lexer input) `shouldBe` expected
 
     it "parses module type definitions" $ do
-      let input = "module type S = sig end;;"
-      let expected = TySig [SigDecl "S" (TyModule (TySig []))]
+      let input = "module type S = ;;"
+      let expected = TySig [SigDecl "S" []]
+      parseModuleTyp (lexer input) `shouldBe` expected
+
+    it "parses functor declaration in signature" $ do
+      let input = "functor M (x : int) : sig end;;"
+      let expected = TySig [FunctorDecl "M" [("x", TmArgType (TyLit TyInt))] (TySig [])]
       parseModuleTyp (lexer input) `shouldBe` expected
 
   describe "EnvML.Parser (Expressions)" $ do
@@ -130,10 +135,10 @@ spec = do
       let input = "clos [type t = int, x = 1] (y) -> y"
       let expected =
             Clos
-              [ ("t", TypE (TyLit TyInt)),
-                ("x", ExpE (Lit (LitInt 1)))
+              [ TypEN "t" (TyLit TyInt),
+                ExpEN "x" (Lit (LitInt 1))
               ]
-              "y"
+              [("y", TmArg)]
               (Var "y")
       parseExp (lexer input) `shouldBe` expected
 
@@ -142,7 +147,7 @@ spec = do
       let expected =
             Clos
               []
-              "y"
+              [("y", TmArg)]
               (Var "y")
       parseExp (lexer input) `shouldBe` expected
 
@@ -157,24 +162,13 @@ spec = do
       parseExp (lexer input) `shouldBe` expected
 
     it "parses type lambda functions" $ do
-      let input = "fun (a : Type) -> x"
+      let input = "fun (type a) -> x"
       let expected = Lam [("a", TyArg)] (Var "x")
       parseExp (lexer input) `shouldBe` expected
 
     it "parses nested type lambda functions" $ do
-      let input = "fun (x : Type) -> fun (y : Type) -> y"
+      let input = "fun (type x) -> fun (type y) -> y"
       let expected = Lam [("x", TyArg)] (Lam [("y", TyArg)] (Var "y"))
-      parseExp (lexer input) `shouldBe` expected
-
-    it "parses type closure" $ do
-      let input = "clos [type t = int, x = 1] type y -> x"
-      let expected =
-            TClos
-              [ ("t", TypE (TyLit TyInt)),
-                ("x", ExpE (Lit (LitInt 1)))
-              ]
-              "y"
-              (Var "x")
       parseExp (lexer input) `shouldBe` expected
 
     it "parses type function application" $ do
@@ -191,15 +185,20 @@ spec = do
       let input = "box [type t = int, x = 1] in x"
       let expected =
             Box
-              [ ("t", TypE (TyLit TyInt)),
-                ("x", ExpE (Lit (LitInt 1)))
+              [ TypEN "t" (TyLit TyInt),
+                ExpEN "x" (Lit (LitInt 1))
               ]
               (Var "x")
       parseExp (lexer input) `shouldBe` expected
 
     it "parses record construction" $ do
       let input = "{label = 5}"
-      let expected = Rec "label" (Lit (LitInt 5))
+      let expected = Rec [("label", Lit (LitInt 5))]
+      parseExp (lexer input) `shouldBe` expected
+
+    it "parses record with multiple fields" $ do
+      let input = "{x = 1, y = 2}"
+      let expected = Rec [("x", Lit (LitInt 1)), ("y", Lit (LitInt 2))]
       parseExp (lexer input) `shouldBe` expected
 
     it "parses record projection" $ do
@@ -211,10 +210,10 @@ spec = do
       let input = "[type t = int, x = 1, module type M = sig end, module N = struct end]"
       let expected =
             FEnv
-              [ ("t", TypE (TyLit TyInt)),
-                ("x", ExpE (Lit (LitInt 1))),
-                ("M", ModTypE (TyModule (TySig []))),
-                ("N", ModExpE (ModE (Struct [] [])))
+              [ TypEN "t" (TyLit TyInt),
+                ExpEN "x" (Lit (LitInt 1)),
+                ModTypE "M" (TySig []),
+                ModE "N" (Struct [] [])
               ]
       parseExp (lexer input) `shouldBe` expected
 
@@ -227,25 +226,25 @@ spec = do
       let input = "box [type t = int, x = 1] in fun (y) -> x"
       let expected =
             Box
-              [ ("t", TypE (TyLit TyInt)),
-                ("x", ExpE (Lit (LitInt 1)))
+              [ TypEN "t" (TyLit TyInt),
+                ExpEN "x" (Lit (LitInt 1))
               ]
               (Lam [("y", TmArg)] (Var "x"))
       parseExp (lexer input) `shouldBe` expected
 
     it "parses functor definition" $ do
-      let input = "functor (x) -> struct end"
-      let expected = ModE $ Functor [("x", TmArg)] (Struct [] [])
+      let input = "functor (x : int) -> struct end"
+      let expected = Mod $ Functor [("x", TmArgType (TyLit TyInt))] (Struct [] [])
       parseExp (lexer input) `shouldBe` expected
 
     it "parses module application" $ do
-      let input = "(functor (x) -> struct end) (struct end)"
-      let expected = ModE $ MApp (Functor [("x", TmArg)] (Struct [] [])) (Struct [] [])
+      let input = "(functor (x : int) -> struct end) (struct end)"
+      let expected = Mod $ MApp (Functor [("x", TmArgType (TyLit TyInt))] (Struct [] [])) (Struct [] [])
       parseExp (lexer input) `shouldBe` expected
 
     it "parses module linking" $ do
       let input = "link(struct end, struct end)"
-      let expected = ModE $ MLink (Struct [] []) (Struct [] [])
+      let expected = Mod $ MLink (Struct [] []) (Struct [] [])
       parseExp (lexer input) `shouldBe` expected
 
     it "parses binary addition" $ do
@@ -293,21 +292,26 @@ spec = do
 
     it "parses box arrow types" $ do
       let input = "[t : Type] ===> int"
-      let expected = TyBoxT [("t", Kind)] (TyLit TyInt)
+      let expected = TyBoxT [KindN "t"] (TyLit TyInt)
       parseTyp (lexer input) `shouldBe` expected
 
     it "parses record types" $ do
       let input = "{l : int}"
-      let expected = TyRcd "l" (TyLit TyInt)
+      let expected = TyRcd [("l", TyLit TyInt)]
+      parseTyp (lexer input) `shouldBe` expected
+
+    it "parses record types with multiple fields" $ do
+      let input = "{x : int, y : bool}"
+      let expected = TyRcd [("x", TyLit TyInt), ("y", TyLit TyBool)]
       parseTyp (lexer input) `shouldBe` expected
 
     it "parses environment types" $ do
-      let input = "[x : Type, y : int, a : (int)=]"
+      let input = "[x : Type, y : int, type a = int]"
       let expected =
-            TyEnvt
-              [ ("x", Kind),
-                ("y", Type (TyLit TyInt)),
-                ("a", TypeEq (TyLit TyInt))
+            TyCtx
+              [ KindN "x",
+                TypeN "y" (TyLit TyInt),
+                TypeEqN "a" (TyLit TyInt)
               ]
       parseTyp (lexer input) `shouldBe` expected
 
@@ -322,13 +326,13 @@ spec = do
       parseTyp (lexer input) `shouldBe` expected
 
     it "parses sig types (ModDecl)" $ do
-      let input = "sig module M : S;; end"
-      let expected = TyModule (TySig [ModDecl "M" (TyVar "S")])
+      let input = "sig module M : sig end;; end"
+      let expected = TyModule (TySig [ModDecl "M" (TySig [])])
       parseTyp (lexer input) `shouldBe` expected
 
     it "parses sig types (SigDecl)" $ do
-      let input = "sig module type S = sig end;; end"
-      let expected = TyModule (TySig [SigDecl "S" (TyModule (TySig []))])
+      let input = "sig module type S = ;; end"
+      let expected = TyModule (TySig [SigDecl "S" []])
       parseTyp (lexer input) `shouldBe` expected
 
     it "parses sig types with multiple declarations" $ do
@@ -345,4 +349,9 @@ spec = do
     it "parses module type arrows" $ do
       let input = "int ->m sig end"
       let expected = TyModule $ TyArrowM (TyLit TyInt) (TySig [])
+      parseTyp (lexer input) `shouldBe` expected
+
+    it "parses forall module types" $ do
+      let input = "forall t. sig end"
+      let expected = TyModule $ ForallM "t" (TySig [])
       parseTyp (lexer input) `shouldBe` expected
