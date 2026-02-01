@@ -64,8 +64,8 @@ elabTyp (EnvML.TyBoxT g1 a) =
   Core.TyBoxT <$> elabTyEnv g1 <*> elabTyp a
 elabTyp (EnvML.TySubstT a1 a2) =
   Core.TySubstT <$> elabTyp a1 <*> elabTyp a2
-elabTyp (EnvML.TyRcd l a) =
-  Core.TyRcd l <$> elabTyp a
+elabTyp (EnvML.TyRcd fields) =
+  error "TO FIX"
 elabTyp (EnvML.TyEnvt bs) =
   Core.TyEnvt <$> elabTyEnv bs
 elabTyp (EnvML.TyModule mt) =
@@ -115,21 +115,21 @@ elabLit (EnvML.LitStr s) = Core.LitStr s
 elabExp ::
   EnvML.Exp ->
   Either ElabError Core.Exp
-elabExp (EnvML.Lit lit) = pure $ Core.Lit $ elabLit lit
-elabExp (EnvML.Var i) = pure $ Core.Var i
-elabExp (EnvML.Lam e) = Core.Lam <$> elabExp e
-elabExp (EnvML.Clos e1 e2) = Core.Clos <$> elabEnv e1 <*> elabExp e2
-elabExp (EnvML.App e1 e2) = Core.App <$> elabExp e1 <*> elabExp e2
-elabExp (EnvML.TLam e) = Core.TLam <$> elabExp e
+elabExp (EnvML.Lit lit)     = pure $ Core.Lit $ elabLit lit
+elabExp (EnvML.Var i)       = pure $ Core.Var i
+elabExp (EnvML.Lam e)       = Core.Lam <$> elabExp e
+elabExp (EnvML.Clos e1 e2)  = Core.Clos <$> elabEnv e1 <*> elabExp e2
+elabExp (EnvML.App e1 e2)   = Core.App <$> elabExp e1 <*> elabExp e2
+elabExp (EnvML.TLam e)      = Core.TLam <$> elabExp e
 elabExp (EnvML.TClos env e) = Core.TClos <$> elabEnv env <*> elabExp e
-elabExp (EnvML.TApp e ty) = Core.TApp <$> elabExp e <*> elabTyp ty
-elabExp (EnvML.Box env ty) = Core.Box <$> elabEnv env <*> elabExp ty
-elabExp (EnvML.Rec x e) = Core.Rec x <$> elabExp e
-elabExp (EnvML.RProj e l) = Core.RProj <$> elabExp e <*> pure l
-elabExp (EnvML.FEnv env) = Core.FEnv <$> elabEnv env
-elabExp (EnvML.Anno e ty) = Core.Anno <$> elabExp e <*> elabTyp ty
-elabExp (EnvML.ModE m) = elabM m
-elabExp (EnvML.BinOp op) = case op of
+elabExp (EnvML.TApp e ty)   = Core.TApp <$> elabExp e <*> elabTyp ty
+elabExp (EnvML.Box env ty)  = Core.Box <$> elabEnv env <*> elabExp ty
+elabExp (EnvML.Rec fields)  = error "TO FIX."
+elabExp (EnvML.RProj e l)   = Core.RProj <$> elabExp e <*> pure l
+elabExp (EnvML.FEnv env)    = Core.FEnv <$> elabEnv env
+elabExp (EnvML.Anno e ty)   = Core.Anno <$> elabExp e <*> elabTyp ty
+elabExp (EnvML.ModE m)      = elabM m
+elabExp (EnvML.BinOp op)    = case op of
   EnvML.Add e1 e2 -> fmap Core.BinOp (Core.Add <$> elabExp e1 <*> elabExp e2)
   EnvML.Sub e1 e2 -> fmap Core.BinOp (Core.Sub <$> elabExp e1 <*> elabExp e2)
   EnvML.Mul e1 e2 -> fmap Core.BinOp (Core.Mul <$> elabExp e1 <*> elabExp e2)

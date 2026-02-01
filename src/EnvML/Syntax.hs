@@ -37,7 +37,7 @@ data Typ
   | TyAll    Typ            -- forall a'. T
   | TyBoxT   TyEnv Typ      -- [t1 : int, t2 : int, t3: bool] ==> A
   | TySubstT Typ Typ        -- A[x:=B]
-  | TyRcd    String Typ     -- {l : A}
+  | TyRcd    [(Name, Typ)]  -- {l : A}
   | TyEnvt   TyEnv          -- [t : A, t1 : Type, t2 : A=]
   | TyModule ModuleTyp      -- Note: First-class modules   
   deriving (Show, Eq)
@@ -79,7 +79,7 @@ data Exp
   | TClos Env Exp           -- clos [type t = int, x = 1] -> 
   | TApp  Exp Typ           -- f<t>
   | Box   Env Exp           -- box [type t = int, x = 1] in e 
-  | Rec   Name Exp          -- {l = A}
+  | Rec   [(Name,Exp)]      -- {l1 = A1, ..., l2=A2}
   | RProj Exp Name          -- e.l
   | FEnv  Env               -- [type a = int, x = 1]
   | Anno  Exp Typ           -- (e::A)

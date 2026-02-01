@@ -1,0 +1,32 @@
+module type POLICY = 
+  forall t. sig log : t -> () end
+
+module guest_policy : POLICY =
+  struct (t: type)
+    log : t -> () = func msg => print msg
+  end
+
+(* The host can choose which of these loggers it actually hands out to code. *)
+
+(* Internal engineers (trusted) can print strings and ints to logs *) 
+module trusted (log_int : int -> (), log_str: str ->()) = 
+   out_code : () = log_int(123)
+   out_debug: () = log_str(“debug”)
+
+(* works for internal engineers *)
+let result = 
+  [log_int_impl = (guest_policy @int).log, 
+   log_str_impl = (guest_policy @str).log,
+   trusted = trusted] |> 
+  trusted(log_int_impl, log_str_impl)
+
+(* External tenants / customers (untrusted) can print ints only (event codes), not strings. *)
+module untrusted (log_int : int -> (), log_str: str ->()) = 
+   out_leak: () = log_str(“exfiltrate”)
+
+-- now the untrusted prints “cannot access”: the “string capability” is replaced by an erroring stub
+let leak =
+  [log_int_impl = (guest_policy @int).log, 
+   log_str_impl = fun _ -> error(“cannot access”),
+   untrusted = untrusted] |> 
+   untrusted(log_int_impl, log_str_impl)
