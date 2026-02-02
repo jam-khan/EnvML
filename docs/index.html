@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EnvML REPL</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        h1 { color: #4fc3f7; }
+        textarea {
+            width: 100%;
+            height: 200px;
+            background: #2a2a2a;
+            color: #e0e0e0;
+            border: 1px solid #444;
+            padding: 10px;
+            font-family: monospace;
+        }
+        button {
+            background: #4fc3f7;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { background: #81d4fa; }
+        #output {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            padding: 10px;
+            min-height: 200px;
+            white-space: pre-wrap;
+            margin-top: 20px;
+        }
+        .status { color: #4fc3f7; margin: 10px 0; }
+        .error { color: #f44336; }
+        .success { color: #4caf50; }
+    </style>
+</head>
+<body>
+    <h1>EnvML REPL</h1>
+    <div class="status" id="status">Loading...</div>
+    
+    <h3>Code Editor</h3>
+    <textarea id="editor">
+    let x : int = 1;;
+    </textarea>
+
+    <div>
+        <button onclick="runStage('Parse')">Parse</button>
+        <button onclick="runStage('Desugar')">Desugar</button>
+        <button onclick="runStage('DeBruijn')">De Bruijn</button>
+        <button onclick="runStage('Elaborate')">Elaborate</button>
+        <button onclick="runStage('Check')">Type Check</button>
+        <button onclick="runStage('Eval')">Evaluate</button>
+        <button onclick="clearOutput()">Clear</button>
+    </div>
+
+    <h3>Output</h3>
+    <div id="output"></div>
+    
+    <script type="module">
+    import { WASI } from "https://cdn.jsdelivr.net/npm/@runno/wasi@0.7.0/dist/wasi.js";
+    import ghc_wasm_jsffi from "./ghc_wasm_jsffi.js";
+    
+    let wasmInstance = null;
+
+    async function initWasm() {
+        try {
+            const wasi = new WASI({
+                stdout: (out) => console.log("[wasm stdout]", out),
+                stderr: (err) => console.error("[wasm stderr]", err)
+            });
+
+            const jsffiExports = {};
+            
+            const importObject = Object.assign(
+                { ghc_wasm_jsffi: ghc_wasm_jsffi(jsffiExports) },
+                wasi.getImportObject()
+            );
+
+            const wasm = await WebAssembly.instantiateStreaming(
+                fetch('./WASM.wasm'),
+                importObject
+            );
+            
+            Object.assign(jsffiExports, wasm.instance.exports);
+
+            wasi.initialize(wasm, {
+                ghc_wasm_jsffi: ghc_wasm_jsffi(jsffiExports)
+            });
+
+            wasm.instance.exports.setup();
+            
+            wasmInstance = wasm.instance;
+            document.getElementById('status').innerHTML = '<span class="success">✓ WASM Module Loaded</span>';
+            
+            window.runStage = runStage;
+            window.clearOutput = clearOutput;
+            
+        } catch (error) {
+            console.error('WASM initialization failed:', error);
+            document.getElementById('status').innerHTML = '<span class="error">✗ Failed: ' + error.message + '</span>';
+            addOutput('Error: ' + error.message + '\n' + error.stack, 'error');
+        }
+    }
+
+    async function runStage(stage) {
+        if (!wasmInstance) {
+            addOutput('Error: WASM not loaded yet\n', 'error');
+            return;
+        }
+
+        const input = document.getElementById('editor').value;
+        const funcName = 'run' + stage;
+        
+        addOutput(`\n=== Running ${stage} ===\n`, 'info');
+        
+        try {
+            const result = await wasmInstance.exports[funcName](input);
+            addOutput(result + '\n', 'result');
+        } catch (error) {
+            addOutput('Error: ' + error.message + '\n', 'error');
+            console.error(error);
+        }
+    }
+
+    function addOutput(text, type) {
+        const output = document.getElementById('output');
+        const span = document.createElement('span');
+        span.textContent = text;
+        if (type === 'error') span.className = 'error';
+        if (type === 'success') span.className = 'success';
+        output.appendChild(span);
+        output.scrollTop = output.scrollHeight;
+    }
+
+    function clearOutput() {
+        document.getElementById('output').textContent = '';
+    }
+
+    initWasm();
+</script>
+</body>
+</html>
