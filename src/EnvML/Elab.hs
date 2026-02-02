@@ -29,10 +29,10 @@ elabTyEnvE (EnvML.TypeEq t) =
 elabModTyp ::
   EnvML.ModuleTyp ->
   Either ElabError Core.Typ
-elabModTyp (EnvML.TySig intf) =
-  Core.TyEnvt <$> elabIntf intf
-elabModTyp (EnvML.TyArrowM a sigB) =
-  Core.TyArr <$> elabTyp a <*> elabModTyp sigB
+elabModTyp (EnvML.TySig intf)       = Core.TyEnvt <$> elabIntf intf
+elabModTyp (EnvML.TyArrowM a sigB)  = Core.TyArr <$> elabTyp a <*> elabModTyp sigB
+elabModTyp (EnvML.ForallM sig)      = Core.TyAll <$> elabModTyp sig
+elabModTyp (EnvML.TyVarM i)         = pure $ Core.TyVar i
 
 elabIntf ::
   EnvML.Intf ->
@@ -42,28 +42,34 @@ elabIntf = mapM elabIntfE
 elabIntfE ::
   EnvML.IntfE ->
   Either ElabError Core.TyEnvE
-elabIntfE (EnvML.TyDef t) = Core.Type <$> elabTyp t
-elabIntfE (EnvML.ValDecl ty) = Core.Type <$> elabTyp ty
-elabIntfE (EnvML.ModDecl intf) = Core.Type <$> elabTyp intf
-elabIntfE (EnvML.SigDecl mty) = Core.Type <$> elabTyp mty
+elabIntfE (EnvML.TyDef t)       = Core.TypeEq <$> elabTyp t    -- type t = int
+elabIntfE (EnvML.ValDecl ty)    = Core.Type <$> elabTyp ty     -- val x : int
+elabIntfE (EnvML.ModDecl intf)  = Core.TypeEq <$> elabTyp intf -- module M : SIG
+elabIntfE (EnvML.SigDecl mty)   = Core.TypeEq <$> elabTyp mty  -- signature S = SIG
 
 elabTyp ::
   EnvML.Typ ->
   Either ElabError Core.Typ
-elabTyp (EnvML.TyLit i) =
+elabTyp (EnvML.TyLit i)   =
   pure $ Core.TyLit (elabTyLit i)
-elabTyp (EnvML.TyVar n) =
+elabTyp (EnvML.TyVar n)   =
   pure $ Core.TyVar n
 elabTyp (EnvML.TyArr a1 a2) =
   Core.TyArr <$> elabTyp a1 <*> elabTyp a2
-elabTyp (EnvML.TyAll a) =
+elabTyp (EnvML.TyAll a)   =
   Core.TyAll <$> elabTyp a
 elabTyp (EnvML.TyBoxT g1 a) =
   Core.TyBoxT <$> elabTyEnv g1 <*> elabTyp a
 elabTyp (EnvML.TySubstT a1 a2) =
   Core.TySubstT <$> elabTyp a1 <*> elabTyp a2
-elabTyp (EnvML.TyRcd fields) =
-  error "TO FIX"
+elabTyp (EnvML.TyRcd []) = Left "Single records not allowed"
+elabTyp (EnvML.TyRcd [(n, t)]) =
+  Core.TyRcd n <$> elabTyp t
+elabTyp (EnvML.TyRcd fields) = do
+  fields' <- traverse elabField fields
+  pure $ Core.TyEnvt fields'
+  where
+    elabField (x, t) = Core.Type . Core.TyRcd x <$> elabTyp t
 elabTyp (EnvML.TyEnvt bs) =
   Core.TyEnvt <$> elabTyEnv bs
 elabTyp (EnvML.TyModule mt) =
@@ -122,7 +128,13 @@ elabExp (EnvML.TLam e)      = Core.TLam <$> elabExp e
 elabExp (EnvML.TClos env e) = Core.TClos <$> elabEnv env <*> elabExp e
 elabExp (EnvML.TApp e ty)   = Core.TApp <$> elabExp e <*> elabTyp ty
 elabExp (EnvML.Box env ty)  = Core.Box <$> elabEnv env <*> elabExp ty
-elabExp (EnvML.Rec fields)  = error "TO FIX."
+elabExp (EnvML.Rec [])      = Left "Empty records not allowed."
+elabExp (EnvML.Rec [(n, e)])= Core.Rec n <$> elabExp e
+elabExp (EnvML.Rec fields) = do
+  fields' <- traverse elabField fields
+  pure $ Core.FEnv fields'
+  where
+    elabField (x, e) = Core.ExpE . Core.Rec x <$> elabExp e
 elabExp (EnvML.RProj e l)   = Core.RProj <$> elabExp e <*> pure l
 elabExp (EnvML.FEnv env)    = Core.FEnv <$> elabEnv env
 elabExp (EnvML.Anno e ty)   = Core.Anno <$> elabExp e <*> elabTyp ty

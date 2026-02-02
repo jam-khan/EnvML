@@ -32,9 +32,10 @@ data ModuleTyp
   = TyArrowM  Typ ModuleTyp   -- (A ->m I)
   | ForallM   Name ModuleTyp  -- ∀t. I
   | TySig     Intf            -- (sig .. end)
+  | TyVarM    Name            -- M
   deriving (Show, Eq)
 
-type Intf = [IntfE]           -- (sig ... end) .eli
+type Intf = [IntfE]                    -- (sig ... end) .eli
 data IntfE
   = TyDef       Name Typ               -- (type t = ...)
   | ValDecl     Name Typ               -- (val x : t)
@@ -247,6 +248,7 @@ prettyModuleTyp (ForallM n m) =
   "∀" ++ n ++ ". " ++ prettyModuleTyp m
 prettyModuleTyp (TySig intf) = 
   "sig " ++ prettyIntf intf ++ " end"
+prettyModuleTyp (TyVarM n) = n
 
 -- Type pretty printing (same as before)
 prettyTyp :: Typ -> String

@@ -180,11 +180,11 @@ extractEnvNamesForward = concatMap getName
 
 convEnvE :: Ctx -> S.EnvE -> T.EnvE
 convEnvE ctx = \case
-  S.ExpEN _n e    -> T.ExpE (convExp ctx e) 
+  S.ExpEN n e     -> T.ExpE (T.Rec [(n, convExp ctx e)])
   S.ExpE e        -> T.ExpE (convExp ctx e)  
-  S.TypEN _n t    -> T.TypE (convTyp ctx t)  
+  S.TypEN _n t    -> T.TypE (convTyp ctx t)
   S.TypE t        -> T.TypE (convTyp ctx t)
-  S.ModE _n m     -> T.ModExpE (T.ModE (convModule ctx m))  
+  S.ModE n m      -> T.ModExpE (T.Rec [(n, T.ModE (convModule ctx m))])
   S.ModTypE _n mt -> T.ModTypE (convTyp ctx (S.TyModule mt))
 
 
@@ -197,9 +197,11 @@ convModuleTyp ctx = \case
   S.TyArrowM t mt ->
     T.TyArrowM (convTyp ctx t) (convModuleTyp ctx mt)  
   S.ForallM x mt ->
-    convModuleTyp (TypeEntry x : ctx) mt
+    T.ForallM $ convModuleTyp (TypeEntry x : ctx) mt
   S.TySig intf ->
     T.TySig (convIntf ctx intf)
+  S.TyVarM name -> T.TyVarM (lookupTyVar name ctx)  
+
 
 convIntf :: Ctx -> S.Intf -> T.Intf
 convIntf outerCtx intf =
@@ -214,17 +216,17 @@ convIntf outerCtx intf =
 extractIntfNamesForward :: S.Intf -> Ctx
 extractIntfNamesForward = concatMap getName
   where
-    getName (S.TyDef n _) = [TypeEntry n]       -- type definition
-    getName (S.ValDecl n _) = [TermEntry n]     -- value declaration
-    getName (S.ModDecl n _) = [TermEntry n]     -- module is a term
+    getName (S.TyDef n _) = [TypeEntry n]         -- type definition
+    getName (S.ValDecl _n _) = []                 -- record (* no de-bruijn *)
+    getName (S.ModDecl _n _)      = []            -- record (* no de-brujn  *) is a term
     getName (S.FunctorDecl n _ _) = [TermEntry n]
-    getName (S.SigDecl n _) = [TypeEntry n]     -- signature is a type
+    getName (S.SigDecl n _)       = [TypeEntry n] -- signature is a type
 
 convIntfE :: Ctx -> S.IntfE -> T.IntfE
 convIntfE ctx = \case
-  S.TyDef _n t -> T.TyDef (convTyp ctx t)  
-  S.ValDecl _n t -> T.ValDecl (convTyp ctx t)
-  S.ModDecl _n mt -> T.ModDecl (convTyp ctx (S.TyModule mt))  
+  S.TyDef   _n t -> T.TyDef (convTyp ctx t)  
+  S.ValDecl n t  -> T.ValDecl (T.TyRcd [(n, convTyp ctx t)])
+  S.ModDecl n mt -> T.ValDecl (T.TyRcd [(n, convTyp ctx (S.TyModule mt))])
   S.FunctorDecl _n _args _mt -> 
     error "FunctorDecl should be desugared to ModDecl!"  
   S.SigDecl _n intf -> T.SigDecl (convTyp ctx (S.TyModule (S.TySig intf)))
@@ -232,7 +234,7 @@ convIntfE ctx = \case
 -- Module Conversion
 convModule :: Ctx -> S.Module -> T.Module
 convModule ctx = \case
-  S.VarM x -> T.VarM (lookupVar x ctx)
+  S.VarM x  -> T.VarM (lookupVar x ctx)
   S.Functor [(x, S.TyArg)] body ->
     T.Functort (convModule (TypeEntry x : ctx) body)  
   S.Functor [(x, _)] body ->

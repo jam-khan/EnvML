@@ -11,7 +11,6 @@ import Core.Syntax
 %tokentype { Token }
 %error { parseError }
 
--- Expected shift/reduce conflicts (standard for functional languages)
 %expect 1
 
 %token

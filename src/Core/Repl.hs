@@ -1,7 +1,7 @@
 module Core.Repl where
 
-import System.IO (hFlush, stdout)
 import Control.Exception (try, SomeException)
+import Control.Monad.IO.Class (liftIO) -- Necessary to run IO inside Haskeline
 
 -- Your Project Modules
 import Core.Syntax
@@ -10,28 +10,34 @@ import Core.Parser.Parser (parseExp)
 import Core.Pretty
 import Core.Eval (eval)
 import Core.Check (infer)
+import System.Console.Haskeline
 
 main :: IO ()
 main = do
   putStrLn "Welcome to the Calculus REPL"
   putStrLn "Commands: :t (test suite), :q (quit)"
-  repl
+  -- You must wrap the Haskeline monad with runInputT
+  runInputT defaultSettings repl
 
-repl :: IO ()
+repl :: InputT IO ()
 repl = do
-  putStr "λ> "
-  hFlush stdout
-  input <- getLine
-  case input of
-    ":q" -> putStrLn "Goodbye!"
-    _ | null input -> repl
-    _ -> do
-      handleInput input
-      repl
+  minput <- getInputLine "λ.∀> "
+  case minput of
+    Nothing      -> outputStrLn "Goodbye!" -- Handles Ctrl-D
+    Just input -> 
+      case input of
+        ":q"    -> outputStrLn "Goodbye!"
+        ":quit" -> outputStrLn "Goodbye!"
+        ""      -> repl -- Handle empty input (just loop again)
+        _       -> do
+          -- handleInput is IO, so we must lift it to InputT IO
+          liftIO $ handleInput input
+          repl
 
 handleInput :: String -> IO ()
 handleInput str = do
   -- 1. Parse
+  -- We use ($!) to force evaluation to catch pure exceptions from the parser
   exprRes <- try (return $! parseExp (lexer str)) :: IO (Either SomeException Exp)
   case exprRes of
     Left err -> putStrLn $ "Parse Error: " ++ show err

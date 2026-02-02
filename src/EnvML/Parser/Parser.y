@@ -71,19 +71,21 @@ import EnvML.Parser.AST
 -------------------------------------------------------------------------
 
 ModuleBody :: { Module }
-  : ModuleImports ModuleEnv { Struct $1 $2 }
+  : ModuleEnv               {Struct [] $1}
+  | ModuleImports ModuleEnv { Struct $1 $2 }
 
 ModuleEnv :: { Env }
   : ModuleEnvElem ModuleEnv     { $1 : $2 }
   |                              { [] }
 
 ModuleEnvElem :: { EnvE }
-  : let id '=' Exp ';;'                    { ExpEN $2 $4 }
-  | let id ':' Typ '=' Exp ';;'            { ExpEN $2 (Anno $6 $4) }
-  | type id '=' Typ ';;'                   { TypEN $2 $4 }
-  | module id '=' ModuleExp ';;'           { ModE $2 $4 }
-  | module id ':' ModuleTyp '=' ModuleExp ';;' { ModE $2 $6 }
-  | module type id '=' ModuleTyp ';;'      { ModTypE $3 $5 }
+  : let id '=' Exp ';;'                         { ExpEN $2 $4 }
+  | let id ':' Typ '=' Exp ';;'                 { ExpEN $2 (Anno $6 $4) }
+  | type id '=' Typ ';;'                        { TypEN $2 $4           }
+  | module id '=' ModuleExp ';;'                { ExpEN $2 (Mod $4)     }
+  | module id ':' id '=' ModuleExp ';;'         { ExpEN $2 (Mod $6)     }
+  | module id ':' ModuleTyp '=' ModuleExp ';;'  { ExpEN $2 (Anno (Mod $6) (TyModule $4)) }
+  | module type id '=' ModuleTyp ';;'           { TypEN $3 (TyModule $5) }
 
 ModuleImports :: { Imports }
   : import ImportList ';;'    { $2 }  

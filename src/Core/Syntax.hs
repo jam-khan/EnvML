@@ -20,40 +20,31 @@ data Typ
   deriving (Eq, Show)
 
 data TyLit
-  = TyInt -- int
-  | TyBool -- bool
-  | TyStr -- string
+  = TyInt
+  | TyBool
+  | TyStr
   deriving (Eq, Show)
 
--- Environment
 type Env = [EnvE]
 
--- Environment elements
 data EnvE = ExpE Exp | TypE Typ
   deriving (Eq, Show)
 
 data Exp
   = Lit Literal
-  | -- De-bruijn index
-    Var Int
-  | -- Term abstractions etc.
-    Lam Exp
+  | Var Int
+  | Lam Exp
   | Clos Env Exp
   | App Exp Exp
-  | -- Type abstractions etc.
-    TLam Exp
+  | TLam Exp
   | TClos Env Exp
   | TApp Exp Typ
-  | -- Box
-    Box Env Exp
-  | -- Records
-    Rec String Exp
+  | Box Env Exp
+  | Rec String Exp
   | RProj Exp String
-  | -- First-class Environment
-    FEnv Env
+  | FEnv Env
   | Anno Exp Typ
-  | -- Extensions
-    Fix Exp
+  | Fix Exp
   | If Exp Exp Exp
   | BinOp BinOp
   deriving (Eq, Show)
