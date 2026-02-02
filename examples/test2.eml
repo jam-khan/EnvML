@@ -1,0 +1,7 @@
+module m : sig val y : int;; end 
+ =  struct
+      type t = int;;
+      let y : int = 10;;
+    end;;
+
+let z : int = box [x = 1] in x;;

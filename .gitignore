@@ -81,3 +81,4 @@ src/EnvML/Parser/Lexer.hs
 src/EnvML/Parser/Parser.hs
 src/Core/Parser/Lexer.hs
 src/Core/Parser/Parser.hs
+.envml_history

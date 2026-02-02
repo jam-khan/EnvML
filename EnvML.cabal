@@ -9,7 +9,6 @@ library
     hs-source-dirs:   src
     
     exposed-modules:    Utils 
-                        Syntax
                         WASM
                         EnvML.Elab
                         EnvML.Syntax
@@ -49,7 +48,8 @@ library
 executable EnvML
     main-is:          Main.hs
     
-    build-depends:    base >= 4.17 && < 5,
+    build-depends:    haskeline ^>=0.8.2.1,
+                      base >= 4.17 && < 5,
                       EnvML
 
     hs-source-dirs:   app

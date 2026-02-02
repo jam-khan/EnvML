@@ -1,0 +1,5 @@
+
+module m : sig val y : int;; end
+  = struct
+      let y : int = 1;;
+    end;;
