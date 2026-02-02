@@ -5,68 +5,284 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EnvML REPL</title>
     <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
         body {
-            font-family: monospace;
-            max-width: 1200px;
-            margin: 0 auto;
+            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
             padding: 20px;
-            background: #1a1a1a;
-            color: #e0e0e0;
         }
-        h1 { color: #4fc3f7; }
+        
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: #4fc3f7;
+            font-size: 2.5rem;
+            text-shadow: 0 0 20px rgba(79, 195, 247, 0.3);
+            margin-bottom: 5px;
+        }
+        
+        .subtitle {
+            color: #888;
+            font-size: 0.9rem;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-top: 10px;
+        }
+        
+        .status.loading {
+            background: rgba(79, 195, 247, 0.2);
+            color: #4fc3f7;
+        }
+        
+        .status.success {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+        }
+        
+        .status.error {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+            height: calc(100vh - 150px);
+        }
+        
+        .panel {
+            background: rgba(30, 30, 50, 0.8);
+            border: 1px solid #333;
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .panel-header {
+            background: linear-gradient(90deg, #2a2a4a 0%, #1a1a3a 100%);
+            padding: 12px 20px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .panel-header h3 {
+            color: #4fc3f7;
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        
+        .dot.red { background: #ff5f56; }
+        .dot.yellow { background: #ffbd2e; }
+        .dot.green { background: #27ca40; }
+        
+        .editor-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        
         textarea {
+            flex: 1;
             width: 100%;
-            height: 200px;
-            background: #2a2a2a;
+            background: #0d0d1a;
             color: #e0e0e0;
-            border: 1px solid #444;
-            padding: 10px;
-            font-family: monospace;
+            border: none;
+            padding: 20px;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
         }
+        
+        textarea::placeholder {
+            color: #555;
+        }
+        
+        .button-bar {
+            padding: 15px;
+            background: rgba(20, 20, 40, 0.8);
+            border-top: 1px solid #333;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
         button {
-            background: #4fc3f7;
+            background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
             color: #000;
             border: none;
-            padding: 10px 20px;
-            margin: 5px;
+            padding: 10px 18px;
+            border-radius: 6px;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 0.85rem;
+            font-family: inherit;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        button:hover { background: #81d4fa; }
+        
+        button:hover {
+            background: linear-gradient(135deg, #81d4fa 0%, #4fc3f7 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(79, 195, 247, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.secondary {
+            background: linear-gradient(135deg, #555 0%, #444 100%);
+            color: #ddd;
+        }
+        
+        button.secondary:hover {
+            background: linear-gradient(135deg, #666 0%, #555 100%);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .output-wrapper {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        
         #output {
-            background: #2a2a2a;
-            border: 1px solid #444;
-            padding: 10px;
-            min-height: 200px;
-            white-space: pre-wrap;
-            margin-top: 20px;
+            flex: 1;
+            background: #0d0d1a;
+            padding: 20px;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.6;
         }
-        .status { color: #4fc3f7; margin: 10px 0; }
-        .error { color: #f44336; }
-        .success { color: #4caf50; }
+        
+        #output::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        #output::-webkit-scrollbar-track {
+            background: #1a1a2e;
+        }
+        
+        #output::-webkit-scrollbar-thumb {
+            background: #4fc3f7;
+            border-radius: 4px;
+        }
+        
+        .output-line {
+            margin-bottom: 5px;
+        }
+        
+        .output-line.header {
+            color: #4fc3f7;
+            font-weight: bold;
+            margin-top: 15px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #333;
+        }
+        
+        .output-line.error {
+            color: #f44336;
+        }
+        
+        .output-line.success {
+            color: #4caf50;
+        }
+        
+        .output-line.result {
+            color: #aaa;
+            white-space: pre-wrap;
+            font-family: inherit;
+        }
+        
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            
+            .panel {
+                min-height: 400px;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>EnvML REPL</h1>
-    <div class="status" id="status">Loading...</div>
+    <header>
+        <h1>EnvML REPL</h1>
+        <div class="subtitle">Interactive Environment-based ML Language Playground</div>
+        <div class="status loading" id="status">⏳ Loading WASM module...</div>
+    </header>
     
-    <h3>Code Editor</h3>
-    <textarea id="editor">
-    let x : int = 1;;
-    </textarea>
-
-    <div>
-        <button onclick="runStage('Parse')">Parse</button>
-        <button onclick="runStage('Desugar')">Desugar</button>
-        <button onclick="runStage('DeBruijn')">De Bruijn</button>
-        <button onclick="runStage('Elaborate')">Elaborate</button>
-        <button onclick="runStage('Check')">Type Check</button>
-        <button onclick="runStage('Eval')">Evaluate</button>
-        <button onclick="clearOutput()">Clear</button>
+    <div class="container">
+        <div class="panel">
+            <div class="panel-header">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+                <h3>📝 Editor</h3>
+            </div>
+            <div class="editor-wrapper">
+                <textarea id="editor" placeholder="Enter your EnvML code here...">let x : int = 1;;</textarea>
+                <div class="button-bar">
+                    <button onclick="runStage('Parse')">Parse</button>
+                    <button onclick="runStage('Desugar')">Desugar</button>
+                    <button onclick="runStage('DeBruijn')">De Bruijn</button>
+                    <button onclick="runStage('Elaborate')">Elaborate</button>
+                    <button onclick="runStage('Check')">Type Check</button>
+                    <button onclick="runStage('Eval')">Evaluate</button>
+                    <button class="secondary" onclick="clearOutput()">Clear</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <div class="panel-header">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+                <h3>📤 Output</h3>
+            </div>
+            <div class="output-wrapper">
+                <div id="output"></div>
+            </div>
+        </div>
     </div>
-
-    <h3>Output</h3>
-    <div id="output"></div>
     
     <script type="module">
     import { WASI } from "https://cdn.jsdelivr.net/npm/@runno/wasi@0.7.0/dist/wasi.js";
@@ -75,6 +291,7 @@
     let wasmInstance = null;
 
     async function initWasm() {
+        const statusEl = document.getElementById('status');
         try {
             const wasi = new WASI({
                 stdout: (out) => console.log("[wasm stdout]", out),
@@ -102,53 +319,54 @@
             wasm.instance.exports.setup();
             
             wasmInstance = wasm.instance;
-            document.getElementById('status').innerHTML = '<span class="success">✓ WASM Module Loaded</span>';
+            statusEl.className = 'status success';
+            statusEl.textContent = '✓ WASM Module Ready';
             
             window.runStage = runStage;
             window.clearOutput = clearOutput;
             
         } catch (error) {
             console.error('WASM initialization failed:', error);
-            document.getElementById('status').innerHTML = '<span class="error">✗ Failed: ' + error.message + '</span>';
+            statusEl.className = 'status error';
+            statusEl.textContent = '✗ Failed to load WASM';
             addOutput('Error: ' + error.message + '\n' + error.stack, 'error');
         }
     }
 
     async function runStage(stage) {
         if (!wasmInstance) {
-            addOutput('Error: WASM not loaded yet\n', 'error');
+            addOutput('Error: WASM not loaded yet', 'error');
             return;
         }
 
         const input = document.getElementById('editor').value;
         const funcName = 'run' + stage;
         
-        addOutput(`\n=== Running ${stage} ===\n`, 'info');
+        addOutput(`Running ${stage}...`, 'header');
         
         try {
             const result = await wasmInstance.exports[funcName](input);
-            addOutput(result + '\n', 'result');
+            addOutput(result, 'result');
         } catch (error) {
-            addOutput('Error: ' + error.message + '\n', 'error');
+            addOutput('Error: ' + error.message, 'error');
             console.error(error);
         }
     }
 
     function addOutput(text, type) {
         const output = document.getElementById('output');
-        const span = document.createElement('span');
-        span.textContent = text;
-        if (type === 'error') span.className = 'error';
-        if (type === 'success') span.className = 'success';
-        output.appendChild(span);
+        const div = document.createElement('div');
+        div.className = 'output-line ' + (type || '');
+        div.textContent = text;
+        output.appendChild(div);
         output.scrollTop = output.scrollHeight;
     }
 
     function clearOutput() {
-        document.getElementById('output').textContent = '';
+        document.getElementById('output').innerHTML = '';
     }
 
     initWasm();
-</script>
+    </script>
 </body>
 </html>
