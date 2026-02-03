@@ -89,3 +89,5 @@ src/WASM.o
 
 *.o
 *.hi
+src/EnvML/Parser/Parser.info
+src/Core/Parser/Parser.info

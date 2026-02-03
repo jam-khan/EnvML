@@ -39,8 +39,8 @@ type Intf = [IntfE]                    -- (sig ... end) .eli
 data IntfE
   = TyDef       Name Typ               -- (type t = ...)
   | ValDecl     Name Typ               -- (val x : t)
-  | ModDecl     Name ModuleTyp         -- (module M : S)
-  | FunctorDecl Name FunArgs ModuleTyp -- (functor m (type t) (x: A) : S)
+  | ModDecl     Name Typ               -- (module M : S)
+  | FunctorDecl Name FunArgs Typ       -- (functor m (type t) (x: A) : S)
   | SigDecl     Name Intf              -- (module type S = ...)
   deriving (Show, Eq)
 
@@ -78,6 +78,7 @@ data Module
   | MApp    Module Module   -- M1 ^ M2
   | MAppt   Module Typ      -- M1 ^ @A
   | MLink   Module Module   -- link(M1, M2)
+  | MAnno   Module ModuleTyp
   deriving (Show, Eq)
 
 data Exp
@@ -219,9 +220,9 @@ prettyEnv (e : es) = prettyEnvE e ++ ", " ++ prettyEnv es
 prettyIntfE :: IntfE -> String
 prettyIntfE (TyDef n t) = "type " ++ n ++ " = " ++ prettyTyp t
 prettyIntfE (ValDecl n t) = "val " ++ n ++ " : " ++ prettyTyp t
-prettyIntfE (ModDecl n mt) = "module " ++ n ++ " : " ++ prettyModuleTyp mt
+prettyIntfE (ModDecl n mt) = "module " ++ n ++ " : " ++ prettyTyp mt
 prettyIntfE (FunctorDecl n args mt) = 
-  "functor " ++ n ++ " " ++ prettyFunArgs args ++ " : " ++ prettyModuleTyp mt
+  "functor " ++ n ++ " " ++ prettyFunArgs args ++ " : " ++ prettyTyp mt
 prettyIntfE (SigDecl n intf) = "module type " ++ n ++ " = sig " ++ prettyIntf intf ++ " end"
 
 prettyIntf :: Intf -> String
@@ -295,6 +296,8 @@ prettyModule (MAppt m t) =
   prettyModule m ++ " ^@ " ++ prettyTyp t
 prettyModule (MLink m1 m2) = 
   "link(" ++ prettyModule m1 ++ ", " ++ prettyModule m2 ++ ")"
+prettyModule (MAnno m1 mty) =
+  "("++ prettyModule m1 ++ "::" ++ prettyModuleTyp mty ++ ")"
 
 -- Expression pretty printing (same as before)
 prettyExp :: Exp -> String

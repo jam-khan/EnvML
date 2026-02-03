@@ -1,0 +1,28 @@
+module type POLICY = 
+  forall t. sig val trans : t -> [t];; end;;
+
+module type FOO = 
+  sig
+    type a = int;;
+    val trans_int : a;;
+  end;;
+
+module policy1 : POLICY = 
+  functor (type t)
+    let trans : t -> [t] = (fun (x) -> [x]);;
+  end;;
+
+module policy2 : POLICY =
+  functor (type t)
+    let trans : t -> [t] = fun (x) -> [];;
+  end;;
+
+module foo : POLICY ->m FOO =
+  functor (m : POLICY) ->
+    struct
+      type a = int;;
+      let trans_int : a -> [a] = (m @ int).trans;;
+    end;;
+
+let ls1 : int = box [impl = foo(policy1).trans_int] in impl(42);;
+let ls2 : int = box [impl = foo(policy2).trans_int] in impl(42);;

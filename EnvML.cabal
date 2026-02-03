@@ -9,7 +9,7 @@ library
     hs-source-dirs:   src
     
     exposed-modules:    Utils 
-                        WASM
+                        -- WASM
                         EnvML.Elab
                         EnvML.Syntax
                         EnvML.Desugar

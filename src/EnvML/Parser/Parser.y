@@ -48,6 +48,7 @@ import EnvML.Parser.AST
   '->'      { TokArrow }
   '===>'    { TokTripleArrow }
   '->m'     { TokArrowM }
+  '@'       { TokAt }
   ','       { TokComma }
   '.'       { TokDot }
   '('       { TokLParen }
@@ -63,6 +64,7 @@ import EnvML.Parser.AST
   '*'       { TokStar   }
 
 %right '->'
+%right '->m'
 
 %%
 
@@ -79,17 +81,16 @@ ModuleEnv :: { Env }
   |                              { [] }
 
 ModuleEnvElem :: { EnvE }
-  : let id '=' Exp ';;'                         { ExpEN $2 $4 }
-  | let id ':' Typ '=' Exp ';;'                 { ExpEN $2 (Anno $6 $4) }
-  | type id '=' Typ ';;'                        { TypEN $2 $4           }
-  | module id '=' ModuleExp ';;'                { ExpEN $2 (Mod $4)     }
-  | module id ':' id '=' ModuleExp ';;'         { ExpEN $2 (Mod $6)     }
-  | module id ':' ModuleTyp '=' ModuleExp ';;'  { ExpEN $2 (Anno (Mod $6) (TyModule $4)) }
-  | module type id '=' ModuleTyp ';;'           { TypEN $3 (TyModule $5) }
-
+  : let id '=' Exp ';;'                                 { ExpEN $2 $4 }
+  | let id ':' Typ '=' Exp ';;'                         { ExpEN $2 (Anno $6 $4) }
+  | type id '=' Typ ';;'                                { TypEN $2 $4           }
+  | module id '=' ModuleExp ';;'                        { ExpEN $2 (Mod $4)     }
+  | module id ':' ModuleTyp '=' ModuleExp ';;'          { ExpEN $2 (Mod (MAnno $6 $4)) }
+  | module type id '=' ModuleTyp ';;'                   { TypEN $3 (TyModule $5) }
+ 
 ModuleImports :: { Imports }
-  : import ImportList ';;'    { $2 }  
-  |                           { [] } 
+  : import ImportList ';;'    { $2 }
+  |                           { [] }
 
 ImportList :: { Imports }
   : ImportItem ',' ImportList { $1 : $3 } 
@@ -114,8 +115,10 @@ Intf :: { Intf }
 IntfE :: { IntfE }
   : val id ':' Typ ';;'                      { ValDecl $2 $4 }
   | type id '=' Typ ';;'                     { TyDef $2 $4 }
-  | module id ':' ModuleTyp ';;'             { ModDecl $2 $4 }
-  | functor id FunArgs ':' ModuleTyp ';;'    { FunctorDecl $2 $3 $5 }
+  | module id ':' id ';;'                    { ModDecl $2 (TyVar $4) }
+  | module id ':' ModuleTyp ';;'             { ModDecl $2 (TyModule $4) }
+  | functor id FunArgs ':' id ';;'           { FunctorDecl $2 $3 (TyVar $5) }
+  | functor id FunArgs ':' ModuleTyp ';;'    { FunctorDecl $2 $3 (TyModule $5) }
   | module type id '=' Intf ';;'             { SigDecl $3 $5 }
 
 -------------------------------------------------------------------------
@@ -136,15 +139,16 @@ Exp :: { Exp }
 ModuleExp :: { Module }
   : struct ModuleImports ModuleEnv end      { Struct $2 $3 }
   | ModuleExp '(' ModuleExp ')'             { MApp $1 $3 }
-  | ModuleExp '<' Typ '>'                   { MAppt $1 $3 }
+  | ModuleExp '@' Typ                       { MAppt $1 $3 }
   | link '(' ModuleExp ',' ModuleExp ')'    { MLink $3 $5 }
   | functor FunArgs '->' ModuleExp          { Functor $2 $4 }
+  | functor FunArgs ModuleEnv end           { Functor $2 (Struct [] $3) }
   | id                                      { VarM $1 }
   | '(' ModuleExp ')'                       { $2 }
 
 Term :: { Exp }
-  : Term '(' Atom ')'    { App $1 $3 }
-  | Term '<' Typ '>'     { TApp $1 $3 }
+  : Term '(' Exp ')'     { App $1 $3 }    -- Changed Atom to Exp
+  | Term '@' Typ         { TApp $1 $3 }
   | Term '.' id          { RProj $1 $3 }
   | Atom                 { $1 }
 
@@ -190,7 +194,6 @@ Typ :: { Typ }
   : BaseTyp '->' Typ                  { TyArr $1 $3 }
   | forall id '.' Typ                 { TyAll $2 $4 }
   | '[' TyCtx ']' '===>' Typ          { TyBoxT $2 $5 }
-  | ModuleTyp                         { TyModule $1 }
   | BaseTyp                           { $1 }
 
 BaseTyp :: { Typ }
@@ -208,10 +211,13 @@ TyRcdFields :: { [(Name, Typ)] }
   |                             { [] }
 
 ModuleTyp :: { ModuleTyp }
-  : sig Intf end                { TySig $2 }
-  | forall id '.' ModuleTyp     { ForallM $2 $4 }
-  | Typ '->m' ModuleTyp         { TyArrowM $1 $3 }
-  | '(' ModuleTyp ')'           { $2 }
+  : sig Intf end                          { TySig $2 }
+  | forall id '.' ModuleTyp               { ForallM $2 $4 }
+  | id '->m' ModuleTyp                    { TyArrowM (TyVar $1) $3 }
+  | '(' Typ ')' '->m' ModuleTyp           { TyArrowM $2 $5 }
+  | '(' ModuleTyp ')' '->m' ModuleTyp     { TyArrowM (TyModule $2) $5 }
+  | '(' ModuleTyp ')'                     { $2 }
+  | id                                    { TyVarM $1 }
 
 TyCtx :: { TyCtx }
   : TyCtxElem ',' TyCtx  { $1 : $3 }
@@ -220,12 +226,15 @@ TyCtx :: { TyCtx }
 
 TyCtxElem :: { TyCtxE }
   : id ':' Type                         { KindN $1 }
-  | Type                                { Kind }
   | id ':' Typ                          { TypeN $1 $3 }
-  | Typ                                 { Type $1 }
   | type id '=' Typ                     { TypeEqN $2 $4 }
   | module id ':' ModuleTyp             { TyMod $2 $4 }
   | module type id '=' ModuleTyp        { TypeEqM $3 $5 }
+  | Type                                { Kind }
+  | id                                  { Type (TyVar $1) }
+  | int                                 { Type (TyLit TyInt) }
+  | bool                                { Type (TyLit TyBool) }
+  | stringt                             { Type (TyLit TyStr) }
 
 {
 parseError :: [Token] -> a

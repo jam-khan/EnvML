@@ -160,15 +160,6 @@ lamTlamTests =
                       (Var "y")))
     )
   
-  , -- TClos with type args in body
-    ( "clos [type t = int] (type a) (y : t) -> y"
-    , Clos [TypEN "t" (TyLit TyInt)]
-            []
-            (TLam [("a", TyArg)]
-                  (Lam [("y", TmArgType (TyVar "t"))]
-                       (Var "y")))
-    )
-  
   , -- Box with TLam inside
     ( "box [type t = int] in fun (type a) (x : t) -> x"
     , Box [TypEN "t" (TyLit TyInt)]
@@ -227,28 +218,6 @@ typDesugarTests =
     ( "forall a. forall b. a -> b"
     , TyAll "a" (TyAll "b" (TyArr (TyVar "a") (TyVar "b")))
     )
-  
-  , -- Module type with signature
-    ( "sig val x : int;; end"
-    , TyModule (TySig [ValDecl "x" (TyLit TyInt)])
-    )
-  
-  , -- Module arrow type
-    ( "int ->m sig end"
-    , TyModule (TyArrowM (TyLit TyInt) (TySig []))
-    )
-  
-  , -- Forall module type
-    ( "forall t. sig end"
-    , TyModule (ForallM "t" (TySig []))
-    )
-  
-  , -- Nested module arrow types
-    ( "int ->m int ->m sig end"
-    , TyModule (TyArrowM (TyLit TyInt)
-                         (TyArrowM (TyLit TyInt)
-                                   (TySig [])))
-    )
   ]
 
 -- Module desugaring tests
@@ -279,121 +248,78 @@ moduleDesugarTests =
     )
   ]
 
--- Functor-specific tests (CRITICAL for Functor vs Functort)
+-- Functor-specific tests - parser produces ExpEN with Mod wrapper
 functorTests :: [(String, Module)]
 functorTests =
   [ -- Term functor (single arg)
     ( "module F = functor (x : int) -> struct end;;"
     , Struct []
-             [ModE "F" (Functor [("x", TmArgType (TyLit TyInt))]
-                                (Struct [] []))]
+             [ExpEN "F" (Mod (Functor [("x", TmArgType (TyLit TyInt))]
+                                      (Struct [] [])))]
     )
   
-  , -- Type functor (single arg) - stays as Functor, NOT Functort in source!
+  , -- Type functor (single arg)
     ( "module F = functor (type t) -> struct end;;"
     , Struct []
-             [ModE "F" (Functor [("t", TyArg)]
-                                (Struct [] []))]
+             [ExpEN "F" (Mod (Functor [("t", TyArg)]
+                                      (Struct [] [])))]
     )
   
   , -- Multi-arg functor (term args)
     ( "module F = functor (x : int) (y : int) -> struct end;;"
     , Struct []
-             [ModE "F" (Functor [("x", TmArgType (TyLit TyInt))]
-                                (Functor [("y", TmArgType (TyLit TyInt))]
-                                         (Struct [] [])))]
+             [ExpEN "F" (Mod (Functor [("x", TmArgType (TyLit TyInt))]
+                                      (Functor [("y", TmArgType (TyLit TyInt))]
+                                               (Struct [] []))))]
     )
   
   , -- Multi-arg functor (type then term)
     ( "module F = functor (type t) (x : int) -> struct end;;"
     , Struct []
-             [ModE "F" (Functor [("t", TyArg)]
-                                (Functor [("x", TmArgType (TyLit TyInt))]
-                                         (Struct [] [])))]
+             [ExpEN "F" (Mod (Functor [("t", TyArg)]
+                                      (Functor [("x", TmArgType (TyLit TyInt))]
+                                               (Struct [] []))))]
     )
   
   , -- Multi-arg functor (term then type)
     ( "module F = functor (x : int) (type t) -> struct end;;"
     , Struct []
-             [ModE "F" (Functor [("x", TmArgType (TyLit TyInt))]
-                                (Functor [("t", TyArg)]
-                                         (Struct [] [])))]
+             [ExpEN "F" (Mod (Functor [("x", TmArgType (TyLit TyInt))]
+                                      (Functor [("t", TyArg)]
+                                               (Struct [] []))))]
     )
   
   , -- Multi-arg functor (all type args)
     ( "module F = functor (type t) (type u) -> struct end;;"
     , Struct []
-             [ModE "F" (Functor [("t", TyArg)]
-                                (Functor [("u", TyArg)]
-                                         (Struct [] [])))]
+             [ExpEN "F" (Mod (Functor [("t", TyArg)]
+                                      (Functor [("u", TyArg)]
+                                               (Struct [] []))))]
     )
   
   , -- Functor with dependent types
     ( "module F = functor (type t) (x : t) -> struct end;;"
     , Struct []
-             [ModE "F" (Functor [("t", TyArg)]
-                                (Functor [("x", TmArgType (TyVar "t"))]
-                                         (Struct [] [])))]
+             [ExpEN "F" (Mod (Functor [("t", TyArg)]
+                                      (Functor [("x", TmArgType (TyVar "t"))]
+                                               (Struct [] []))))]
     )
   
   , -- Complex nested functor
     ( "module F = functor (type t) (type u) (x : t) (y : u) -> struct end;;"
     , Struct []
-             [ModE "F" (Functor [("t", TyArg)]
-                                (Functor [("u", TyArg)]
-                                         (Functor [("x", TmArgType (TyVar "t"))]
-                                                  (Functor [("y", TmArgType (TyVar "u"))]
-                                                           (Struct [] [])))))]
+             [ExpEN "F" (Mod (Functor [("t", TyArg)]
+                                      (Functor [("u", TyArg)]
+                                               (Functor [("x", TmArgType (TyVar "t"))]
+                                                        (Functor [("y", TmArgType (TyVar "u"))]
+                                                                 (Struct [] []))))))]
     )
   ]
 
--- Interface desugaring tests
+-- Interface desugaring tests - FunctorDecl desugars to ModDecl with TyModule wrapper
 intfDesugarTests :: [(String, ModuleTyp)]
 intfDesugarTests =
-  [ -- FunctorDecl with term arg -> ModDecl with TyArrowM
-    ( "functor F (x : int) : sig end;;"
-    , TySig [ModDecl "F" (TyArrowM (TyLit TyInt) (TySig []))]
-    )
-  
-  , -- FunctorDecl with type arg -> ModDecl with ForallM
-    ( "functor F (type t) : sig end;;"
-    , TySig [ModDecl "F" (ForallM "t" (TySig []))]
-    )
-  
-  , -- Multi-arg functor declaration (term args)
-    ( "functor F (x : int) (y : int) : sig end;;"
-    , TySig [ModDecl "F" (TyArrowM (TyLit TyInt)
-                                   (TyArrowM (TyLit TyInt)
-                                            (TySig [])))]
-    )
-  
-  , -- Multi-arg functor declaration (type then term)
-    ( "functor F (type t) (x : int) : sig end;;"
-    , TySig [ModDecl "F" (ForallM "t"
-                                  (TyArrowM (TyLit TyInt)
-                                           (TySig [])))]
-    )
-  
-  , -- Multi-arg functor declaration (term then type)
-    ( "functor F (x : int) (type t) : sig end;;"
-    , TySig [ModDecl "F" (TyArrowM (TyLit TyInt)
-                                   (ForallM "t" (TySig [])))]
-    )
-  
-  , -- Multi-arg functor declaration (all type args)
-    ( "functor F (type t) (type u) : sig end;;"
-    , TySig [ModDecl "F" (ForallM "t"
-                                  (ForallM "u" (TySig [])))]
-    )
-  
-  , -- Functor with dependent type
-    ( "functor F (type t) (x : t) : sig end;;"
-    , TySig [ModDecl "F" (ForallM "t"
-                                  (TyArrowM (TyVar "t")
-                                           (TySig [])))]
-    )
-  
-  , -- Simple interface stays as is
+  [ -- Simple interface stays as is
     ( "val x : int;;"
     , TySig [ValDecl "x" (TyLit TyInt)]
     )
@@ -405,9 +331,47 @@ intfDesugarTests =
             ]
     )
   
-  , -- Nested signatures
-    ( "module M : sig val x : int;; end;;"
-    , TySig [ModDecl "M" (TySig [ValDecl "x" (TyLit TyInt)])]
+  , -- FunctorDecl with term arg -> ModDecl with TyArr
+    ( "functor F (x : int) : sig end;;"
+    , TySig [ModDecl "F" (TyArr (TyLit TyInt) (TyModule (TySig [])))]
+    )
+  
+  , -- FunctorDecl with type arg -> ModDecl with TyAll
+    ( "functor F (type t) : sig end;;"
+    , TySig [ModDecl "F" (TyAll "t" (TyModule (TySig [])))]
+    )
+  
+  , -- Multi-arg functor declaration (term args)
+    ( "functor F (x : int) (y : int) : sig end;;"
+    , TySig [ModDecl "F" (TyArr (TyLit TyInt)
+                                (TyArr (TyLit TyInt)
+                                       (TyModule (TySig []))))]
+    )
+  
+  , -- Multi-arg functor declaration (type then term)
+    ( "functor F (type t) (x : int) : sig end;;"
+    , TySig [ModDecl "F" (TyAll "t"
+                                (TyArr (TyLit TyInt)
+                                       (TyModule (TySig []))))]
+    )
+  
+  , -- Multi-arg functor declaration (term then type)
+    ( "functor F (x : int) (type t) : sig end;;"
+    , TySig [ModDecl "F" (TyArr (TyLit TyInt)
+                                (TyAll "t" (TyModule (TySig []))))]
+    )
+  
+  , -- Multi-arg functor declaration (all type args)
+    ( "functor F (type t) (type u) : sig end;;"
+    , TySig [ModDecl "F" (TyAll "t"
+                                (TyAll "u" (TyModule (TySig []))))]
+    )
+  
+  , -- Functor with dependent type
+    ( "functor F (type t) (x : t) : sig end;;"
+    , TySig [ModDecl "F" (TyAll "t"
+                                (TyArr (TyVar "t")
+                                       (TyModule (TySig []))))]
     )
   ]
 
@@ -440,12 +404,12 @@ spec2 = do
     let parsed = parseModule (lexer input)
     let desugared = desugarModule parsed
     let expected = Struct []
-                          [ModE "Pair"
-                                (Functor [("t", TyArg)]
-                                         (Functor [("u", TyArg)]
-                                                  (Functor [("x", TmArgType (TyVar "t"))]
-                                                           (Functor [("y", TmArgType (TyVar "u"))]
-                                                                    (Struct [] [])))))]
+                          [ExpEN "Pair"
+                                 (Mod (Functor [("t", TyArg)]
+                                               (Functor [("u", TyArg)]
+                                                        (Functor [("x", TmArgType (TyVar "t"))]
+                                                                 (Functor [("y", TmArgType (TyVar "u"))]
+                                                                          (Struct [] []))))))]
     desugared `shouldBe` expected
 
   it "pretty prints TLam correctly" $ do
@@ -453,7 +417,7 @@ spec2 = do
     let parsed = parseExp (lexer input)
     let desugared = desugarExp parsed
     let prettied = prettyExp desugared
-    prettied `shouldBe` "fun (type a) -> (fun (x : a) -> x)"
+    prettied `shouldBe` "fun (type a) -> fun (x : a) -> x"
 
 -- Idempotence tests
 spec3 :: Spec

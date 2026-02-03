@@ -59,6 +59,7 @@ tokens :-
   "+"         { \_ -> TokPlus     }
   "-"         { \_ -> TokDash     }
   "*"         { \_ -> TokStar     }
+  "@"         { \_ -> TokAt    }
 
   -- Literals and Identifiers
   $digit+             { \s -> TokInt (read s) }
@@ -81,6 +82,7 @@ data Token
   | TokLet
   | TokVal
   | TokFun
+  | TokAt
   | TokClos
   | TokTClos
   | TokBox
