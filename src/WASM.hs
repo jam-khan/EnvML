@@ -4,6 +4,7 @@ module Main where
 
 import qualified EnvML.Parser.Parser as Parser
 import qualified EnvML.Parser.Lexer as Lexer
+import qualified EnvML.Parser.AST as AST
 import qualified EnvML.Desugar as Desugar
 import qualified EnvML.DeBruijn as DB
 import qualified EnvML.Elab as Elab
@@ -44,7 +45,7 @@ runParse input = safeRun runParseImpl input
 runParseImpl :: String -> String
 runParseImpl input = 
     let res = Parser.parseModule (Lexer.lexer input) 
-    in "=== Parsed AST ===\n" ++ show res
+    in "=== Parsed AST ===\n" ++ AST.pretty res
 
 -- | Stage 2: Parse + Desugar
 foreign export javascript "runDesugar" runDesugar :: JSString -> IO JSString
@@ -56,7 +57,7 @@ runDesugarImpl :: String -> String
 runDesugarImpl input = 
     let parsed    = Parser.parseModule (Lexer.lexer input)
         desugared = Desugar.desugarModule parsed
-    in "=== Desugared AST ===\n" ++ show desugared
+    in "=== Desugared AST ===\n" ++ AST.pretty desugared
 
 -- | Stage 3: De-Bruijn
 foreign export javascript "runDeBruijn" runDeBruijn :: JSString -> IO JSString

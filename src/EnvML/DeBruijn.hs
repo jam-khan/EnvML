@@ -226,7 +226,7 @@ convIntfE :: Ctx -> S.IntfE -> T.IntfE
 convIntfE ctx = \case
   S.TyDef   _n t -> T.TyDef (convTyp ctx t)  
   S.ValDecl n t  -> T.ValDecl (T.TyRcd [(n, convTyp ctx t)])
-  S.ModDecl n mt -> T.ValDecl (T.TyRcd [(n, convTyp ctx (S.TyModule mt))])
+  S.ModDecl n mt -> T.ValDecl (T.TyRcd [(n, convTyp ctx mt)])
   S.FunctorDecl _n _args _mt -> 
     error "FunctorDecl should be desugared to ModDecl!"  
   S.SigDecl _n intf -> T.SigDecl (convTyp ctx (S.TyModule (S.TySig intf)))
