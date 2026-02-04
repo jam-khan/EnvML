@@ -100,6 +100,7 @@ elabM (EnvML.Functort m) = Core.TLam <$> elabM m
 elabM (EnvML.Struct env) = Core.FEnv <$> elabEnv env
 elabM (EnvML.MApp m1 m2) = Core.App <$> elabM m1 <*> elabM m2
 elabM (EnvML.MAppt m t) = Core.TApp <$> elabM m <*> elabTyp t
+elabM (EnvML.MAnno m mt) = Core.Anno <$> elabM m <*> elabModTyp mt
 
 elabEnvE ::
   EnvML.EnvE ->

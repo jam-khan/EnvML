@@ -283,7 +283,7 @@ prettyTyLit TyStr = "string"
 
 -- Module pretty printing (same as before)
 prettyModule :: Module -> String
-prettyModule (VarM n) = n
+prettyModule (VarM n) = "__module__" ++ n
 prettyModule (Functor args m) =
   "functor " ++ prettyFunArgs args ++ " -> " ++ prettyModule m
 prettyModule (Struct imports env) =
@@ -297,7 +297,7 @@ prettyModule (MAppt m t) =
 prettyModule (MLink m1 m2) = 
   "link(" ++ prettyModule m1 ++ ", " ++ prettyModule m2 ++ ")"
 prettyModule (MAnno m1 mty) =
-  "("++ prettyModule m1 ++ "::" ++ prettyModuleTyp mty ++ ")"
+  "("++ prettyModule m1 ++ " ::m_ " ++ prettyModuleTyp mty ++ ")"
 
 -- Expression pretty printing (same as before)
 prettyExp :: Exp -> String

@@ -2,24 +2,24 @@
 
 module Main where
 
-import System.Console.Haskeline
+import Control.Exception (SomeException, catch, evaluate)
 import Control.Monad.IO.Class (liftIO)
-import Control.Exception (catch, evaluate, SomeException)
-import Data.List (stripPrefix)
-import Data.Char (isSpace)
-
 -- Import your modules
-import qualified EnvML.Parser.Parser as Parser
-import qualified EnvML.Parser.Lexer as Lexer
-import qualified EnvML.Parser.AST as AST
-import qualified EnvML.Desugar as Desugar
-import qualified EnvML.DeBruijn as DeBruijn
-import qualified EnvML.Syntax as EnvML
-import qualified EnvML.Elab as Elab
-import qualified Core.Syntax as Core
+
 import qualified Core.Check as Check
 import qualified Core.Eval as Eval
 import Core.Pretty (stringOfExp, stringOfTyp)
+import qualified Core.Syntax as Core
+import Data.Char (isSpace)
+import Data.List (stripPrefix)
+import qualified EnvML.DeBruijn as DeBruijn
+import qualified EnvML.Desugar as Desugar
+import qualified EnvML.Elab as Elab
+import qualified EnvML.Parser.AST as AST
+import qualified EnvML.Parser.Lexer as Lexer
+import qualified EnvML.Parser.Parser as Parser
+import qualified EnvML.Syntax as EnvML
+import System.Console.Haskeline
 
 main :: IO ()
 main = do
@@ -27,31 +27,33 @@ main = do
   runInputT settings repl
 
 banner :: String
-banner = unlines
-  [ "╔══════════════════════════════════════════════════════════════╗"
-  , "║                    EnvML REPL v0.1                           ║"
-  , "║  A Module System with First-Class Environments               ║"
-  , "╠══════════════════════════════════════════════════════════════╣"
-  , "║  Pipeline: Source → Desugar → DeBruijn → Elaborate → Core    ║"
-  , "║  Type :help for available commands                           ║"
-  , "╚══════════════════════════════════════════════════════════════╝"
-  ]
+banner =
+  unlines
+    [ "╔══════════════════════════════════════════════════════════════╗",
+      "║                    EnvML REPL v0.1                           ║",
+      "║  A Module System with First-Class Environments               ║",
+      "╠══════════════════════════════════════════════════════════════╣",
+      "║  Pipeline: Source → Desugar → DeBruijn → Elaborate → Core    ║",
+      "║  Type :help for available commands                           ║",
+      "╚══════════════════════════════════════════════════════════════╝"
+    ]
 
 settings :: Settings IO
-settings = Settings
-  { complete       = completeFilename
-  , historyFile    = Just ".envml_history"
-  , autoAddHistory = True
-  }
+settings =
+  Settings
+    { complete = completeFilename,
+      historyFile = Just ".envml_history",
+      autoAddHistory = True
+    }
 
 repl :: InputT IO ()
 repl = do
   minput <- getInputLine "envml> "
   case minput of
-    Nothing      -> outputStrLn "Goodbye!"
+    Nothing -> outputStrLn "Goodbye!"
     Just ":quit" -> outputStrLn "Goodbye!"
-    Just ":q"    -> outputStrLn "Goodbye!"
-    Just input   -> do
+    Just ":q" -> outputStrLn "Goodbye!"
+    Just input -> do
       liftIO $ processCommand (trim input)
       repl
 
@@ -62,44 +64,46 @@ processCommand :: String -> IO ()
 processCommand "" = return ()
 processCommand cmd
   | cmd == ":help" || cmd == ":h" = printHelp
-  | Just path <- stripPrefix ":p " cmd     = cmdParse (trim path)
-  | Just path <- stripPrefix ":d " cmd     = cmdDesugar (trim path)
-  | Just path <- stripPrefix ":n " cmd     = cmdDeBruijn (trim path)
-  | Just path <- stripPrefix ":e " cmd     = cmdElaborate (trim path)
+  | Just path <- stripPrefix ":p " cmd = cmdParse (trim path)
+  | Just path <- stripPrefix ":d " cmd = cmdDesugar (trim path)
+  | Just path <- stripPrefix ":n " cmd = cmdDeBruijn (trim path)
+  | Just path <- stripPrefix ":e " cmd = cmdElaborate (trim path)
   | Just path <- stripPrefix ":check " cmd = cmdCheck (trim path)
-  | Just path <- stripPrefix ":eval " cmd  = cmdEval (trim path)
-  | Just path <- stripPrefix ":c " cmd     = cmdCheck (trim path)
-  | Just path <- stripPrefix ":v " cmd     = cmdEval (trim path)
+  | Just path <- stripPrefix ":eval " cmd = cmdEval (trim path)
+  | Just path <- stripPrefix ":c " cmd = cmdCheck (trim path)
+  | Just path <- stripPrefix ":v " cmd = cmdEval (trim path)
   | otherwise = putStrLn $ "Unknown command: " ++ cmd ++ "\nType :help for available commands."
 
 printHelp :: IO ()
-printHelp = putStrLn $ unlines
-  [ ""
-  , "┌─────────────────────────────────────────────────────────────────┐"
-  , "│                     EnvML REPL Commands                        │"
-  , "├─────────────────────────────────────────────────────────────────┤"
-  , "│  :p <file>     Parse and print AST                             │"
-  , "│  :d <file>     Parse → Desugar → Print                         │"
-  , "│  :n <file>     Parse → Desugar → De Bruijn → Print             │"
-  , "│  :e <file>     Parse → Desugar → De Bruijn → Elaborate → Print │"
-  , "│  :check <file> Full pipeline → Type check → Print result       │"
-  , "│  :eval <file>  Full pipeline → Evaluate → Print result         │"
-  , "│  :c <file>     (shorthand for :check)                          │"
-  , "│  :v <file>     (shorthand for :eval)                           │"
-  , "│  :help, :h     Show this help                                  │"
-  , "│  :quit, :q     Exit the REPL                                   │"
-  , "├─────────────────────────────────────────────────────────────────┤"
-  , "│                     Pipeline Overview                          │"
-  , "├─────────────────────────────────────────────────────────────────┤"
-  , "│  1. Parse      Source text → EnvML.Parser.AST.Module           │"
-  , "│  2. Desugar    Multi-arg → Single-arg, FunctorDecl → ModDecl   │"
-  , "│  3. De Bruijn  Names → Indices (EnvML.Syntax.Module)           │"
-  , "│  4. Elaborate  EnvML.Syntax → Core.Syntax (System F + Env)     │"
-  , "│  5. Check      Type inference/checking at Core level           │"
-  , "│  6. Eval       Evaluation at Core level                        │"
-  , "└─────────────────────────────────────────────────────────────────┘"
-  , ""
-  ]
+printHelp =
+  putStrLn $
+    unlines
+      [ "",
+        "┌─────────────────────────────────────────────────────────────────┐",
+        "│                     EnvML REPL Commands                        │",
+        "├─────────────────────────────────────────────────────────────────┤",
+        "│  :p <file>     Parse and print AST                             │",
+        "│  :d <file>     Parse → Desugar → Print                         │",
+        "│  :n <file>     Parse → Desugar → De Bruijn → Print             │",
+        "│  :e <file>     Parse → Desugar → De Bruijn → Elaborate → Print │",
+        "│  :check <file> Full pipeline → Type check → Print result       │",
+        "│  :eval <file>  Full pipeline → Evaluate → Print result         │",
+        "│  :c <file>     (shorthand for :check)                          │",
+        "│  :v <file>     (shorthand for :eval)                           │",
+        "│  :help, :h     Show this help                                  │",
+        "│  :quit, :q     Exit the REPL                                   │",
+        "├─────────────────────────────────────────────────────────────────┤",
+        "│                     Pipeline Overview                          │",
+        "├─────────────────────────────────────────────────────────────────┤",
+        "│  1. Parse      Source text → EnvML.Parser.AST.Module           │",
+        "│  2. Desugar    Multi-arg → Single-arg, FunctorDecl → ModDecl   │",
+        "│  3. De Bruijn  Names → Indices (EnvML.Syntax.Module)           │",
+        "│  4. Elaborate  EnvML.Syntax → Core.Syntax (System F + Env)     │",
+        "│  5. Check      Type inference/checking at Core level           │",
+        "│  6. Eval       Evaluation at Core level                        │",
+        "└─────────────────────────────────────────────────────────────────┘",
+        ""
+      ]
 
 -------------------------------------------------------------------------------
 -- File Reading and Parsing
@@ -133,13 +137,14 @@ readAndParse path = do
 -- Pipeline Helpers
 -------------------------------------------------------------------------------
 
-runPipeline :: FilePath 
-            -> (AST.Module -> IO ()) 
-            -> IO ()
+runPipeline ::
+  FilePath ->
+  (AST.Module -> IO ()) ->
+  IO ()
 runPipeline path action = do
   result <- readAndParse path
   case result of
-    Left err  -> putStrLn $ "Error: " ++ err
+    Left err -> putStrLn $ "Error: " ++ err
     Right ast -> action ast
 
 desugarModule :: AST.Module -> AST.Module
@@ -169,7 +174,9 @@ cmdDesugar path = runPipeline path $ \ast -> do
 cmdDeBruijn :: FilePath -> IO ()
 cmdDeBruijn path = runPipeline path $ \ast -> do
   let nameless = toDeBruijn ast
-  putStrLn "=== De Bruijn AST ==="
+  putStrLn "=== De Bruijn (AST) ==="
+  print $ show nameless
+  putStrLn "=== De Bruijn (Pretty) ==="
   print $ EnvML.pretty nameless
 
 cmdElaborate :: FilePath -> IO ()
@@ -177,8 +184,10 @@ cmdElaborate path = runPipeline path $ \ast -> do
   case elaborate ast of
     Left err -> putStrLn $ "Elaboration error: " ++ err
     Right coreExp -> do
-      putStrLn "=== Elaborated Core ==="
-      print $ stringOfExp coreExp
+      putStrLn "=== Elaborated Core (AST) ==="
+      print coreExp
+      putStrLn "=== Elaborated Core (Pretty) ==="
+      putStrLn (stringOfExp coreExp)
 
 cmdCheck :: FilePath -> IO ()
 cmdCheck path = runPipeline path $ \ast -> do
@@ -205,5 +214,7 @@ cmdEval path = runPipeline path $ \ast -> do
       case Eval.eval [] coreExp of
         Nothing -> putStrLn "✗ Evaluation failed"
         Just result -> do
-          putStrLn "✓ Result:"
+          putStrLn "✓ Result (AST):"
+          print result
+          putStrLn "✓ Result (Pretty):"
           putStrLn $ stringOfExp result

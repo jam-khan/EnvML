@@ -2,6 +2,7 @@ module Core.Check where
 
 import Control.Monad (guard)
 import Core.Syntax
+import Debug.Trace (trace)
 
 -- | Count type variable bindings (Etvar and Eteq) in an environment
 
@@ -223,6 +224,10 @@ infer g (BinOp (Sub e1 e2)) = do
   guard (check g e1 (TyLit TyInt))
   guard (check g e2 (TyLit TyInt))
   return (TyLit TyInt)
+infer g (BinOp (Add e1 e2)) = do
+  guard (check g e1 (TyLit TyInt))
+  guard (check g e2 (TyLit TyInt))
+  return (TyLit TyInt)
 infer g (BinOp (Mul e1 e2)) = do
   guard (check g e1 (TyLit TyInt))
   guard (check g e2 (TyLit TyInt))
@@ -237,7 +242,7 @@ infer g (BinOp (EqEq e1 e2)) = do
   t1 <- infer g e1
   guard (check g e2 t1)
   return (TyLit TyBool)
-infer _ _ = Nothing -- Other cases cannot be inferred
+infer _ _ = Nothing
 
 -- | Check an expression against a type
 --   Returns True if the expression has the given type
@@ -256,5 +261,5 @@ check g (Fix e) (TyArr a b) =
   check (Type (TyArr a b) : g) e (TyArr a b)
 check g e t =
   case infer g e of
-    Just t' -> teq g t' t g -- Use type equality
-    _ -> False
+    Just t' -> teq g t' t g || trace ("Expected: " ++ show t ++ ", but got: " ++ show t' ++ " for " ++ show e) False
+    _ -> trace ("Inference returned Nothing: " ++ show e) False
