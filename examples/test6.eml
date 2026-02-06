@@ -1,0 +1,2 @@
+let comp : forall a. {f : a -> [a], x : a} -> [a] = 
+    fun (env) -> box [e = env] in e.f(e.x);;
