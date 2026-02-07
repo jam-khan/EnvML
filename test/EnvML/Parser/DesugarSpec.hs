@@ -417,7 +417,7 @@ spec2 = do
     let parsed = parseExp (lexer input)
     let desugared = desugarExp parsed
     let prettied = prettyExp desugared
-    prettied `shouldBe` "fun (type a) -> fun (x : a) -> x"
+    prettied `shouldBe` "fun (type a) -> (fun (x : a) -> x)"
 
 -- Idempotence tests
 spec3 :: Spec

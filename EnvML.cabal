@@ -20,7 +20,9 @@ library
                         EnvML.Parser.Lexer
                         Core.Eval
                         Core.Check
+                        Core.Named
                         Core.Syntax
+                        Core.DeBruijn
                         Core.Pretty
                         Core.Repl
                         Core.Parser.Parser
