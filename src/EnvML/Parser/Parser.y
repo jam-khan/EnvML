@@ -185,6 +185,7 @@ BaseTyp :: { Typ }
   | '{' TyRcdFields '}'    { TyRcd $2 }
   | '[' TyCtx ']'          { TyCtx $2 }
   | '(' Typ ')'            { $2 }
+  | ModuleTyp              { TyModule $1 }
 
 TyRcdFields :: { [(Name, Typ)] }
   : id ':' Typ ',' TyRcdFields  { ($1, $3) : $5 }

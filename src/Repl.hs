@@ -132,17 +132,11 @@ runPipeline path action = do
     Left err  -> putStrLn $ "Error: " ++ err
     Right ast -> action ast
 
--- Elaborate AST to Core.Named (includes desugaring)
 elaborate :: AST.Module -> CoreNamed.Exp
 elaborate = Elab.elabModule
 
--- Convert Core.Named to Core.Syntax (de Bruijn)
 toDeBruijn :: CoreNamed.Exp -> Core.Exp
 toDeBruijn = DeBruijn.toDeBruijn
-
--------------------------------------------------------------------------------
--- Commands
--------------------------------------------------------------------------------
 
 cmdParse :: FilePath -> IO ()
 cmdParse path = runPipeline path $ \ast -> do
