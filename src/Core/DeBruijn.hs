@@ -17,7 +17,7 @@ type TypNames   = [Name]
 
 -- index computation
 indexE :: Name -> ExpNames -> (Int, BindingKind)
-indexE _x []    = error "unbound"
+indexE x []    = error ("unbound: " ++ x)
 indexE x ((x', kind):g) = 
   if x == x' then (0, kind) else 
     let (y, kind') = indexE x g
@@ -108,7 +108,7 @@ toNamelessEnvE ::
 toNamelessEnvE eNames tNames entry =
   case entry of
     Named.ExpE _n e -> Nameless.ExpE $ toNamelessExp eNames tNames e
-    Named.ModE n e  -> Nameless.ExpE $ Nameless.Rec n $ toNamelessExp eNames tNames e
+    Named.ModE n e  -> Nameless.ExpE $ Nameless.FEnv $ [Nameless.ExpE (Nameless.Rec n (toNamelessExp eNames tNames e))]
     Named.TypE _n t -> Nameless.TypE $ toNamelessTyp eNames tNames t
 
 getEntryName :: Named.EnvE -> Name
@@ -117,7 +117,7 @@ getEntryName (Named.ModE n _e) = n
 getEntryName (Named.TypE n _e) = n
 
 indexT :: Name -> TypNames -> Int
-indexT _a []    = error "unbound"
+indexT a []     = error ("unbound" ++ a)
 indexT a (a':g) =
   if a == a' then 0 else 1 + indexT a g
 

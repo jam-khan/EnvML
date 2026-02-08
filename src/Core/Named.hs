@@ -44,3 +44,4 @@ data Typ
   | TyRcd    String Typ     -- {l : A}
   | TyEnvt   TyEnv          -- Γ
   deriving (Eq, Show)
+  

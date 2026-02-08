@@ -10,15 +10,14 @@ import Data.Char (isSpace)
 -- Import your modules
 import qualified EnvML.Parser.Parser as Parser
 import qualified EnvML.Parser.Lexer as Lexer
-import qualified EnvML.Parser.AST as AST
-import qualified EnvML.Desugar as Desugar
-import qualified EnvML.DeBruijn as DeBruijn
-import qualified EnvML.Syntax as EnvML
+import qualified EnvML.Syntax as AST
 import qualified EnvML.Elab as Elab
+import qualified Core.Named as CoreNamed
 import qualified Core.Syntax as Core
 import qualified Core.Check as Check
 import qualified Core.Eval as Eval
-import Core.Pretty (stringOfExp, stringOfTyp)
+import qualified Core.Pretty as Pretty
+import qualified Core.DeBruijn as DeBruijn
 
 banner :: String
 banner = unlines
@@ -26,7 +25,7 @@ banner = unlines
   , "║                    EnvML REPL v0.1                           ║"
   , "║  A Module System with First-Class Environments               ║"
   , "╠══════════════════════════════════════════════════════════════╣"
-  , "║  Pipeline: Source → Desugar → DeBruijn → Elaborate → Core    ║"
+  , "║  Pipeline: Source → Parse → Elaborate → Core (Named/Less)    ║"
   , "║  Type :help for available commands                           ║"
   , "╚══════════════════════════════════════════════════════════════╝"
   ]
@@ -57,9 +56,8 @@ processCommand "" = return ()
 processCommand cmd
   | cmd == ":help" || cmd == ":h" = printHelp
   | Just path <- stripPrefix ":p " cmd     = cmdParse (trim path)
-  | Just path <- stripPrefix ":d " cmd     = cmdDesugar (trim path)
-  | Just path <- stripPrefix ":n " cmd     = cmdDeBruijn (trim path)
   | Just path <- stripPrefix ":e " cmd     = cmdElaborate (trim path)
+  | Just path <- stripPrefix ":n " cmd     = cmdDeBruijn (trim path)
   | Just path <- stripPrefix ":check " cmd = cmdCheck (trim path)
   | Just path <- stripPrefix ":eval " cmd  = cmdEval (trim path)
   | Just path <- stripPrefix ":c " cmd     = cmdCheck (trim path)
@@ -73,9 +71,8 @@ printHelp = putStrLn $ unlines
   , "│                     EnvML REPL Commands                        │"
   , "├─────────────────────────────────────────────────────────────────┤"
   , "│  :p <file>     Parse and print AST                             │"
-  , "│  :d <file>     Parse → Desugar → Print                         │"
-  , "│  :n <file>     Parse → Desugar → De Bruijn → Print             │"
-  , "│  :e <file>     Parse → Desugar → De Bruijn → Elaborate → Print │"
+  , "│  :e <file>     Parse → Elaborate (Core.Named) → Print          │"
+  , "│  :n <file>     Parse → Elaborate → De Bruijn → Print           │"
   , "│  :check <file> Full pipeline → Type check → Print result       │"
   , "│  :eval <file>  Full pipeline → Evaluate → Print result         │"
   , "│  :c <file>     (shorthand for :check)                          │"
@@ -85,12 +82,11 @@ printHelp = putStrLn $ unlines
   , "├─────────────────────────────────────────────────────────────────┤"
   , "│                     Pipeline Overview                          │"
   , "├─────────────────────────────────────────────────────────────────┤"
-  , "│  1. Parse      Source text → EnvML.Parser.AST.Module           │"
-  , "│  2. Desugar    Multi-arg → Single-arg, FunctorDecl → ModDecl   │"
-  , "│  3. De Bruijn  Names → Indices (EnvML.Syntax.Module)           │"
-  , "│  4. Elaborate  EnvML.Syntax → Core.Syntax (System F + Env)     │"
-  , "│  5. Check      Type inference/checking at Core level           │"
-  , "│  6. Eval       Evaluation at Core level                        │"
+  , "│  1. Parse      Source text → EnvML.Syntax.Module           │"
+  , "│  2. Elaborate  AST → Core.Named (with desugaring built-in)     │"
+  , "│  3. De Bruijn  Core.Named → Core.Syntax (names → indices)      │"
+  , "│  4. Check      Type inference/checking at Core level           │"
+  , "│  5. Eval       Evaluation at Core level                        │"
   , "└─────────────────────────────────────────────────────────────────┘"
   , ""
   ]
@@ -136,68 +132,54 @@ runPipeline path action = do
     Left err  -> putStrLn $ "Error: " ++ err
     Right ast -> action ast
 
-desugarModule :: AST.Module -> AST.Module
-desugarModule = Desugar.desugarModule
+elaborate :: AST.Module -> CoreNamed.Exp
+elaborate = Elab.elabModule
 
-toDeBruijn :: AST.Module -> EnvML.Module
-toDeBruijn = DeBruijn.modToDeBruijn . desugarModule
-
-elaborate :: AST.Module -> Either String Core.Exp
-elaborate ast = Elab.elabM (toDeBruijn ast)
-
--------------------------------------------------------------------------------
--- Commands
--------------------------------------------------------------------------------
+toDeBruijn :: CoreNamed.Exp -> Core.Exp
+toDeBruijn = DeBruijn.toDeBruijn
 
 cmdParse :: FilePath -> IO ()
 cmdParse path = runPipeline path $ \ast -> do
   putStrLn "=== Parsed AST ==="
   putStrLn $ AST.pretty ast
 
-cmdDesugar :: FilePath -> IO ()
-cmdDesugar path = runPipeline path $ \ast -> do
-  let desugared = desugarModule ast
-  putStrLn "=== Desugared AST ==="
-  putStrLn $ AST.pretty desugared
+cmdElaborate :: FilePath -> IO ()
+cmdElaborate path = runPipeline path $ \ast -> do
+  let coreNamed = elaborate ast
+  putStrLn "=== Elaborated Core (Named) ==="
+  print coreNamed
 
 cmdDeBruijn :: FilePath -> IO ()
 cmdDeBruijn path = runPipeline path $ \ast -> do
-  let nameless = toDeBruijn ast
-  putStrLn "=== De Bruijn AST ==="
-  print $ EnvML.pretty nameless
-
-cmdElaborate :: FilePath -> IO ()
-cmdElaborate path = runPipeline path $ \ast -> do
-  case elaborate ast of
-    Left err -> putStrLn $ "Elaboration error: " ++ err
-    Right coreExp -> do
-      putStrLn "=== Elaborated Core ==="
-      print $ stringOfExp coreExp
+  let coreNamed = elaborate ast
+  let coreNameless = toDeBruijn coreNamed
+  putStrLn "=== De Bruijn Core (Nameless) ==="
+  putStrLn $ Pretty.stringOfExp coreNameless
 
 cmdCheck :: FilePath -> IO ()
 cmdCheck path = runPipeline path $ \ast -> do
-  case elaborate ast of
-    Left err -> putStrLn $ "Elaboration error: " ++ err
-    Right coreExp -> do
-      putStrLn "=== Type Checking ==="
-      case Check.infer [] coreExp of
-        Nothing -> putStrLn "✗ Type check failed: Could not infer type"
-        Just typ -> do
-          putStrLn "✓ Type check succeeded!"
-          putStrLn $ "  Type: " ++ stringOfTyp typ
+  let coreNamed = elaborate ast
+  let coreNameless = toDeBruijn coreNamed
+  putStrLn "=== Type Checking ==="
+  case Check.infer [] coreNameless of
+    Nothing -> putStrLn "✗ Type check failed: Could not infer type"
+    Just typ -> do
+      putStrLn "✓ Type check succeeded!"
+      putStrLn $ "  Type: " ++ Pretty.stringOfTyp typ
 
 cmdEval :: FilePath -> IO ()
 cmdEval path = runPipeline path $ \ast -> do
-  case elaborate ast of
-    Left err -> putStrLn $ "Elaboration error: " ++ err
-    Right coreExp -> do
-      -- Optionally type check first
-      case Check.infer [] coreExp of
-        Nothing -> putStrLn "Warning: Type check failed, attempting evaluation anyway..."
-        Just typ -> putStrLn $ "Type: " ++ show typ
-      putStrLn "=== Evaluation ==="
-      case Eval.eval [] coreExp of
-        Nothing -> putStrLn "✗ Evaluation failed"
-        Just result -> do
-          putStrLn "✓ Result:"
-          putStrLn $ stringOfExp result
+  let coreNamed = elaborate ast
+  let coreNameless = toDeBruijn coreNamed
+  
+  -- Optionally type check first
+  case Check.infer [] coreNameless of
+    Nothing -> putStrLn "Warning: Type check failed, attempting evaluation anyway..."
+    Just typ -> putStrLn $ "Type: " ++ Pretty.stringOfTyp typ
+  
+  putStrLn "=== Evaluation ==="
+  case Eval.eval [] coreNameless of
+    Nothing -> putStrLn "✗ Evaluation failed"
+    Just result -> do
+      putStrLn "✓ Result:"
+      putStrLn $ "  " ++ Pretty.stringOfExp result

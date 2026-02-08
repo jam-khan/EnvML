@@ -1,2 +1,6 @@
-let comp : forall a. {f : a -> [a], x : a} -> [a] = 
-    fun (env) -> box [e = env] in e.f(e.x);;
+let value : int = f(10);
+
+let f : int -> int  = comp(fun (type t) -> {f = (fun (x) -> x):: t -> t});
+
+let comp : (forall a. {f : a -> a}) -> int -> int = 
+    fun (env) (x) -> box [e = (env @int :: {f : int -> int}), x=42] in e.f(x);

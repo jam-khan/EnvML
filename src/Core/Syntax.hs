@@ -61,3 +61,4 @@ data Literal
   | LitBool Bool
   | LitStr  String
   deriving (Eq, Show)
+

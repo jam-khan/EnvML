@@ -51,7 +51,6 @@ tokens :-
   "."         { \_ -> TokDot      } 
   ","         { \_ -> TokComma    }
   ";"         { \_ -> TokSemi     }
-  ";;"        { \_ -> TokSemiSemi }
   "::"        { \_ -> TokDoubleColon}
   "->"        { \_ -> TokArrow    }
   "->m"       { \_ -> TokArrowM   }
@@ -108,7 +107,6 @@ data Token
   | TokComma    
   | TokDot
   | TokSemi
-  | TokSemiSemi
   | TokArrow
   | TokArrowM
   | TokTripleArrow

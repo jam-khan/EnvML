@@ -4,9 +4,8 @@ module Main where
 
 import qualified EnvML.Parser.Parser as Parser
 import qualified EnvML.Parser.Lexer as Lexer
-import qualified EnvML.Parser.AST as AST
+import qualified EnvML.Syntax as AST
 import qualified EnvML.Desugar as Desugar
-import qualified EnvML.DeBruijn as DB
 import qualified EnvML.Elab as Elab
 import qualified Core.Check as Check
 import qualified Core.Eval as Eval
@@ -66,11 +65,7 @@ runDeBruijn :: JSString -> IO JSString
 runDeBruijn input = safeRun runDeBruijnImpl input
 
 runDeBruijnImpl :: String -> String
-runDeBruijnImpl input = 
-    let parsed    = Parser.parseModule (Lexer.lexer input)
-        desugared = Desugar.desugarModule parsed
-        nameless  = DB.modToDeBruijn desugared
-    in "=== De-Bruijn AST ===\n" ++ show nameless
+runDeBruijnImpl input =  error "De-bruijn to be FIXED."
 
 -- | Stage 4: Elaboration
 foreign export javascript "runElaborate" runElaborate :: JSString -> IO JSString

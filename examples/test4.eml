@@ -1,31 +1,32 @@
-module type POLICY = 
-  forall t. sig val trans : t -> [t];; end;;
+let result1 : int = box [impl = foo(policy1)] in (impl.f::int -> int)(42);
+let result2 : int = box [impl = foo(policy1)] in (impl.f::int -> int)(42);
 
-module type FOO = 
-  sig
-    type a = int;;
-    val trans_int : a;;
-  end;;
+module foo : 
+  (forall t. sig val trans : t -> t; end) 
+  ->m (sig
+          val f : a -> a;
+          type a = int;
+        end)
+  = functor (m) ->
+      struct
+        let f : a -> a = ((m @ int)::(sig val trans : int -> int; end)).trans;
+        type a = int;
+      end;
 
 module policy1 : POLICY = 
-  functor (type t)
-    let trans : t -> [t] = (fun (x) -> [x]);;
-  end;;
+  functor (type t) ->
+    struct
+      let trans : t -> t = (fun (x) -> x);
+    end;
 
 module policy2 : POLICY =
-  functor (type t)
-    let trans : t -> [t] = fun (x) -> [];;
-  end;;
-
-module foo : POLICY ->m FOO =
-  functor (m : POLICY) ->
+  functor (type t) ->
     struct
-      type a = int;;
-      let trans_int : a -> [a] = (m @ int).trans;;
-    end;;
+      let trans : t -> t = fun (x) -> x;
+    end;
 
-let comp : {f : int -> [int], x : int} -> [int] = 
-    fun (env) -> box [e = env] in e.f(e.x);;
-
-let result1 : int = comp({f = foo(policy1).trans_int, x = 42});;
-let result2 : int = comp({f = foo(policy2).trans_int, x = 42});;
+module type POLICY = 
+  forall t. 
+    sig
+      val trans : t -> t; 
+    end;

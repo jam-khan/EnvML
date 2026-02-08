@@ -2,10 +2,10 @@
 module EnvML.Parse
   ( parseEmlFile
   , parseEmliFile
-  , module EnvML.Parser.AST
+  , module EnvML.Syntax
   ) where
 
-import EnvML.Parser.AST
+import EnvML.Syntax
 import EnvML.Parser.Lexer (lexer)
 import EnvML.Parser.Parser (parseModule, parseModuleTyp)
 
