@@ -103,13 +103,13 @@ spec = do
       named `shouldBe` Named.TyArr (Named.TyLit Core.TyInt) (Named.TyLit Core.TyBool)
 
     it "elaborates forall types" $ do
-      let input = "forall a. a -> a"
+      let input = "forall a. (a -> a)"
       let parsed = parseTyp (lexer input)
       let named = elabTyp parsed
       named `shouldBe` Named.TyAll "a" (Named.TyArr (Named.TyVar "a") (Named.TyVar "a"))
 
     it "elaborates nested forall" $ do
-      let input = "forall a. forall b. a -> b"
+      let input = "forall a. forall b. (a -> b)"
       let parsed = parseTyp (lexer input)
       let named = elabTyp parsed
       named `shouldBe` Named.TyAll "a" 
@@ -127,7 +127,7 @@ spec = do
       let input = "let x = 1;"
       let parsed = parseModule (lexer input)
       let named = elabModule parsed
-      named `shouldBe` Named.FEnv [Named.ExpE "x" (Named.Lit (Core.LitInt 1))]
+      named `shouldBe` Named.FEnv [Named.ModE "x" (Named.Lit (Core.LitInt 1))]
 
     it "elaborates functor with term argument" $ do
       let m = Src.Functor [("x", Src.TmArgType (Src.TyLit Core.TyInt))]
