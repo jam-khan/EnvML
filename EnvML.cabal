@@ -12,8 +12,6 @@ library
                         Repl
                         EnvML.Elab
                         EnvML.Syntax
-                        EnvML.Desugar
-                        EnvML.DeBruijn
                         EnvML.Parser.AST
                         EnvML.Parse
                         EnvML.Parser.Parser

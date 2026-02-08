@@ -2,144 +2,202 @@
 
 module EnvML.Elab where
 
-import qualified Core.Syntax as Core
-import qualified EnvML.Syntax as EnvML
+import qualified Core.Named         as Core
+import qualified EnvML.Parser.AST   as EnvML
 
 type ElabError = String
 
-elabTyEnv ::
-  EnvML.TyEnv ->
-  Either ElabError Core.TyEnv
-elabTyEnv [] = pure []
-elabTyEnv (x : xs) = do
-  x' <- elabTyEnvE x
-  xs' <- elabTyEnv xs
-  Right $ x' : xs'
 
-elabTyEnvE ::
-  EnvML.TyEnvE ->
-  Either ElabError Core.TyEnvE
-elabTyEnvE (EnvML.Type t) =
-  Core.Type <$> elabTyp t
-elabTyEnvE EnvML.Kind =
-  pure Core.Kind
-elabTyEnvE (EnvML.TypeEq t) =
-  Core.TypeEq <$> elabTyp t
+elabModule :: EnvML.Module -> Core.Exp
+elabModule = elabModuleExp
 
-elabModTyp ::
-  EnvML.ModuleTyp ->
-  Either ElabError Core.Typ
-elabModTyp (EnvML.TySig intf)       = Core.TyEnvt <$> elabIntf intf
-elabModTyp (EnvML.TyArrowM a sigB)  = Core.TyArr <$> elabTyp a <*> elabModTyp sigB
-elabModTyp (EnvML.ForallM sig)      = Core.TyAll <$> elabModTyp sig
-elabModTyp (EnvML.TyVarM i)         = pure $ Core.TyVar i
+elabModuleExp :: 
+  EnvML.Module 
+  -> Core.Exp
+elabModuleExp modl =
+  case modl of
+    EnvML.VarM name         -> Core.Var name
+    EnvML.Functor args m    -> elabFunctor args m
+    EnvML.Struct structs    ->
+      Core.FEnv $ elabStructures structs
+    EnvML.MApp m1 m2        ->
+      Core.App (elabModuleExp m1) (elabModuleExp m2)
+    EnvML.MAppt m1 a        ->
+      Core.TApp (elabModuleExp m1) (elabTyp a)
+    EnvML.MAnno m mty       ->
+      Core.Anno (elabModuleExp m) (elabModTyp mty)
+  
 
-elabIntf ::
-  EnvML.Intf ->
-  Either ElabError Core.TyEnv
-elabIntf = mapM elabIntfE
+-- Functors elaboration
+elabFunctor :: EnvML.FunArgs -> EnvML.Module -> Core.Exp
+elabFunctor [] body = elabModuleExp body
+elabFunctor ((name, arg):rest) body =
+  let restExp = elabFunctor rest body
+  in  case arg of
+        EnvML.TyArg -> Core.TLam name restExp
+        EnvML.TmArg -> Core.Lam  name restExp
+        EnvML.TmArgType _ ->
+          -- NOTE: We ignore type annotations on parameters for now
+          Core.Lam name restExp
 
-elabIntfE ::
-  EnvML.IntfE ->
-  Either ElabError Core.TyEnvE
-elabIntfE (EnvML.TyDef t)       = Core.TypeEq <$> elabTyp t    -- type t = int
-elabIntfE (EnvML.ValDecl ty)    = Core.Type <$> elabTyp ty     -- val x : int
-elabIntfE (EnvML.ModDecl intf)  = Core.TypeEq <$> elabTyp intf -- module M : SIG
-elabIntfE (EnvML.SigDecl mty)   = Core.TypeEq <$> elabTyp mty  -- signature S = SIG
+-- Structures elaboration
+elabStructures :: EnvML.Structures -> Core.Env
+elabStructures = map elabStructure
 
-elabTyp ::
-  EnvML.Typ ->
-  Either ElabError Core.Typ
-elabTyp (EnvML.TyLit i)   =
-  pure $ Core.TyLit (elabTyLit i)
-elabTyp (EnvML.TyVar n)   =
-  pure $ Core.TyVar n
-elabTyp (EnvML.TyArr a1 a2) =
-  Core.TyArr <$> elabTyp a1 <*> elabTyp a2
-elabTyp (EnvML.TyAll a)   =
-  Core.TyAll <$> elabTyp a
-elabTyp (EnvML.TyBoxT g1 a) =
-  Core.TyBoxT <$> elabTyEnv g1 <*> elabTyp a
-elabTyp (EnvML.TySubstT a1 a2) =
-  Core.TySubstT <$> elabTyp a1 <*> elabTyp a2
-elabTyp (EnvML.TyRcd []) = Left "Single records not allowed"
-elabTyp (EnvML.TyRcd [(n, t)]) =
-  Core.TyRcd n <$> elabTyp t
-elabTyp (EnvML.TyRcd fields) = do
-  fields' <- traverse elabField fields
-  pure $ Core.TyEnvt fields'
-  where
-    elabField (x, t) = Core.Type . Core.TyRcd x <$> elabTyp t
-elabTyp (EnvML.TyEnvt bs) =
-  Core.TyEnvt <$> elabTyEnv bs
-elabTyp (EnvML.TyModule mt) =
-  elabModTyp mt
+-- Structure elaboration
+elabStructure :: EnvML.Structure -> Core.EnvE
+elabStructure struct =
+  case struct of
+    (EnvML.Let name maybeTyp e)           ->
+      case maybeTyp of
+        Nothing -> Core.ExpE name (elabExp e)
+        Just ty -> Core.ExpE name (Core.Anno (elabExp e) (elabTyp ty))
+    (EnvML.TypDecl name ty)               ->
+      Core.TypE name (elabTyp ty)
+    (EnvML.ModTypDecl name mty)           ->
+      Core.TypE name (elabModTyp mty)
+    (EnvML.ModStruct name maybeTyp mod1)  ->
+      case maybeTyp of
+        Nothing   -> Core.ModE name (elabModuleExp mod1)
+        Just mty  -> Core.ModE name (Core.Anno (elabModuleExp mod1) (elabModTyp mty))       
+    (EnvML.FunctStruct name args maybeTyp mod1) ->
+      case maybeTyp of
+        Nothing   -> Core.ModE name (elabFunctor args mod1)
+        Just mty  -> Core.ModE name (Core.Anno (elabFunctor args mod1) (elabModTyp mty))
+  
+elabExp :: EnvML.Exp -> Core.Exp
+elabExp e = 
+  case e of
+    (EnvML.Lit i)           -> Core.Lit i
+    (EnvML.Var n)           -> Core.Var n
+    (EnvML.Lam args e1)     -> 
+      elabLambda args e1
+    (EnvML.TLam _ _)        -> 
+      error "Typed lambdas don't exist at source separately."
+    (EnvML.Clos env args e1)->
+      let env'  = elabEnv env
+          body' = elabLambda args e1
+      in  Core.Clos env' body'
+    (EnvML.App e1 e2)       -> Core.App (elabExp e1) (elabExp e2)
+    (EnvML.TClos {})        -> 
+      error "Typed closures don't exist at source separately."
+    (EnvML.TApp e1 t)       ->
+      Core.TApp (elabExp e1) (elabTyp t)
+    (EnvML.Box env e1)      -> 
+      Core.Box (elabEnv env) (elabExp e1)
+    (EnvML.Rec records)     -> 
+      Core.FEnv $ map (Core.ExpE "_") $ elabRecords records
+    (EnvML.RProj e1 n)      -> 
+      Core.RProj (elabExp e1) n
+    (EnvML.FEnv env)        ->
+      Core.FEnv (elabEnv env)
+    (EnvML.Anno e1 ty)      ->
+      Core.Anno (elabExp e1) (elabTyp ty)
+    (EnvML.Mod m)           -> elabModuleExp m
+    (EnvML.BinOp op)        ->
+      error $ "TODO: Binary operators to be supported " ++ show op
 
-elabTyLit ::
-  EnvML.TyLit ->
-  Core.TyLit
-elabTyLit EnvML.TyInt = Core.TyInt
-elabTyLit EnvML.TyBool = Core.TyBool
-elabTyLit EnvML.TyStr = Core.TyStr
+elabLambda :: EnvML.FunArgs -> EnvML.Exp -> Core.Exp
+elabLambda [] body = elabExp body
+elabLambda ((name, arg):rest) body =
+  let restExp = elabLambda rest body
+  in  case arg of
+        EnvML.TyArg -> Core.TLam name restExp
+        EnvML.TmArg -> Core.Lam  name restExp
+        EnvML.TmArgType _ ->
+          -- NOTE: Ignoring type parameters for now
+          Core.Lam name restExp
 
-elabEnv ::
-  EnvML.Env ->
-  Either ElabError Core.Env
-elabEnv [] = pure []
-elabEnv (x : xs) = do
-  etm <- elabEnvE x
-  xs' <- elabEnv xs
-  Right $ etm : xs'
+elabRecords :: [(EnvML.Name, EnvML.Exp)] -> [Core.Exp]
+elabRecords []            = []
+elabRecords ((n, e):rest) = 
+  Core.Rec n (elabExp e):elabRecords rest
 
-elabM ::
-  EnvML.Module ->
-  Either ElabError Core.Exp
-elabM (EnvML.VarM i) = pure $ Core.Var i
-elabM (EnvML.Functor m) = Core.Lam <$> elabM m
-elabM (EnvML.Functort m) = Core.TLam <$> elabM m
-elabM (EnvML.Struct env) = Core.FEnv <$> elabEnv env
-elabM (EnvML.MApp m1 m2) = Core.App <$> elabM m1 <*> elabM m2
-elabM (EnvML.MAppt m t) = Core.TApp <$> elabM m <*> elabTyp t
+elabEnv :: EnvML.Env -> Core.Env
+elabEnv = map elabEnvE
 
-elabEnvE ::
-  EnvML.EnvE ->
-  Either ElabError Core.EnvE
-elabEnvE (EnvML.ExpE e) = Core.ExpE <$> elabExp e
-elabEnvE (EnvML.TypE t) = Core.TypE <$> elabTyp t
-elabEnvE (EnvML.ModExpE e) = Core.ExpE <$> elabExp e
-elabEnvE (EnvML.ModTypE t) = Core.TypE <$> elabTyp t
+elabEnvE :: EnvML.EnvE -> Core.EnvE
+elabEnvE envE = 
+  case envE of
+    (EnvML.ExpEN name e)    -> Core.ExpE name (elabExp e)
+    (EnvML.ExpE e)          -> Core.ExpE "_" (elabExp e)
+    (EnvML.TypEN name ty)   -> Core.TypE name (elabTyp ty)
+    (EnvML.TypE ty)         -> Core.TypE "_" (elabTyp ty)
+    (EnvML.ModE name m)     -> Core.ModE name (elabModule m)
+    (EnvML.ModTypE name mty)-> Core.TypE name (elabModTyp mty)
 
-elabLit ::
-  EnvML.Literal ->
-  Core.Literal
-elabLit (EnvML.LitInt i) = Core.LitInt i
-elabLit (EnvML.LitBool b) = Core.LitBool b
-elabLit (EnvML.LitStr s) = Core.LitStr s
+elabTyp :: EnvML.Typ -> Core.Typ
+elabTyp ty =
+  case ty of
+    (EnvML.TyLit lit)       -> Core.TyLit lit
+    (EnvML.TyVar n)         -> Core.TyVar n
+    (EnvML.TyArr ta tb)     -> Core.TyArr   (elabTyp ta) (elabTyp tb)
+    (EnvML.TyAll n ty1)     -> Core.TyAll n (elabTyp ty1)
+    (EnvML.TyBoxT ctx ty1)  -> Core.TyBoxT  (elabTyCtx ctx) (elabTyp ty1)
+    (EnvML.TyRcd fields)    -> Core.TyEnvt $ map (Core.Type "_") $ elabRcdFieldsTy fields
+    (EnvML.TyCtx ctx)       -> Core.TyEnvt  (elabTyCtx ctx)
+    (EnvML.TyModule mty)    -> elabModTyp mty
 
-elabExp ::
-  EnvML.Exp ->
-  Either ElabError Core.Exp
-elabExp (EnvML.Lit lit)     = pure $ Core.Lit $ elabLit lit
-elabExp (EnvML.Var i)       = pure $ Core.Var i
-elabExp (EnvML.Lam e)       = Core.Lam <$> elabExp e
-elabExp (EnvML.Clos e1 e2)  = Core.Clos <$> elabEnv e1 <*> elabExp e2
-elabExp (EnvML.App e1 e2)   = Core.App <$> elabExp e1 <*> elabExp e2
-elabExp (EnvML.TLam e)      = Core.TLam <$> elabExp e
-elabExp (EnvML.TClos env e) = Core.TClos <$> elabEnv env <*> elabExp e
-elabExp (EnvML.TApp e ty)   = Core.TApp <$> elabExp e <*> elabTyp ty
-elabExp (EnvML.Box env ty)  = Core.Box <$> elabEnv env <*> elabExp ty
-elabExp (EnvML.Rec [])      = Left "Empty records not allowed."
-elabExp (EnvML.Rec [(n, e)])= Core.Rec n <$> elabExp e
-elabExp (EnvML.Rec fields) = do
-  fields' <- traverse elabField fields
-  pure $ Core.FEnv fields'
-  where
-    elabField (x, e) = Core.ExpE . Core.Rec x <$> elabExp e
-elabExp (EnvML.RProj e l)   = Core.RProj <$> elabExp e <*> pure l
-elabExp (EnvML.FEnv env)    = Core.FEnv <$> elabEnv env
-elabExp (EnvML.Anno e ty)   = Core.Anno <$> elabExp e <*> elabTyp ty
-elabExp (EnvML.ModE m)      = elabM m
-elabExp (EnvML.BinOp op)    = case op of
-  EnvML.Add e1 e2 -> fmap Core.BinOp (Core.Add <$> elabExp e1 <*> elabExp e2)
-  EnvML.Sub e1 e2 -> fmap Core.BinOp (Core.Sub <$> elabExp e1 <*> elabExp e2)
-  EnvML.Mul e1 e2 -> fmap Core.BinOp (Core.Mul <$> elabExp e1 <*> elabExp e2)
+elabTyCtx :: EnvML.TyCtx -> Core.TyEnv
+elabTyCtx = map elabTyCtxE
+
+elabTyCtxE :: EnvML.TyCtxE -> Core.TyEnvE
+elabTyCtxE ctxE =
+  case ctxE of
+    (EnvML.TypeN name ty) ->
+      Core.Type name (elabTyp ty)    
+    (EnvML.Type ty) ->
+      Core.Type "_" (elabTyp ty)    
+    (EnvML.KindN name)  -> Core.Kind name
+    EnvML.Kind          -> Core.Kind "_"
+    (EnvML.TypeEqN name ty) ->
+      Core.TypeEq name (elabTyp ty)    
+    (EnvML.TyMod name mty) ->
+      Core.Type name (elabModTyp mty)
+    (EnvML.TypeEqM name mty) ->
+      Core.TypeEq name (elabModTyp mty)
+
+elabRcdFieldsTy :: [(EnvML.Name, EnvML.Typ)] -> [Core.Typ]
+elabRcdFieldsTy []            = []
+elabRcdFieldsTy ((n, ty):rest) =
+  Core.TyRcd n (elabTyp ty):elabRcdFieldsTy rest
+elabModTyp :: EnvML.ModuleTyp -> Core.Typ
+elabModTyp mty =
+  case mty of
+    (EnvML.TyArrowM ty mty1)   -> 
+      Core.TyArr (elabTyp ty) (elabModTyp mty1)
+    (EnvML.ForallM n mty1)     ->
+      Core.TyAll n (elabModTyp mty1)
+    (EnvML.TySig intf)        ->
+      Core.TyEnvt (elabIntf intf)
+    (EnvML.TyVarM name)       ->
+      Core.TyVar name
+
+elabIntf :: EnvML.Intf -> Core.TyEnv
+elabIntf = map elabIntfE
+
+elabIntfE :: EnvML.IntfE -> Core.TyEnvE
+elabIntfE intfE =
+  case intfE of
+    (EnvML.TyDef name ty) ->
+      Core.TypeEq name (elabTyp ty)    
+    (EnvML.ValDecl name ty) ->
+      Core.Type name (elabTyp ty)
+    (EnvML.ModDecl name ty) ->
+      Core.TypeEq name (elabTyp ty)    
+    (EnvML.FunctorDecl name args retTyp) ->
+      Core.TypeEq name (elabFunctorDeclToType args retTyp)
+    (EnvML.SigDecl name intf) ->
+      Core.TypeEq name (Core.TyEnvt (elabIntf intf))
+
+elabFunctorDeclToType :: EnvML.FunArgs -> EnvML.Typ -> Core.Typ
+elabFunctorDeclToType [] retTyp = elabTyp retTyp
+elabFunctorDeclToType ((name, arg):rest) retTyp =
+  let restType = elabFunctorDeclToType rest retTyp
+  in  case arg of
+        EnvML.TyArg ->
+          Core.TyAll name restType
+        EnvML.TmArg ->
+          error $ "Functor argument '" ++ name ++ "' must have type annotation"
+        EnvML.TmArgType ty ->
+          Core.TyArr (elabTyp ty) restType

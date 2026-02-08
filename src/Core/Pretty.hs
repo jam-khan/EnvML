@@ -1,14 +1,45 @@
+{-# LANGUAGE InstanceSigs #-}
 module Core.Pretty where
 
 import Core.Syntax
 
+class Pretty a where
+  pretty :: a -> String
+
+-- Instances for Core.Syntax types
+instance Pretty Typ where
+  pretty :: Typ -> String
+  pretty = stringOfTyp
+
+instance Pretty TyLit where
+  pretty :: TyLit -> String
+  pretty TyInt  = "Int"
+  pretty TyBool = "Bool"
+  pretty TyStr  = "String"
+
+instance Pretty TyEnvE where
+  pretty :: TyEnvE -> String
+  pretty = stringOfTyEnvE
+
+instance Pretty Exp where
+  pretty :: Exp -> String
+  pretty = stringOfExp
+
+instance Pretty Literal where
+  pretty :: Literal -> String
+  pretty = stringOfLiteral
+
+instance Pretty BinOp where
+  pretty :: BinOp -> String
+  pretty = stringOfBinOp
+
+instance Pretty EnvE where
+  pretty :: EnvE -> String
+  pretty = stringOfEnvE
+  
 parensIf :: Bool -> String -> String
 parensIf True  s = "(" ++ s ++ ")"
 parensIf False s = s
-
---------------------------------------------------------------------------------
--- Type Pretty Printing
---------------------------------------------------------------------------------
 
 stringOfTyp :: Typ -> String
 stringOfTyp (TyLit l) = case l of
@@ -44,10 +75,6 @@ typPrec (TyBoxT _ _)   = 8
 typPrec (TyArr _ _)    = 4
 typPrec (TyAll _)      = 2
 
---------------------------------------------------------------------------------
--- Environment Pretty Printing
---------------------------------------------------------------------------------
-
 stringOfTyEnvE :: TyEnvE -> String
 stringOfTyEnvE (Type t)   = stringOfTyp t
 stringOfTyEnvE Kind       = "*"
@@ -67,10 +94,6 @@ stringOfList :: (a -> String) -> [a] -> String
 stringOfList _ [] = ""
 stringOfList f [x] = f x
 stringOfList f (x:xs) = f x ++ ", " ++ stringOfList f xs
-
---------------------------------------------------------------------------------
--- Expression Pretty Printing
---------------------------------------------------------------------------------
 
 stringOfLiteral :: Literal -> String
 stringOfLiteral (LitInt n)  = show n

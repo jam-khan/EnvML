@@ -2,6 +2,9 @@
 
 module EnvML.Parser.AST where
 
+import qualified Core.Syntax as Core
+import qualified Core.Pretty as PrettyCore
+
 main :: IO ()
 main = print "EnvML Parsed AST"
 
@@ -17,7 +20,7 @@ data FunArg
   | TmArgType Typ
   deriving (Show, Eq)
 
-type TyCtx    = [TyCtxE]  -- [t : A, t1 : Type, type t2 = A]
+type TyCtx    = [TyCtxE]    -- [t : A, t1 : Type, type t2 = A]
 data TyCtxE
   = TypeN    Name Typ       -- t : A
   | Type     Typ            -- nameless A
@@ -45,7 +48,7 @@ data IntfE
   deriving (Show, Eq)
 
 data Typ
-  = TyLit     TyLit           -- int, bool, or string
+  = TyLit     Core.TyLit           -- int, bool, or string
   | TyVar     Name            -- x
   | TyArr     Typ   Typ       -- A -> B
   | TyAll     Name  Typ       -- forall a'. T
@@ -55,11 +58,24 @@ data Typ
   | TyModule  ModuleTyp       -- Note: First-class modules
   deriving (Show, Eq)
 
-data TyLit
-  = TyInt     -- int
-  | TyBool    -- bool
-  | TyStr     -- string
+
+data Module
+  = VarM    Name
+  | Functor FunArgs Module  -- functor (x : A) ->
+  | Struct  Structures      -- struct type a = int; x = 1 end
+  | MApp    Module Module   -- M1(M2)
+  | MAppt   Module Typ      -- (M1 @A)
+  | MAnno   Module ModuleTyp
   deriving (Show, Eq)
+
+type Structures = [Structure]
+data Structure
+  = Let           Name (Maybe Typ) Exp 
+  | TypDecl       Name Typ
+  | ModTypDecl    Name ModuleTyp
+  | ModStruct     Name (Maybe ModuleTyp) Module
+  | FunctStruct   Name FunArgs (Maybe ModuleTyp) Module 
+  deriving (Eq, Show)
 
 type Env = [EnvE]
 data EnvE
@@ -71,18 +87,8 @@ data EnvE
   | ModTypE Name ModuleTyp  -- [module type A = sig .. end]
   deriving (Show, Eq)
 
-data Module
-  = VarM    Name            -- module variable
-  | Functor FunArgs Module  -- functor (x : A) ->
-  | Struct  Imports Env     -- struct type a = int; x = 1 end
-  | MApp    Module Module   -- M1 ^ M2
-  | MAppt   Module Typ      -- M1 ^ @A
-  | MLink   Module Module   -- link(M1, M2)
-  | MAnno   Module ModuleTyp
-  deriving (Show, Eq)
-
 data Exp
-  = Lit   Literal         -- Literals: int, double, bool, string
+  = Lit   Core.Literal    -- Literals: int, double, bool, string
   | Var   Name            -- Var x, y, hello
   | Lam   FunArgs Exp     -- fun (x: A) (y : B) -> x + 1
   | TLam  FunArgs Exp     -- fun 
@@ -97,19 +103,7 @@ data Exp
   | Anno  Exp Typ         -- (e::A)
   | Mod   Module          -- functor or struct
   -- Extensions
-  | BinOp BinOp
-  deriving (Show, Eq)
-
-data BinOp
-  = Add Exp Exp
-  | Sub Exp Exp
-  | Mul Exp Exp
-  deriving (Show, Eq)
-
-data Literal
-  = LitInt  Int     -- 1, 2, etc.
-  | LitBool Bool    -- false, true
-  | LitStr  String  -- "hello"
+  | BinOp Core.BinOp
   deriving (Show, Eq)
 
 type Precedence = Int
@@ -163,14 +157,6 @@ instance Pretty Module where
   pretty :: Module -> String
   pretty = prettyModule
 
-instance Pretty Literal where
-  pretty :: Literal -> String
-  pretty = prettyLiteral
-
-instance Pretty TyLit where
-  pretty :: TyLit -> String
-  pretty = prettyTyLit
-
 instance Pretty TyCtxE where
   pretty :: TyCtxE -> String
   pretty = prettyTyCtxE
@@ -182,6 +168,10 @@ instance Pretty IntfE where
 instance Pretty ModuleTyp where
   pretty :: ModuleTyp -> String
   pretty = prettyModuleTyp
+
+instance Pretty Structure where
+  pretty :: Structure -> String
+  pretty = prettyStructure
 
 parensIf :: Bool -> String -> String
 parensIf True s = "(" ++ s ++ ")"
@@ -253,7 +243,7 @@ prettyModuleTyp (TyVarM n) = n
 
 -- Type pretty printing (same as before)
 prettyTyp :: Typ -> String
-prettyTyp (TyLit l) = prettyTyLit l
+prettyTyp (TyLit l) = PrettyCore.pretty l
 prettyTyp (TyVar s) = s
 prettyTyp (TyArr t1 t2) =
   let s1 = parensIf (typPrec t1 < typPrec (TyArr t1 t2)) (prettyTyp t1)
@@ -276,32 +266,45 @@ prettyTyp (TyRcd fields) =
     intercalateComma (x:xs) = x ++ ", " ++ intercalateComma xs
 prettyTyp (TyModule mt) = prettyModuleTyp mt
 
-prettyTyLit :: TyLit -> String
-prettyTyLit TyInt = "int"
-prettyTyLit TyBool = "bool"
-prettyTyLit TyStr = "string"
+prettyStructures :: Structures -> String
+prettyStructures = concatMap (\s -> prettyStructure s ++ "\n")
 
--- Module pretty printing (same as before)
+-- Structures pretty printing
+prettyStructure :: Structure -> String
+prettyStructure (Let n Nothing e) = 
+  "let " ++ n ++ " = " ++ prettyExp e
+prettyStructure (Let n (Just t) e) = 
+  "let " ++ n ++ " : " ++ prettyTyp t ++ " = " ++ prettyExp e
+prettyStructure (TypDecl n t) = 
+  "type " ++ n ++ " = " ++ prettyTyp t
+prettyStructure (ModTypDecl n mt) = 
+  "module type " ++ n ++ " = " ++ prettyModuleTyp mt
+prettyStructure (ModStruct n Nothing s) = 
+  "module " ++ n ++ " = " ++ prettyModule s
+prettyStructure (ModStruct n (Just mt) s) = 
+  "module " ++ n ++ " : " ++ prettyModuleTyp mt ++ " = " ++ prettyModule s
+prettyStructure (FunctStruct n args Nothing s) = 
+  "functor " ++ n ++ " " ++ prettyFunArgs args ++ " = " ++ prettyModule s
+prettyStructure (FunctStruct n args (Just mt) s) = 
+  "functor " ++ n ++ " " ++ prettyFunArgs args ++ " : " ++ prettyModuleTyp mt ++ " = " ++ prettyModule s
+
+-- Module pretty printing
 prettyModule :: Module -> String
 prettyModule (VarM n) = n
 prettyModule (Functor args m) =
   "functor " ++ prettyFunArgs args ++ " -> " ++ prettyModule m
-prettyModule (Struct imports env) =
-  let sEnv = prettyEnv env
-      sImports = concatMap (\(n, t) -> "import " ++ n ++ " : " ++ prettyTyp t ++ "; ") imports
-   in "struct " ++ sImports ++ sEnv ++ " end"
+prettyModule (Struct structs) =
+  "struct " ++ prettyStructures structs ++ " end"
 prettyModule (MApp m1 m2) = 
   prettyModule m1 ++ " ^ " ++ prettyModule m2
 prettyModule (MAppt m t) = 
   prettyModule m ++ " ^@ " ++ prettyTyp t
-prettyModule (MLink m1 m2) = 
-  "link(" ++ prettyModule m1 ++ ", " ++ prettyModule m2 ++ ")"
 prettyModule (MAnno m1 mty) =
   "("++ prettyModule m1 ++ "::" ++ prettyModuleTyp mty ++ ")"
 
--- Expression pretty printing (same as before)
+-- Expression pretty printing
 prettyExp :: Exp -> String
-prettyExp (Lit l) = prettyLiteral l
+prettyExp (Lit l) = PrettyCore.pretty l
 prettyExp (Var n) = n
 prettyExp (Lam args e) = 
   "fun " ++ prettyFunArgs args ++ " -> " ++ 
@@ -337,14 +340,4 @@ prettyExp (FEnv env) = "[" ++ prettyEnv env ++ "]"
 prettyExp (Anno e t) = 
   parensIf (expPrec e < expPrec (Anno e t)) (prettyExp e) ++ " :: " ++ prettyTyp t
 prettyExp (Mod m) = prettyModule m
-prettyExp (BinOp op) = prettyBinOp op
-
-prettyBinOp :: BinOp -> String
-prettyBinOp (Add e1 e2) = prettyExp e1 ++ " + " ++ prettyExp e2
-prettyBinOp (Sub e1 e2) = prettyExp e1 ++ " - " ++ prettyExp e2
-prettyBinOp (Mul e1 e2) = prettyExp e1 ++ " * " ++ prettyExp e2
-
-prettyLiteral :: Literal -> String
-prettyLiteral (LitInt i) = show i
-prettyLiteral (LitBool b) = if b then "true" else "false"
-prettyLiteral (LitStr s) = show s
+prettyExp (BinOp op) = PrettyCore.pretty op
