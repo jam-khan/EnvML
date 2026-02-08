@@ -50,8 +50,8 @@ elabStructure struct =
   case struct of
     (EnvML.Let name maybeTyp e)           ->
       case maybeTyp of
-        Nothing -> Core.ExpE name (elabExp e)
-        Just ty -> Core.ExpE name (Core.Anno (elabExp e) (elabTyp ty))
+        Nothing -> Core.ModE name (elabExp e)
+        Just ty -> Core.ModE name (Core.Anno (elabExp e) (elabTyp ty))
     (EnvML.TypDecl name ty)               ->
       Core.TypE name (elabTyp ty)
     (EnvML.ModTypDecl name mty)           ->
@@ -182,9 +182,9 @@ elabIntfE intfE =
     (EnvML.TyDef name ty) ->
       Core.TypeEq name (elabTyp ty)    
     (EnvML.ValDecl name ty) ->
-      Core.Type name (elabTyp ty)
+      Core.Type name (Core.TyEnvt [Core.Type "_" (Core.TyRcd name (elabTyp ty))])
     (EnvML.ModDecl name ty) ->
-      Core.TypeEq name (elabTyp ty)    
+      Core.Type name (Core.TyRcd name (elabTyp ty))    
     (EnvML.FunctorDecl name args retTyp) ->
       Core.TypeEq name (elabFunctorDeclToType args retTyp)
     (EnvML.SigDecl name intf) ->

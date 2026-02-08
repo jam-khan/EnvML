@@ -23,7 +23,7 @@ instance Pretty TyEnvE where
 
 instance Pretty Exp where
   pretty :: Exp -> String
-  pretty = stringOfExp
+  pretty = prettyTop
 
 instance Pretty Literal where
   pretty :: Literal -> String
@@ -36,32 +36,53 @@ instance Pretty BinOp where
 instance Pretty EnvE where
   pretty :: EnvE -> String
   pretty = stringOfEnvE
-  
+
+--------------------------------------------------------------------------------
+-- Top-level: detect FEnv (top-level module) and print with newlines
+--------------------------------------------------------------------------------
+
+prettyTop :: Exp -> String
+prettyTop (FEnv env) = prettyEnvVertical 0 (reverse env)
+prettyTop e = stringOfExpI 0 e
+
+--------------------------------------------------------------------------------
+-- Indentation helpers
+--------------------------------------------------------------------------------
+
+indent :: Int -> String
+indent n = replicate (n * 2) ' '
+
+-- Print a list of env entries vertically (for top-level and nested structs)
+prettyEnvVertical :: Int -> [EnvE] -> String
+prettyEnvVertical _ [] = "[]"
+prettyEnvVertical lvl entries =
+  concatMap (\e -> indent lvl ++ stringOfEnvEI lvl e ++ "\n\n") entries
+
+--------------------------------------------------------------------------------
+-- Types
+--------------------------------------------------------------------------------
+
 parensIf :: Bool -> String -> String
 parensIf True  s = "(" ++ s ++ ")"
 parensIf False s = s
 
 stringOfTyp :: Typ -> String
-stringOfTyp (TyLit l) = case l of
-    TyInt  -> "Int"
-    TyBool -> "Bool"
-    TyStr  -> "String"
-stringOfTyp (TyVar n) = show n
+stringOfTyp (TyLit l) = pretty l
+stringOfTyp (TyVar n) = "t" ++ show n
 stringOfTyp (TyArr t1 t2) =
     let s1 = parensIf (typPrec t1 <= typPrec (TyArr t1 t2)) (stringOfTyp t1)
         s2 = stringOfTyp t2
-     in s1 ++ " -> " ++ s2
+     in s1 ++ " → " ++ s2
 stringOfTyp (TyAll t) =
-    let s = stringOfTyp t
-     in "forall. " ++ s
+    "∀. " ++ stringOfTyp t
 stringOfTyp (TyBoxT bs t) =
     let sBinds = showTyEnv bs
         sTyp = parensIf (typPrec t < typPrec (TyBoxT bs t)) (stringOfTyp t)
-     in "[" ++ sBinds ++ "] |> " ++ sTyp
+     in "[" ++ sBinds ++ "] ▷ " ++ sTyp
 stringOfTyp (TySubstT t1 t2) =
     let s1 = stringOfTyp t1
         s2 = parensIf (typPrec t2 < typPrec (TySubstT t1 t2)) (stringOfTyp t2)
-     in "#[" ++ s1 ++ "]" ++ s2
+     in "#[" ++ s1 ++ "] " ++ s2
 stringOfTyp (TyEnvt bs) = "Env[" ++ showTyEnv bs ++ "]"
 stringOfTyp (TyRcd label t) = "{" ++ label ++ " : " ++ stringOfTyp t ++ "}"
 
@@ -77,91 +98,167 @@ typPrec (TyAll _)      = 2
 
 stringOfTyEnvE :: TyEnvE -> String
 stringOfTyEnvE (Type t)   = stringOfTyp t
-stringOfTyEnvE Kind       = "*"
-stringOfTyEnvE (TypeEq t) = "eq " ++ stringOfTyp t
+stringOfTyEnvE Kind       = "★"
+stringOfTyEnvE (TypeEq t) = "≡ " ++ stringOfTyp t
 
 showTyEnv :: TyEnv -> String
 showTyEnv = stringOfList stringOfTyEnvE . reverse
 
+--------------------------------------------------------------------------------
+-- Env entries (indentation-aware)
+--------------------------------------------------------------------------------
+
 stringOfEnvE :: EnvE -> String
-stringOfEnvE (ExpE e) = stringOfExp e
-stringOfEnvE (TypE t) = "tdef " ++ stringOfTyp t
+stringOfEnvE = stringOfEnvEI 0
+
+stringOfEnvEI :: Int -> EnvE -> String
+stringOfEnvEI lvl (ExpE e) = stringOfEnvExpI lvl e
+stringOfEnvEI _   (TypE t) = "type " ++ stringOfTyp t
+
+-- Special handling for expressions that appear as env entries:
+-- Rec entries get label display, Anno wraps, FEnv nests
+stringOfEnvExpI :: Int -> Exp -> String
+stringOfEnvExpI lvl (Rec label e) =
+    label ++ " = " ++ stringOfExpCompactI lvl e
+stringOfEnvExpI lvl (Anno (Rec label e) t) =
+    label ++ " : " ++ stringOfTyp t ++ " =\n"
+    ++ indent (lvl + 1) ++ stringOfExpCompactI (lvl + 1) e
+stringOfEnvExpI lvl (Anno e t) =
+    stringOfExpCompactI lvl e ++ "\n"
+    ++ indent (lvl + 1) ++ ": " ++ stringOfTyp t
+stringOfEnvExpI lvl e = stringOfExpCompactI lvl e
+
+-- Compact expression printing: for env entries, inline short exprs
+stringOfExpCompactI :: Int -> Exp -> String
+stringOfExpCompactI lvl e =
+    let s = stringOfExpI lvl e
+    in  s
+
+--------------------------------------------------------------------------------
+-- Expressions (indentation-aware)
+--------------------------------------------------------------------------------
+
+stringOfExp :: Exp -> String
+stringOfExp = stringOfExpI 0
+
+stringOfExpI :: Int -> Exp -> String
+stringOfExpI _ (Lit l) = stringOfLiteral l
+stringOfExpI _ (Var n) = "x" ++ show n
+stringOfExpI lvl (Lam e) =
+    "λ. " ++ stringOfExpI lvl e
+stringOfExpI lvl (TLam e) =
+    "Λ. " ++ stringOfExpI lvl e
+stringOfExpI lvl (Fix e) =
+    "fix " ++ parensIf (expPrec e < 2) (stringOfExpI lvl e)
+
+stringOfExpI lvl (If e1 e2 e3) =
+    "if " ++ stringOfExpI lvl e1 ++ "\n"
+    ++ indent (lvl + 1) ++ "then " ++ stringOfExpI (lvl + 1) e2 ++ "\n"
+    ++ indent (lvl + 1) ++ "else " ++ stringOfExpI (lvl + 1) e3
+
+stringOfExpI lvl op@(Box env e) =
+    let sEnv = showEnvInline env
+        sE = parensIf (expPrec e < expPrec op) (stringOfExpI lvl e)
+     in "[" ++ sEnv ++ "] ▷ " ++ sE
+
+stringOfExpI lvl op@(App e1 e2) =
+    let s1 = parensIf (expPrec e1 < expPrec op) (stringOfExpI lvl e1)
+        s2 = parensIf (expPrec e2 <= expPrec op) (stringOfExpI lvl e2)
+     in s1 ++ " " ++ s2
+
+stringOfExpI lvl (BinOp binOp) = stringOfBinOpI lvl binOp
+
+stringOfExpI lvl (Clos env e) =
+    "⟨[" ++ showEnvInline env ++ "] | λ. " ++ stringOfExpI lvl e ++ "⟩"
+
+stringOfExpI lvl (TClos env e) =
+    "⟨[" ++ showEnvInline env ++ "] | Λ. " ++ stringOfExpI lvl e ++ "⟩"
+
+stringOfExpI lvl op@(TApp e t) =
+    let sE = parensIf (expPrec e < expPrec op) (stringOfExpI lvl e)
+     in sE ++ " @" ++ stringOfTyp t
+
+stringOfExpI lvl (FEnv env) =
+    let entries = reverse env
+    in  if isSmallEnv entries
+        then "[" ++ stringOfList stringOfEnvE entries ++ "]"
+        else "[\n" ++ prettyEnvVertical (lvl + 1) entries ++ indent lvl ++ "]"
+
+stringOfExpI _ (Rec label e) =
+    "{" ++ label ++ " = " ++ stringOfExp e ++ "}"
+
+stringOfExpI lvl op@(RProj e label) =
+    let sE = parensIf (expPrec e < expPrec op) (stringOfExpI lvl e)
+     in sE ++ "." ++ label
+
+stringOfExpI lvl op@(Anno e t) =
+    let sE = parensIf (expPrec e < expPrec op) (stringOfExpI lvl e)
+     in sE ++ " : " ++ stringOfTyp t
+
+-- Heuristic: an env is "small" if it has <= 2 entries and no nested FEnv
+isSmallEnv :: [EnvE] -> Bool
+isSmallEnv entries =
+    length entries <= 2 && all isSimpleEnvE entries
+
+isSimpleEnvE :: EnvE -> Bool
+isSimpleEnvE (ExpE e) = isSimpleExp e
+isSimpleEnvE (TypE _) = True
+
+isSimpleExp :: Exp -> Bool
+isSimpleExp (Lit _)     = True
+isSimpleExp (Var _)     = True
+isSimpleExp (Rec _ e)   = isSimpleExp e
+isSimpleExp (RProj e _) = isSimpleExp e
+isSimpleExp _           = False
+
+--------------------------------------------------------------------------------
+-- Env inline (for closures, boxes — always single-line)
+--------------------------------------------------------------------------------
+
+showEnvInline :: Env -> String
+showEnvInline = stringOfList stringOfEnvE . reverse
 
 showEnv :: Env -> String
-showEnv = stringOfList stringOfEnvE . reverse
+showEnv = showEnvInline
 
-stringOfList :: (a -> String) -> [a] -> String
-stringOfList _ [] = ""
-stringOfList f [x] = f x
-stringOfList f (x:xs) = f x ++ ", " ++ stringOfList f xs
+--------------------------------------------------------------------------------
+-- BinOp
+--------------------------------------------------------------------------------
+
+stringOfBinOp :: BinOp -> String
+stringOfBinOp = stringOfBinOpI 0
+
+stringOfBinOpI :: Int -> BinOp -> String
+stringOfBinOpI lvl op@(Add e1 e2) =
+    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
+        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
+     in s1 ++ " + " ++ s2
+stringOfBinOpI lvl op@(Sub e1 e2) =
+    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
+        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
+     in s1 ++ " - " ++ s2
+stringOfBinOpI lvl op@(Mul e1 e2) =
+    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
+        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
+     in s1 ++ " * " ++ s2
+stringOfBinOpI lvl op@(EqEq e1 e2) =
+    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
+        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
+     in s1 ++ " == " ++ s2
+
+--------------------------------------------------------------------------------
+-- Literals
+--------------------------------------------------------------------------------
 
 stringOfLiteral :: Literal -> String
 stringOfLiteral (LitInt n)  = show n
 stringOfLiteral (LitBool b) = if b then "true" else "false"
 stringOfLiteral (LitStr s)  = "\"" ++ s ++ "\""
 
-stringOfExp :: Exp -> String
-stringOfExp (Lit l) = stringOfLiteral l
-stringOfExp (Var n) = "x" ++ show n
-stringOfExp (Lam e) = "lam. " ++ stringOfExp e
-stringOfExp (TLam e) = "Lam. " ++ stringOfExp e
-stringOfExp (Fix e) = "fix " ++ parensIf (expPrec e < 2) (stringOfExp e)
+--------------------------------------------------------------------------------
+-- Precedence
+--------------------------------------------------------------------------------
 
-stringOfExp (If e1 e2 e3) =
-    "if " ++ stringOfExp e1 ++ " then " ++ stringOfExp e2 ++ " else " ++ stringOfExp e3
-
-stringOfExp op@(Box env e) =
-    let sEnv = showEnv env
-        sE = parensIf (expPrec e < expPrec op) (stringOfExp e)
-     in "[" ++ sEnv ++ "] |> " ++ sE
-
-stringOfExp op@(App e1 e2) =
-    let s1 = parensIf (expPrec e1 < expPrec op) (stringOfExp e1)
-        s2 = parensIf (expPrec e2 <= expPrec op) (stringOfExp e2)
-     in s1 ++ " " ++ s2
-stringOfExp (BinOp binOp) = stringOfBinOp binOp
-stringOfExp (Clos env e) =
-    "<[" ++ showEnv env ++ "] | lam. " ++ stringOfExp e ++ ">"
-stringOfExp (TClos env e) =
-    "<[" ++ showEnv env ++ "] | Lam. " ++ stringOfExp e ++ ">"
-
-stringOfExp op@(TApp e t) =
-    let sE = parensIf (expPrec e < expPrec op) (stringOfExp e)
-     in sE ++ " @ " ++ stringOfTyp t
-
-stringOfExp (FEnv env) = "[" ++ showEnv env ++ "]"
-
-stringOfExp (Rec label e) = "{" ++ label ++ " = " ++ stringOfExp e ++ "}"
-
-stringOfExp op@(RProj e label) =
-    let sE = parensIf (expPrec e < expPrec op) (stringOfExp e)
-     in sE ++ "." ++ label
-
-stringOfExp op@(Anno e t) =
-    let sE = parensIf (expPrec e < expPrec op) (stringOfExp e)
-     in sE ++ " : " ++ stringOfTyp t
-
-
-stringOfBinOp :: BinOp -> String
-stringOfBinOp op@(Add e1 e2) =
-    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExp e1)
-        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExp e2)
-     in s1 ++ " + " ++ s2
-stringOfBinOp op@(Sub e1 e2) =
-    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExp e1)
-        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExp e2)
-     in s1 ++ " - " ++ s2
-stringOfBinOp op@(Mul e1 e2) =
-    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExp e1)
-        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExp e2)
-     in s1 ++ " * " ++ s2
-stringOfBinOp op@(EqEq e1 e2) =
-    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExp e1)
-        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExp e2)
-     in s1 ++ " == " ++ s2
-
-
--- | Precedence for Expressions
 expPrec :: Exp -> Int
 expPrec (Lit _)     = 10
 expPrec (Var _)     = 10
@@ -189,6 +286,11 @@ binOpPrec (EqEq _ _) = 5
 --------------------------------------------------------------------------------
 -- Utilities
 --------------------------------------------------------------------------------
+
+stringOfList :: (a -> String) -> [a] -> String
+stringOfList _ [] = ""
+stringOfList f [x] = f x
+stringOfList f (x:xs) = f x ++ ", " ++ stringOfList f xs
 
 stringOfMaybeTyp :: Maybe Typ -> String
 stringOfMaybeTyp Nothing = "None"

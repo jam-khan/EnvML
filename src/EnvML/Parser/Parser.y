@@ -165,11 +165,11 @@ Env :: { Env }
 
 EnvElem :: { EnvE }
   : id '=' Exp                     { ExpEN $1 $3 }
-  | Exp                            { ExpE $1 }
   | type id '=' Typ                { TypEN $2 $4 }
-  | Typ                            { TypE $1 }
   | module      id  '=' ModuleExp  { ModE $2 $4 }
   | module type id  '=' ModuleTyp  { ModTypE $3 $5 }
+  | Exp                            { ExpE $1 }
+
 
 Typ :: { Typ }
   : BaseTyp '->' Typ                  { TyArr $1 $3 }

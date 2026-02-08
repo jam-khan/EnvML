@@ -1,0 +1,8 @@
+let result = (policy1 @int).id;
+
+module policy1 =
+  functor (type t) ->
+    struct
+      let id : t -> t = (fun (x) -> x);
+    end;
+
