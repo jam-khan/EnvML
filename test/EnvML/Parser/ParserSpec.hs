@@ -1,6 +1,6 @@
 module EnvML.Parser.ParserSpec (spec) where
 
-import EnvML.Parser.AST
+import EnvML.Syntax
 import EnvML.Parser.Lexer (lexer)
 import EnvML.Parser.Parser (parseExp, parseModule, parseModuleTyp, parseTyp)
 import Test.Hspec

@@ -2,7 +2,7 @@
 module EnvML.Parser.Parser where
 
 import EnvML.Parser.Lexer
-import EnvML.Parser.AST
+import EnvML.Syntax
 import qualified Core.Syntax as Core
 }
 
@@ -114,9 +114,9 @@ Exp :: { Exp }
   | tclos '[' Env ']' FunArgs '->' Exp    { TClos $3 $5 $7 }
   | box '[' Env ']' in Exp                { Box $3 $6 }
   | Term '::' Typ                         { Anno $1 $3 }
-  | Exp '+' Exp                           { BinOp (Core.Add $1 $3) }
-  | Exp '-' Exp                           { BinOp (Core.Sub $1 $3) }
-  | Exp '*' Exp                           { BinOp (Core.Mul $1 $3) }
+  | Exp '+' Exp                           { BinOp (Add $1 $3) }
+  | Exp '-' Exp                           { BinOp (Sub $1 $3) }
+  | Exp '*' Exp                           { BinOp (Mul $1 $3) }
   | Term                                  { $1 }
 
 ModuleExp :: { Module }

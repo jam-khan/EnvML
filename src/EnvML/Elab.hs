@@ -3,7 +3,7 @@
 module EnvML.Elab where
 
 import qualified Core.Named         as Core
-import qualified EnvML.Parser.AST   as EnvML
+import qualified EnvML.Syntax   as EnvML
 
 type ElabError = String
 

@@ -10,7 +10,7 @@ import Data.Char (isSpace)
 -- Import your modules
 import qualified EnvML.Parser.Parser as Parser
 import qualified EnvML.Parser.Lexer as Lexer
-import qualified EnvML.Parser.AST as AST
+import qualified EnvML.Syntax as AST
 import qualified EnvML.Elab as Elab
 import qualified Core.Named as CoreNamed
 import qualified Core.Syntax as Core
@@ -82,7 +82,7 @@ printHelp = putStrLn $ unlines
   , "├─────────────────────────────────────────────────────────────────┤"
   , "│                     Pipeline Overview                          │"
   , "├─────────────────────────────────────────────────────────────────┤"
-  , "│  1. Parse      Source text → EnvML.Parser.AST.Module           │"
+  , "│  1. Parse      Source text → EnvML.Syntax.Module           │"
   , "│  2. Elaborate  AST → Core.Named (with desugaring built-in)     │"
   , "│  3. De Bruijn  Core.Named → Core.Syntax (names → indices)      │"
   , "│  4. Check      Type inference/checking at Core level           │"

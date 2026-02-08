@@ -12,7 +12,6 @@ library
                         Repl
                         EnvML.Elab
                         EnvML.Syntax
-                        EnvML.Parser.AST
                         EnvML.Parse
                         EnvML.Parser.Parser
                         EnvML.Parser.Lexer

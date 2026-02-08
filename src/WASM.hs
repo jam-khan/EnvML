@@ -4,7 +4,7 @@ module Main where
 
 import qualified EnvML.Parser.Parser as Parser
 import qualified EnvML.Parser.Lexer as Lexer
-import qualified EnvML.Parser.AST as AST
+import qualified EnvML.Syntax as AST
 import qualified EnvML.Desugar as Desugar
 import qualified EnvML.Elab as Elab
 import qualified Core.Check as Check
