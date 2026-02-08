@@ -1,4 +1,4 @@
-module Core.EvalSpec (spec) where
+module Core.CoreSpec (spec) where
 
 import Core.Eval (eval)
 import Core.Check (infer, check)
@@ -206,10 +206,6 @@ evalTests =
     )
   ]
 
--- ═══════════════════════════════════════════════════════════════════
--- Type checking tests
--- ═══════════════════════════════════════════════════════════════════
-
 checkTests :: [(String, String, String, Bool)]
 checkTests =
   [ ( "int literal checks as Int"
@@ -279,9 +275,6 @@ checkTests =
     )
   ]
 
--- ═══════════════════════════════════════════════════════════════════
--- Type inference tests
--- ═══════════════════════════════════════════════════════════════════
 
 inferTests :: [(String, String, Typ)]
 inferTests =
@@ -319,10 +312,6 @@ inferTests =
     )
   ]
 
--- ═══════════════════════════════════════════════════════════════════
--- Inference in context tests
--- ═══════════════════════════════════════════════════════════════════
-
 inferCtxTests :: [(String, String, String, Typ)]
 inferCtxTests =
   [ ( "var in singleton context"
@@ -351,10 +340,6 @@ inferCtxTests =
     , TyLit TyInt
     )
   ]
-
--- ═══════════════════════════════════════════════════════════════════
--- Check in context tests
--- ═══════════════════════════════════════════════════════════════════
 
 checkCtxTests :: [(String, String, String, String, Bool)]
 checkCtxTests =
