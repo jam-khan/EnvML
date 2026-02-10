@@ -1,6 +1,8 @@
-let value : int = f(10);
 
-let f : int -> int  = comp(fun (type t) -> {f = (fun (x) -> x):: t -> t});
 
 let comp : (forall a. {f : a -> a}) -> int -> int = 
     fun (env) (x) -> box [e = (env @int :: {f : int -> int}), x=42] in e.f(x);
+
+let f : int -> int  = comp(fun (type t) -> {f = (fun (x) -> x):: t -> t});
+
+let value : int = f(10);

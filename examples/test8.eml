@@ -1,5 +1,5 @@
-let final = (result::(sig val id : int -> int; end)).id(1);
-let result = policy1 @int;
+
+type a = int;
 
 module policy1 =
   functor (type t) ->
@@ -7,3 +7,6 @@ module policy1 =
       let id : t -> t = (fun (x) -> x);
     end;
 
+let result = policy1 @a;
+
+let final = (result::(sig val id : a -> a; end)).id(1);

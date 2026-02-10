@@ -42,7 +42,7 @@ elabFunctor ((name, arg):rest) body =
 
 -- Structures elaboration
 elabStructures :: EnvML.Structures -> Core.Env
-elabStructures = map elabStructure
+elabStructures = reverse . map elabStructure
 
 -- Structure elaboration
 elabStructure :: EnvML.Structure -> Core.EnvE
@@ -114,7 +114,7 @@ elabRecords ((n, e):rest) =
   Core.Rec n (elabExp e):elabRecords rest
 
 elabEnv :: EnvML.Env -> Core.Env
-elabEnv = map elabEnvE
+elabEnv = reverse . map elabEnvE
 
 elabEnvE :: EnvML.EnvE -> Core.EnvE
 elabEnvE envE = 
@@ -139,7 +139,7 @@ elabTyp ty =
     (EnvML.TyModule mty)    -> elabModTyp mty
 
 elabTyCtx :: EnvML.TyCtx -> Core.TyEnv
-elabTyCtx = map elabTyCtxE
+elabTyCtx = reverse . map elabTyCtxE
 
 elabTyCtxE :: EnvML.TyCtxE -> Core.TyEnvE
 elabTyCtxE ctxE =
@@ -174,7 +174,7 @@ elabModTyp mty =
       Core.TyVar name
 
 elabIntf :: EnvML.Intf -> Core.TyEnv
-elabIntf = map elabIntfE
+elabIntf = reverse . map elabIntfE
 
 elabIntfE :: EnvML.IntfE -> Core.TyEnvE
 elabIntfE intfE =

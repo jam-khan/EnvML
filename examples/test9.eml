@@ -1,6 +1,7 @@
 
-let final  : int = result({l = 1});
-let result : ({l : int} -> int) = (f @ int);
-
 let f : forall a. {l : a} -> a = 
   fun (type t) (x) -> x.l;
+
+let result : ({l : int} -> int) = (f @ int);
+
+let final  : int = result({l = 1});
