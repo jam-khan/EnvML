@@ -35,7 +35,7 @@ toNamelessExp eNames tNames e =
       let (i, b) = indexE n eNames
       in  case b of
             TermBinding -> Nameless.Var i
-            ModBinding  -> Nameless.RProj (Nameless.Var i) n
+            ModBinding  -> Nameless.RProj (Nameless.FEnv [Nameless.ExpE (Nameless.Var i)]) n
     (Named.Lam x e1) -> 
       Nameless.Lam (toNamelessExp ((x, TermBinding):eNames) tNames e1)
     (Named.Clos env e1)  ->
@@ -108,7 +108,7 @@ toNamelessEnvE ::
 toNamelessEnvE eNames tNames entry =
   case entry of
     Named.ExpE _n e -> Nameless.ExpE $ toNamelessExp eNames tNames e
-    Named.ModE n e  -> Nameless.ExpE $ Nameless.FEnv $ [Nameless.ExpE (Nameless.Rec n (toNamelessExp eNames tNames e))]
+    Named.ModE n e  -> Nameless.ExpE (Nameless.Rec n (toNamelessExp eNames tNames e))
     Named.TypE _n t -> Nameless.TypE $ toNamelessTyp eNames tNames t
 
 getEntryName :: Named.EnvE -> Name
@@ -151,9 +151,10 @@ getTyEntryNames ::
   Named.TyEnv
   -> TypNames
 getTyEntryNames [] = []
-getTyEntryNames (e:tyenv) =
+getTyEntryNames ((Named.Type _ _):tyenv) = getTyEntryNames tyenv
+getTyEntryNames (t:tyenv)                =
   let names' = getTyEntryNames tyenv
-      n = getTyEntryName e
+      n = getTyEntryName t
   in  n:names'
 
 getTyEntryName ::

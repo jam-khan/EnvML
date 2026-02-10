@@ -1,0 +1,16 @@
+
+let left : forall a. ({l : a, r : a} -> a) = 
+  fun (type t) (m) -> m.l;
+let right : forall a. ({l : a, r : a} -> a) = 
+  fun (type t) (m) -> m.r;
+
+let FUNC :
+  forall t.
+    (forall a. {l : a, r : a} -> a)
+    -> {l : t, r : t}
+    -> {result : t}
+ = fun (type t) (tag) (env) -> 
+        {result = 
+            (tag@t
+                :: ({l : t, r : t} -> t)
+            )(env)};

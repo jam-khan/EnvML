@@ -182,7 +182,7 @@ elabIntfE intfE =
     (EnvML.TyDef name ty) ->
       Core.TypeEq name (elabTyp ty)    
     (EnvML.ValDecl name ty) ->
-      Core.Type name (Core.TyEnvt [Core.Type "_" (Core.TyRcd name (elabTyp ty))])
+      Core.Type name (Core.TyRcd name (elabTyp ty))
     (EnvML.ModDecl name ty) ->
       Core.Type name (Core.TyRcd name (elabTyp ty))    
     (EnvML.FunctorDecl name args retTyp) ->
