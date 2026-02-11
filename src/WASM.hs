@@ -127,7 +127,7 @@ foreign export javascript "coreParseExp" coreParseExp :: JSString -> IO JSString
 coreParseExp :: JSString -> IO JSString
 coreParseExp = safeRun $ \input ->
     let expr = CoreParser.parseExp (CoreLexer.lexer input)
-    in "=== Parsed CoreFE ===\n\n" ++ Pretty.pretty expr
+    in "=== Parsed CoreFE ===\n\n" ++ CoreFE.pretty expr
 
 -- | Parse + Infer type of a CoreFE expression
 foreign export javascript "coreCheck" coreCheck :: JSString -> IO JSString
