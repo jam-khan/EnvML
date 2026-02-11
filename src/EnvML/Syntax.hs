@@ -3,12 +3,6 @@
 module EnvML.Syntax where
 
 import qualified Core.Syntax as Core
-import qualified Core.Pretty as PrettyCore
-
-main :: IO ()
-main = print "EnvML Parsed AST"
-
--- AST with names and direct source-level representation
 
 type Name     = String            -- Alias for naming
 type Imports  = [(Name, Typ)]     -- import x : A
@@ -250,7 +244,7 @@ prettyModuleTyp (TyVarM n) = n
 
 -- Type pretty printing (same as before)
 prettyTyp :: Typ -> String
-prettyTyp (TyLit l) = PrettyCore.pretty l
+prettyTyp (TyLit l) = Core.pretty l
 prettyTyp (TyVar s) = s
 prettyTyp (TyArr t1 t2) =
   let s1 = parensIf (typPrec t1 < typPrec (TyArr t1 t2)) (prettyTyp t1)
@@ -311,7 +305,7 @@ prettyModule (MAnno m1 mty) =
 
 -- Expression pretty printing
 prettyExp :: Exp -> String
-prettyExp (Lit l) = PrettyCore.pretty l
+prettyExp (Lit l) = Core.pretty l
 prettyExp (Var n) = n
 prettyExp (Lam args e) = 
   "fun " ++ prettyFunArgs args ++ " -> " ++ 

@@ -1,5 +1,37 @@
 
-module m : sig val y : int; end
-  = struct
-      let y : int = 1;
+module type POLICY = 
+  forall t. 
+    sig
+      val trans : t -> t; 
     end;
+
+module policy1 : POLICY = 
+  functor (type t) ->
+    struct
+      let trans : t -> t = (fun (x) -> x);
+    end;
+
+module policy2 : POLICY =
+  functor (type t) ->
+    struct
+      let trans : t -> t = fun (x) -> x;
+    end;
+
+module foo : 
+  (forall t. sig val trans : t -> t; end) 
+  ->m ( sig
+          type a = int;
+          val f : a -> a;
+        end
+      )
+  = functor (m) ->
+      struct
+        type a = int;
+        let f : a -> a = ((m @ a)::(sig val trans : int -> int; end)).trans;
+      end;
+
+let comp : {f : int -> int, x: int} -> int = 
+    fun (env) -> box [e = env] in e.f(e.x);
+
+let result1 : int = comp({f = foo(policy1).f, x = 42});
+let result2 : int = comp({f = foo(policy2).f, x = 42});

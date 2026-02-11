@@ -1,4 +1,0 @@
-
-import f: int -> int;;
-
-let main = f(3)

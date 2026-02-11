@@ -1,8 +1,0 @@
-
-module env =
-  struct
-    type t = int;;
-    let inc : t -> t = fun (n) -> n + 1;;
-  end;;
-
-let result : int = box [x = env] in x.inc(10);;

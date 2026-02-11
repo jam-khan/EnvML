@@ -1,3 +1,0 @@
-@pure interface Factorial
-
-function factorial : Int -> (Int -> Int) -> Int

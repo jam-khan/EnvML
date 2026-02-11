@@ -1,8 +1,0 @@
-
-module type Library = sig val inc : int -> int end;;
-
-module SimpleLib : sig val inc : int -> int end;;
-
-val lib : (module Library);;
-
-val calc_with : (module Library) -> int -> int;;

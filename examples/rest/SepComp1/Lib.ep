@@ -1,3 +1,0 @@
-@resource module Lib 
-
-let inc = \(x: Int) => { x + 1 }

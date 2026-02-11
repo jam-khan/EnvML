@@ -4,13 +4,13 @@ import Control.Exception (try, SomeException)
 import Control.Monad.IO.Class (liftIO) -- Necessary to run IO inside Haskeline
 
 -- Your Project Modules
-import Core.Syntax
+import Core.Syntax ( Exp, stringOfTyp, stringOfExp )
 import Core.Parser.Lexer (lexer)
 import Core.Parser.Parser (parseExp)
-import Core.Pretty
 import Core.Eval (eval)
 import Core.Check (infer)
 import System.Console.Haskeline
+    ( InputT, defaultSettings, getInputLine, outputStrLn, runInputT )
 
 main :: IO ()
 main = do

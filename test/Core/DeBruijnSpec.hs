@@ -372,9 +372,9 @@ debruijnTests =
     -- ==========================================================================
   , ( "27. ModE wraps in FEnv containing record"
     , Named.FEnv [Named.ModE "m" (Named.Lit (Nameless.LitInt 42))]
-    , Nameless.FEnv [Nameless.ExpE (Nameless.FEnv [Nameless.ExpE (Nameless.Rec "m" (Nameless.Lit (Nameless.LitInt 42)))])]
-    , Just (Nameless.TyEnvt [Nameless.Type (Nameless.TyEnvt [Nameless.Type (Nameless.TyRcd "m" (Nameless.TyLit Nameless.TyInt))])])
-    , Just (Nameless.FEnv [Nameless.ExpE (Nameless.FEnv [Nameless.ExpE (Nameless.Rec "m" (Nameless.Lit (Nameless.LitInt 42)))])])
+    , Nameless.FEnv [Nameless.ExpE (Nameless.Rec "m" (Nameless.Lit (Nameless.LitInt 42)))]
+    , Just (Nameless.TyEnvt [Nameless.Type (Nameless.TyRcd "m" (Nameless.TyLit Nameless.TyInt))])
+    , Just (Nameless.FEnv [Nameless.ExpE (Nameless.Rec "m" (Nameless.Lit (Nameless.LitInt 42)))])
     )
   , ( "28. ModE projection via RProj on FEnv"
     -- To project from ModE, we need to go through FEnv and RProj
@@ -382,7 +382,7 @@ debruijnTests =
         (Named.FEnv [Named.ModE "m" (Named.Lit (Nameless.LitInt 42))])
         "m"
     , Nameless.RProj 
-        (Nameless.FEnv [Nameless.ExpE (Nameless.FEnv [Nameless.ExpE (Nameless.Rec "m" (Nameless.Lit (Nameless.LitInt 42)))])])
+        (Nameless.FEnv [Nameless.ExpE (Nameless.Rec "m" (Nameless.Lit (Nameless.LitInt 42)))])
         "m"
     , Just (Nameless.TyLit Nameless.TyInt)
     , Just (Nameless.Lit (Nameless.LitInt 42))

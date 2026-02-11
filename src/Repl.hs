@@ -2,12 +2,16 @@
 module Repl where
 
 import System.Console.Haskeline
+    ( InputT,
+      Settings(..),
+      getInputLine,
+      outputStrLn,
+      completeFilename )
 import Control.Monad.IO.Class (liftIO)
 import Control.Exception (catch, evaluate, SomeException)
 import Data.List (stripPrefix)
 import Data.Char (isSpace)
 
--- Import your modules
 import qualified EnvML.Parser.Parser as Parser
 import qualified EnvML.Parser.Lexer as Lexer
 import qualified EnvML.Syntax as AST
@@ -16,7 +20,6 @@ import qualified Core.Named as CoreNamed
 import qualified Core.Syntax as Core
 import qualified Core.Check as Check
 import qualified Core.Eval as Eval
-import qualified Core.Pretty as Pretty
 import qualified Core.DeBruijn as DeBruijn
 
 banner :: String
@@ -91,10 +94,6 @@ printHelp = putStrLn $ unlines
   , ""
   ]
 
--------------------------------------------------------------------------------
--- File Reading and Parsing
--------------------------------------------------------------------------------
-
 safeReadFile :: FilePath -> IO (Either String String)
 safeReadFile path = do
   (Right <$> readFile path) `catch` handler
@@ -102,11 +101,9 @@ safeReadFile path = do
     handler :: SomeException -> IO (Either String String)
     handler e = return $ Left $ "Error reading file '" ++ path ++ "': " ++ show e
 
--- | Parse with error handling for Happy-generated parser errors
 safeParse :: String -> IO (Either String AST.Module)
 safeParse content = do
   let tokens = Lexer.lexer content
-  -- evaluate forces the parse result, catching any 'error' calls from Happy
   (Right <$> evaluate (Parser.parseModule tokens)) `catch` handler
   where
     handler :: SomeException -> IO (Either String AST.Module)
@@ -118,10 +115,6 @@ readAndParse path = do
   case result of
     Left err -> return $ Left err
     Right content -> safeParse content
-
--------------------------------------------------------------------------------
--- Pipeline Helpers
--------------------------------------------------------------------------------
 
 runPipeline :: FilePath 
             -> (AST.Module -> IO ()) 
@@ -154,7 +147,7 @@ cmdDeBruijn path = runPipeline path $ \ast -> do
   let coreNamed = elaborate ast
   let coreNameless = toDeBruijn coreNamed
   putStrLn "=== De Bruijn Core (Nameless) ==="
-  putStrLn $ Pretty.stringOfExp coreNameless
+  putStrLn $ Core.pretty coreNameless
 
 cmdCheck :: FilePath -> IO ()
 cmdCheck path = runPipeline path $ \ast -> do
@@ -165,7 +158,7 @@ cmdCheck path = runPipeline path $ \ast -> do
     Nothing -> putStrLn "✗ Type check failed: Could not infer type"
     Just typ -> do
       putStrLn "✓ Type check succeeded!"
-      putStrLn $ "  Type: " ++ Pretty.stringOfTyp typ
+      putStrLn $ "  Type: " ++ Core.pretty typ
 
 cmdEval :: FilePath -> IO ()
 cmdEval path = runPipeline path $ \ast -> do
@@ -175,11 +168,11 @@ cmdEval path = runPipeline path $ \ast -> do
   -- Optionally type check first
   case Check.infer [] coreNameless of
     Nothing -> putStrLn "Warning: Type check failed, attempting evaluation anyway..."
-    Just typ -> putStrLn $ "Type: " ++ Pretty.stringOfTyp typ
+    Just typ -> putStrLn $ "Type: " ++ Core.pretty typ
   
   putStrLn "=== Evaluation ==="
   case Eval.eval [] coreNameless of
     Nothing -> putStrLn "✗ Evaluation failed"
     Just result -> do
       putStrLn "✓ Result:"
-      putStrLn $ "  " ++ Pretty.stringOfExp result
+      putStrLn $ "  " ++ Core.pretty result

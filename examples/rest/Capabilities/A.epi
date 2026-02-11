@@ -1,3 +1,0 @@
-@resource
-
-val result = B(System.Utils)

@@ -1,8 +1,0 @@
-@pure module Example
-
-type alias = {x: Int, y: Int};
-
-let one     = [1, 2, 3, 4]<Int>;
-let two     = [1, 2]<Int -> Int>;
-let three   = [1]<alias>;
-let empty   = []<Int>

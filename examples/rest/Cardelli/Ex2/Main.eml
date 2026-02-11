@@ -1,6 +1,0 @@
-
-import (x : int) in
-
-let f = fun (y: int) -> y + x;;
-
-let m = f(x)

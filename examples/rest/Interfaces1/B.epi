@@ -1,4 +1,0 @@
-@resource interface B
-
-require A;
-Int

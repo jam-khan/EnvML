@@ -1,9 +1,0 @@
-
-let x : int = 1;;
-
-module m : sig val y : int;; end 
- =  struct
-      let y : int = 1;;
-    end;;
-
-let z : int = m.y;;

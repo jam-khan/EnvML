@@ -1,4 +1,0 @@
-@pure
-
-require System.Utils;
-val result : List[Int]

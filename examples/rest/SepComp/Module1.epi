@@ -1,5 +1,0 @@
-type ExampleOutputType = {y : Int, inc : Int};
-
-val x : Int;
-
-module example (x: Int) : ExampleOutputType

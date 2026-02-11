@@ -165,6 +165,18 @@
             min-height: 42px;
         }
 
+        .panel-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .panel-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         .panel-label {
             font-size: 0.6875rem;
             font-weight: 600;
@@ -411,22 +423,23 @@
             <h1>EnvML</h1>
             <span>Playground</span>
         </div>
-        <div class="header-controls">
-            <div class="mode-switcher">
-                <button class="mode-btn active" id="mode-envml" onclick="setMode('envml')">EnvML</button>
-                <button class="mode-btn" id="mode-core" onclick="setMode('core')">FE Calculus</button>
-            </div>
-            <select class="styled-select" id="exampleSelect" onchange="loadExample(this.value)">
-                <option value="">Load example…</option>
-            </select>
-        </div>
     </header>
 
     <main>
         <section class="editor-panel">
             <div class="panel-bar">
-                <span class="panel-label" id="editorLabel">EnvML Source</span>
-                <button class="btn" onclick="clearEditor()">Clear</button>
+                <div class="panel-bar-left">
+                    <div class="mode-switcher">
+                        <button class="mode-btn active" id="mode-envml" onclick="setMode('envml')">EnvML</button>
+                        <button class="mode-btn" id="mode-core" onclick="setMode('core')">Core FE</button>
+                    </div>
+                    <select class="styled-select" id="exampleSelect" onchange="loadExample(this.value)">
+                        <option value="">Load example…</option>
+                    </select>
+                </div>
+                <div class="panel-bar-right">
+                    <button class="btn" onclick="clearEditor()">Clear</button>
+                </div>
             </div>
             <div class="editor-wrapper">
                 <div class="editor-container">
@@ -467,88 +480,152 @@ import ghc_wasm_jsffi from "./ghc_wasm_jsffi.js";
 // ═══════════════════════════════════════════════════════════════
 
 const envmlExamples = [
-{ id: "e4", label: "Policy Functors",
-    code: `let result1 : int = box [impl = foo(policy1)] in (impl.f::int -> int)(42);
-let result2 : int = box [impl = foo(policy1)] in (impl.f::int -> int)(42);
-
-module foo : 
-  (forall t. sig val trans : t -> t; end) 
-  ->m (sig
-          val f : a -> a;
-          type a = int;
-        end)
-  = functor (m) ->
-      struct
-        let f : a -> a = ((m @ int)::(sig val trans : int -> int; end)).trans;
-        type a = int;
-      end;
-
+  { id: "e1", label: "Policy Functors",
+    code: `module type POLICY = 
+  forall t. 
+    sig
+      val trans : t -> t; 
+    end;
 module policy1 : POLICY = 
   functor (type t) ->
     struct
       let trans : t -> t = (fun (x) -> x);
     end;
-
 module policy2 : POLICY =
   functor (type t) ->
     struct
       let trans : t -> t = fun (x) -> x;
     end;
-
-module type POLICY = 
+module foo : 
+  (forall t. sig val trans : t -> t; end) 
+  ->m ( sig
+          type a = int;
+          val f : a -> a;
+        end
+      )
+  = functor (m) ->
+      struct
+        type a = int;
+        let f : a -> a = ((m @ a)::(sig val trans : int -> int; end)).trans;
+      end;
+let result1 : int = box [impl = foo(policy1)] in (impl.f::int -> int)(42);
+let result2 : int = box [impl = foo(policy1)] in (impl.f::int -> int)(42);`
+  },
+  { id: "e2", label: "Policy Composition",
+    code: `module type POLICY = 
   forall t. 
     sig
       val trans : t -> t; 
-    end;`
+    end;
+module policy1 : POLICY = 
+  functor (type t) ->
+    struct
+      let trans : t -> t = (fun (x) -> x);
+    end;
+module policy2 : POLICY =
+  functor (type t) ->
+    struct
+      let trans : t -> t = fun (x) -> x;
+    end;
+module foo : 
+  (forall t. sig val trans : t -> t; end) 
+  ->m ( sig
+          type a = int;
+          val f : a -> a;
+        end
+      )
+  = functor (m) ->
+      struct
+        type a = int;
+        let f : a -> a = ((m @ a)::(sig val trans : int -> int; end)).trans;
+      end;
+let comp : {f : int -> int, x: int} -> int = 
+    fun (env) -> box [e = env] in e.f(e.x);
+let result1 : int = comp({f = foo(policy1).f, x = 42});
+let result2 : int = comp({f = foo(policy2).f, x = 42});`
   },
-  { id: "e1", label: "Simple Let Bindings",
-    code: `let z : int = x;
-let x : int = 1;`
-  },
-  { id: "e2", label: "Module + Signature",
+  { id: "e3", label: "Module + Signature",
     code: `module m : sig val y : int; end
   = struct
       let y : int = 1;
-    end;`
+    end;
+let x : sig val res : int; end = struct let res = 2; end;
+let z : int = x.res;`
   },
-  { id: "e3", label: "Module with Type Decl",
-    code: `module m : 
-  sig 
-    type t = int;
-    val y : int;
-  end = struct
-          type t = int;
-          let y : int = 10;
-        end;`
-  },
-  { id: "e5", label: "Polymorphic Composition",
-    code: `let value : int = f(10);
-
+  { id: "e4", label: "Polymorphic Composition",
+    code: `let comp : (forall a. {f : a -> a}) -> int -> int = 
+    fun (env) (x) -> box [e = (env @int :: {f : int -> int}), x=42] in e.f(x);
 let f : int -> int  = comp(fun (type t) -> {f = (fun (x) -> x):: t -> t});
-
-let comp : (forall a. {f : a -> a}) -> int -> int = 
-    fun (env) (x) -> box [e = (env @int :: {f : int -> int}), x=42] in e.f(x);`
+let value : int = f(10);`
   },
-  { id: "e6", label: "Box with Record Env",
+  { id: "e5", label: "Box with Record Env",
     code: `let comp : {f : int -> [int], x : int} -> [int] = 
     fun (env) -> box [e = env] in e.f(e.x);`
   },
-  { id: "e7", label: "Functor + Projection",
-    code: `let final = (result::(sig val id : int -> int; end)).id(1);
-let result = policy1 @int;
-
+  { id: "e6", label: "Left/Right with Signatures",
+    code: `let left : forall a. (sig val l : a; val r : a; end -> a) = 
+  fun (type t) (m) -> m.l;
+let right : forall a. (sig val l : a; val r : a; end -> a) = 
+  fun (type t) (m) -> m.r;
+module FUNC :
+  forall t.
+    (forall a. (sig val l : a; val r : a; end -> a))
+    ->m (sig val l : t; val r : t; end)
+    ->m (sig val result : t; end)
+  = functor (type t) (tag) (env) ->
+      struct
+        let result = 
+            (tag@t ::
+                (sig val l : t; val r : t; end -> t)
+            )(env);
+      end;`
+  },
+  { id: "e7", label: "Left/Right with Records",
+    code: `let left : forall a. ({l : a, r : a} -> a) = 
+  fun (type t) (m) -> m.l;
+let right : forall a. ({l : a, r : a} -> a) = 
+  fun (type t) (m) -> m.r;
+let FUNC :
+  forall t.
+    (forall a. {l : a, r : a} -> a)
+    -> {l : t, r : t}
+    -> {result : t}
+ = fun (type t) (tag) (env) -> 
+        {result = 
+            (tag@t
+                :: ({l : t, r : t} -> t)
+            )(env)};`
+  },
+  { id: "e8", label: "Simple Let Bindings",
+    code: `let x : int = 1;
+let y : int = x;
+let z : bool = true;`
+  },
+  { id: "e9", label: "Polymorphic Field Access",
+    code: `let f : forall a. {l : a} -> a = 
+  fun (type t) (x) -> x.l;
+let result : ({l : int} -> int) = (f @ int);
+let final  : int = result({l = 1});`
+  },
+  { id: "e10", label: "Functor + Projection",
+    code: `type a = int;
 module policy1 =
   functor (type t) ->
     struct
       let id : t -> t = (fun (x) -> x);
-    end;`
+    end;
+let result = policy1 @a;
+let final = (result::(sig val id : a -> a; end)).id(1);`
   },
-  { id: "e8", label: "Polymorphic Field Access",
-    code: `let final  : int = result({l = 1});
-let result : ({l : int} -> int) = (f @ int);
-
-let f : forall a. {l : a} -> a = 
-  fun (type t) (x) -> x.l;`
+  { id: "e11", label: "Module with Type Decl",
+    code: `module m : 
+  sig 
+    type t = int;
+    val y : t;
+  end = struct
+          type t = int;
+          let y : t = 10;
+        end;`
   }
 ];
 
@@ -560,27 +637,21 @@ const coreExamples = [
     code: `<[7] | lam. x0 ** x1> 6`
   },
   { id: "c3", label: "Env + Box Application",
-    code: `[{f = lam. x0 ** 2}, {x = 5}] |> (x0.f) (x0.x)`
+    code: `[{f = lam. x0 ** 10}, {x = 5}] |> ([x1].f [x0].x)`
   },
   { id: "c4", label: "Record via Env",
     code: `[{greeting = "hello"}].greeting`
   },
-  { id: "c5", label: "Factorial (fix)",
-    code: `(fix (lam. if x0 == 0 then 1 else x0 ** ((x1) (x0 - 1)))) 5`
-  },
-  { id: "c6", label: "K Combinator",
-    code: `((lam. lam. x1) 42) 99`
-  },
-  { id: "c7", label: "Apply Twice",
+  { id: "c5", label: "Apply Twice",
     code: `(lam. (x0) ((x0) 5)) (lam. x0 - 1)`
   },
-  { id: "c8", label: "Nested Env Projection",
+  { id: "c6", label: "Nested Env Projection",
     code: `[{inner = [{val = 99}]}].inner.val`
   },
-  { id: "c9", label: "Type Closure",
+  { id: "c7", label: "Type Closure",
     code: `(<[] | Lam. lam. x0> @ Int) 7`
   },
-  { id: "c10", label: "Conditional Arithmetic",
+  { id: "c8", label: "Conditional Arithmetic",
     code: `if 10 - 3 == 7 then 100 ** 2 else 0`
   }
 ];
@@ -620,11 +691,6 @@ const envmlKeywords = [
 ];
 const envmlTypes = ['int','bool','string','unit'];
 
-const coreKeywords = [
-  'lam','Lam','fix','if','then','else','tdef','eq','forall','Env'
-];
-const coreTypes = ['Int','Bool','String'];
-
 function escapeHtml(t) {
   return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
@@ -646,24 +712,8 @@ function highlightEnvML(code) {
 }
 
 function highlightCore(code) {
-  let r = escapeHtml(code);
-  r = r.replace(/--.*$/gm, '<span class="syn-comment">$&</span>');
-  r = r.replace(/"([^"\\]|\\.)*"/g, '<span class="syn-string">$&</span>');
-  // Variables x0, x1, ...
-  r = r.replace(/\bx(\d+)\b/g, '<span class="syn-variable">x$1</span>');
-  r = r.replace(/\b(\d+)\b/g, '<span class="syn-number">$1</span>');
-  const kw = new RegExp(`\\b(${coreKeywords.join('|')})\\b`, 'g');
-  r = r.replace(kw, '<span class="syn-keyword">$1</span>');
-  const ty = new RegExp(`\\b(${coreTypes.join('|')})\\b`, 'g');
-  r = r.replace(ty, '<span class="syn-type">$1</span>');
-  r = r.replace(/-&gt;/g, '<span class="syn-operator">-&gt;</span>');
-  r = r.replace(/\|&gt;/g, '<span class="syn-operator">|&gt;</span>');
-  r = r.replace(/\*\*/g, '<span class="syn-operator">**</span>');
-  r = r.replace(/==/g, '<span class="syn-operator">==</span>');
-  r = r.replace(/@/g, '<span class="syn-operator">@</span>');
-  // Brackets: < > [ ] { }
-  r = r.replace(/[&lt;&gt;\[\]{}|]/g, '<span class="syn-bracket">$&</span>');
-  return r;
+  // No syntax highlighting for Core - just escape HTML
+  return escapeHtml(code);
 }
 
 function updateHighlight() {
@@ -691,14 +741,13 @@ function setMode(mode) {
   document.getElementById('mode-envml').classList.toggle('active', mode === 'envml');
   document.getElementById('mode-core').classList.toggle('active', mode === 'core');
 
-  // Update label
-  document.getElementById('editorLabel').textContent = mode === 'envml' ? 'EnvML Source' : 'FE Calculus';
-  document.getElementById('modeIndicator').textContent = mode === 'envml' ? 'EnvML v0.1' : 'FE Calculus';
+  // Update mode indicator
+  document.getElementById('modeIndicator').textContent = mode === 'envml' ? 'EnvML v0.1' : 'Core FE';
 
   // Update placeholder
   document.getElementById('editor').placeholder = mode === 'envml'
     ? '(* Enter EnvML code here *)'
-    : '-- Enter FE Calculus expression';
+    : '-- Enter Core FE expression';
 
   // Update examples dropdown
   populateExamples();
@@ -706,8 +755,15 @@ function setMode(mode) {
   // Update stage buttons
   renderStageBar();
 
-  // Re-highlight
-  updateHighlight();
+  // Clear editor and output, then load first example
+  clearEditor();
+  clearOutput();
+  const examples = mode === 'envml' ? envmlExamples : coreExamples;
+  if (examples.length > 0) {
+    document.getElementById('editor').value = examples[0].code;
+    document.getElementById('exampleSelect').value = examples[0].id;
+    updateHighlight();
+  }
 }
 
 function populateExamples() {
@@ -871,6 +927,7 @@ updateHighlight();
 
 // Load first EnvML example by default
 editor.value = envmlExamples[0].code;
+document.getElementById('exampleSelect').value = envmlExamples[0].id;
 updateHighlight();
 
 window.setMode = setMode;

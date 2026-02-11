@@ -20,7 +20,6 @@ library
                         Core.Named
                         Core.Syntax
                         Core.DeBruijn
-                        Core.Pretty
                         Core.Repl
                         Core.Parser.Parser
                         Core.Parser.Lexer

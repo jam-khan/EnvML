@@ -1,7 +1,0 @@
-@pure interface TyAliases
-
-type newInt = Int;
-
-val hello :  newInt -> newInt;
-
-newInt

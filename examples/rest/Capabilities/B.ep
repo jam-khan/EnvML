@@ -1,5 +1,0 @@
-@pure
-
-require System.Utils as U;
-
-val mapList = U.Map(\(x:Int) => {x + 1}, [1, 2, 3])

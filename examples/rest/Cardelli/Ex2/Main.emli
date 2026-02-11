@@ -1,4 +1,0 @@
-
-val f : int -> int;;
-
-val m : int
