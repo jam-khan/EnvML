@@ -712,7 +712,7 @@ function highlightEnvML(code) {
 }
 
 function highlightCore(code) {
-  // No syntax highlighting for Core - just escape HTML
+  // No syntax highlighting for CoreFE - just escape HTML
   return escapeHtml(code);
 }
 
@@ -747,7 +747,7 @@ function setMode(mode) {
   // Update placeholder
   document.getElementById('editor').placeholder = mode === 'envml'
     ? '(* Enter EnvML code here *)'
-    : '-- Enter Core FE expression';
+    : '-- Enter CoreFE FE expression';
 
   // Update examples dropdown
   populateExamples();

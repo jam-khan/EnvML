@@ -1,11 +1,11 @@
-module Core.DeBruijnSpec (spec) where
+module CoreFE.DeBruijnSpec (spec) where
 
 import Test.Hspec
-import qualified Core.Named as Named
-import qualified Core.Syntax as Nameless
-import Core.DeBruijn (toNamelessExp, toNamelessTyp, toDeBruijn, toDeBruijnTyp)
-import Core.Check (check, infer)
-import Core.Eval (eval)
+import qualified CoreFE.Named as Named
+import qualified CoreFE.Syntax as Nameless
+import CoreFE.DeBruijn (toNamelessExp, toNamelessTyp, toDeBruijn, toDeBruijnTyp)
+import CoreFE.Check (check, infer)
+import CoreFE.Eval (eval)
 
 -- Helper to run full pipeline
 runPipeline :: Named.Exp -> Maybe (Nameless.Exp, Nameless.Typ, Nameless.Exp)

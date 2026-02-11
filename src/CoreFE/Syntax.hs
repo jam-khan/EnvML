@@ -1,5 +1,5 @@
 {-# LANGUAGE InstanceSigs #-}
-module Core.Syntax where
+module CoreFE.Syntax where
 
 type TyEnv = [TyEnvE]
 
@@ -67,7 +67,7 @@ data Literal
 class Pretty a where
   pretty :: a -> String
 
--- Instances for Core.Syntax types
+-- Instances for CoreFE.Syntax types
 instance Pretty Typ where
   pretty :: Typ -> String
   pretty = stringOfTyp

@@ -1,6 +1,6 @@
-module Core.Eval where
+module CoreFE.Eval where
 
-import Core.Syntax
+import CoreFE.Syntax
 
 lookupv :: Env -> Int -> Maybe Exp
 lookupv [] _ = Nothing

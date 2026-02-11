@@ -252,7 +252,7 @@ Inductive step : exp -> exp -> exp -> Prop :=
       step v (rproj v1 l) v2.
 
 #[export]
-Hint Constructors typ op exp lookup lookupv lin rlookup Slookup styp sop sexp elaborate_sexp has_type value rlookupv step : core.
+Hint Constructors typ op exp lookup lookupv lin rlookup Slookup styp sop sexp elaborate_sexp has_type value rlookupv step : CoreFE.
 
 
 Require Import Program.Equality.

@@ -5,9 +5,9 @@ import EnvML.Syntax as Src
 import EnvML.Parser.Lexer (lexer)
 import EnvML.Parser.Parser (parseExp, parseModule, parseModuleTyp, parseTyp)
 import EnvML.Elab
-import qualified Core.Named as Named
-import qualified Core.DeBruijn as DB
-import qualified Core.Syntax as Core
+import qualified CoreFE.Named as Named
+import qualified CoreFE.DeBruijn as DB
+import qualified CoreFE.Syntax as CoreFE
 import Test.Hspec
 
 spec :: Spec
@@ -25,13 +25,13 @@ spec = do
       let input = "42"
       let parsed = parseExp (lexer input)
       let named = elabExp parsed
-      named `shouldBe` Named.Lit (Core.LitInt 42)
+      named `shouldBe` Named.Lit (CoreFE.LitInt 42)
 
     it "elaborates boolean literal" $ do
       let input = "true"
       let parsed = parseExp (lexer input)
       let named = elabExp parsed
-      named `shouldBe` Named.Lit (Core.LitBool True)
+      named `shouldBe` Named.Lit (CoreFE.LitBool True)
 
   describe "Elaborate Lambda Expressions" $ do
     
@@ -86,7 +86,7 @@ spec = do
       let input = "f @ int"
       let parsed = parseExp (lexer input)
       let named = elabExp parsed
-      named `shouldBe` Named.TApp (Named.Var "f") (Named.TyLit Core.TyInt)
+      named `shouldBe` Named.TApp (Named.Var "f") (Named.TyLit CoreFE.TyInt)
 
   describe "Elaborate Types" $ do
     
@@ -94,13 +94,13 @@ spec = do
       let input = "int"
       let parsed = parseTyp (lexer input)
       let named = elabTyp parsed
-      named `shouldBe` Named.TyLit Core.TyInt
+      named `shouldBe` Named.TyLit CoreFE.TyInt
 
     it "elaborates arrow types" $ do
       let input = "int -> bool"
       let parsed = parseTyp (lexer input)
       let named = elabTyp parsed
-      named `shouldBe` Named.TyArr (Named.TyLit Core.TyInt) (Named.TyLit Core.TyBool)
+      named `shouldBe` Named.TyArr (Named.TyLit CoreFE.TyInt) (Named.TyLit CoreFE.TyBool)
 
     it "elaborates forall types" $ do
       let input = "forall a. (a -> a)"
@@ -127,10 +127,10 @@ spec = do
       let input = "let x = 1;"
       let parsed = parseModule (lexer input)
       let named = elabModule parsed
-      named `shouldBe` Named.FEnv [Named.ModE "x" (Named.Lit (Core.LitInt 1))]
+      named `shouldBe` Named.FEnv [Named.ModE "x" (Named.Lit (CoreFE.LitInt 1))]
 
     it "elaborates functor with term argument" $ do
-      let m = Src.Functor [("x", Src.TmArgType (Src.TyLit Core.TyInt))]
+      let m = Src.Functor [("x", Src.TmArgType (Src.TyLit CoreFE.TyInt))]
                           (Src.Struct [])
       let named = elabModule m
       named `shouldBe` Named.Lam "x" (Named.FEnv [])
@@ -151,17 +151,17 @@ spec = do
     it "converts simple lambda" $ do
       let named = Named.Lam "x" (Named.Var "x")
       let nameless = DB.toDeBruijn named
-      nameless `shouldBe` Core.Lam (Core.Var 0)
+      nameless `shouldBe` CoreFE.Lam (CoreFE.Var 0)
 
     it "converts nested lambda with outer reference" $ do
       let named = Named.Lam "x" (Named.Lam "y" (Named.Var "x"))
       let nameless = DB.toDeBruijn named
-      nameless `shouldBe` Core.Lam (Core.Lam (Core.Var 1))
+      nameless `shouldBe` CoreFE.Lam (CoreFE.Lam (CoreFE.Var 1))
 
     it "converts type lambda" $ do
       let named = Named.TLam "a" (Named.Var "x")
       -- Assumes "x" is in context at index 0
       let nameless = DB.toDeBruijn named
       case nameless of
-        Core.TLam body -> return ()
+        CoreFE.TLam body -> return ()
         _ -> expectationFailure "Expected TLam"

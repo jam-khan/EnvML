@@ -3,7 +3,7 @@ module EnvML.Parser.Parser where
 
 import EnvML.Parser.Lexer
 import EnvML.Syntax
-import qualified Core.Syntax as Core
+import qualified CoreFE.Syntax as CoreFE
 }
 
 %name parseModule ModuleBody
@@ -134,10 +134,10 @@ Term :: { Exp }
   | Atom                 { $1 }
 
 Atom :: { Exp }
-  : num                  { Lit (Core.LitInt $1) }
-  | str                  { Lit (Core.LitStr $1) }
-  | true                 { Lit (Core.LitBool True) }
-  | false                { Lit (Core.LitBool False) }
+  : num                  { Lit (CoreFE.LitInt $1) }
+  | str                  { Lit (CoreFE.LitStr $1) }
+  | true                 { Lit (CoreFE.LitBool True) }
+  | false                { Lit (CoreFE.LitBool False) }
   | id                   { Var $1 }
   | '{' RecFields '}'    { Rec $2 }
   | '[' Env ']'          { FEnv $2 }
@@ -178,9 +178,9 @@ Typ :: { Typ }
   | BaseTyp                           { $1 }
 
 BaseTyp :: { Typ }
-  : int                    { TyLit Core.TyInt }
-  | bool                   { TyLit Core.TyBool }
-  | stringt                { TyLit Core.TyStr }
+  : int                    { TyLit CoreFE.TyInt }
+  | bool                   { TyLit CoreFE.TyBool }
+  | stringt                { TyLit CoreFE.TyStr }
   | id                     { TyVar $1 }
   | '{' TyRcdFields '}'    { TyRcd $2 }
   | '[' TyCtx ']'          { TyCtx $2 }
@@ -214,9 +214,9 @@ TyCtxElem :: { TyCtxE }
   | module type id '=' ModuleTyp        { TypeEqM $3 $5 }
   | Type                                { Kind }
   | id                                  { Type (TyVar $1) }
-  | int                                 { Type (TyLit Core.TyInt) }
-  | bool                                { Type (TyLit Core.TyBool) }
-  | stringt                             { Type (TyLit Core.TyStr) }
+  | int                                 { Type (TyLit CoreFE.TyInt) }
+  | bool                                { Type (TyLit CoreFE.TyBool) }
+  | stringt                             { Type (TyLit CoreFE.TyStr) }
 
 {
 parseError :: [Token] -> a

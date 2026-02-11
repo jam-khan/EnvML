@@ -1,10 +1,10 @@
-module Core.CoreSpec (spec) where
+module CoreFE.CoreFESpec (spec) where
 
-import Core.Eval (eval)
-import Core.Check (infer, check)
-import Core.Syntax
-import Core.Parser.Lexer (lexer)
-import Core.Parser.Parser (parseExp, parseTyp, parseEnv)
+import CoreFE.Eval (eval)
+import CoreFE.Check (infer, check)
+import CoreFE.Syntax
+import CoreFE.Parser.Lexer (lexer)
+import CoreFE.Parser.Parser (parseExp, parseTyp, parseEnv)
 import Test.Hspec
 
 -- Helpers: parse and evaluate
@@ -39,7 +39,7 @@ checkInCtx env expr typ = check (pEnv env) (pExp expr) (pTyp typ)
 -- Eval tests
 -- ═══════════════════════════════════════════════════════════════════
 --
--- Core parser syntax reference (from lexer):
+-- CoreFE parser syntax reference (from lexer):
 --   Types:    Int, Bool, String  (capitalized keywords)
 --   Vars:     x0, x1, x2, ...   (de Bruijn indices)
 --   Lambda:   lam. body
@@ -359,11 +359,11 @@ checkCtxTests =
 
 spec :: Spec
 spec = do
-  describe "Core.Eval" $
+  describe "CoreFE.Eval" $
     describe "evaluation" $
       mapM_ mkEvalTest evalTests
 
-  describe "Core.Check" $ do
+  describe "CoreFE.Check" $ do
     describe "type checking" $
       mapM_ mkCheckTest checkTests
     describe "type inference" $

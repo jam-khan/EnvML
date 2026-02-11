@@ -1,7 +1,7 @@
-module Core.DeBruijn where
+module CoreFE.DeBruijn where
 
-import qualified Core.Syntax    as Nameless
-import qualified Core.Named     as Named
+import qualified CoreFE.Syntax    as Nameless
+import qualified CoreFE.Named     as Named
 
 type Name       = String
 data BindingKind= TermBinding | ModBinding

@@ -2,7 +2,7 @@
 
 module EnvML.Syntax where
 
-import qualified Core.Syntax as Core
+import qualified CoreFE.Syntax as CoreFE
 
 type Name     = String            -- Alias for naming
 type Imports  = [(Name, Typ)]     -- import x : A
@@ -42,7 +42,7 @@ data IntfE
   deriving (Show, Eq)
 
 data Typ
-  = TyLit     Core.TyLit           -- int, bool, or string
+  = TyLit     CoreFE.TyLit           -- int, bool, or string
   | TyVar     Name            -- x
   | TyArr     Typ   Typ       -- A -> B
   | TyAll     Name  Typ       -- forall a'. T
@@ -82,7 +82,7 @@ data EnvE
   deriving (Show, Eq)
 
 data Exp
-  = Lit   Core.Literal    -- Literals: int, double, bool, string
+  = Lit   CoreFE.Literal    -- Literals: int, double, bool, string
   | Var   Name            -- Var x, y, hello
   | Lam   FunArgs Exp     -- fun (x: A) (y : B) -> x + 1
   | TLam  FunArgs Exp     -- fun 
@@ -244,7 +244,7 @@ prettyModuleTyp (TyVarM n) = n
 
 -- Type pretty printing (same as before)
 prettyTyp :: Typ -> String
-prettyTyp (TyLit l) = Core.pretty l
+prettyTyp (TyLit l) = CoreFE.pretty l
 prettyTyp (TyVar s) = s
 prettyTyp (TyArr t1 t2) =
   let s1 = parensIf (typPrec t1 < typPrec (TyArr t1 t2)) (prettyTyp t1)
@@ -305,7 +305,7 @@ prettyModule (MAnno m1 mty) =
 
 -- Expression pretty printing
 prettyExp :: Exp -> String
-prettyExp (Lit l) = Core.pretty l
+prettyExp (Lit l) = CoreFE.pretty l
 prettyExp (Var n) = n
 prettyExp (Lam args e) = 
   "fun " ++ prettyFunArgs args ++ " -> " ++ 

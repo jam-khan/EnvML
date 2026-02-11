@@ -1,14 +1,14 @@
-module Core.Repl where
+module CoreFE.Repl where
 
 import Control.Exception (try, SomeException)
 import Control.Monad.IO.Class (liftIO) -- Necessary to run IO inside Haskeline
 
 -- Your Project Modules
-import Core.Syntax ( Exp, stringOfTyp, stringOfExp )
-import Core.Parser.Lexer (lexer)
-import Core.Parser.Parser (parseExp)
-import Core.Eval (eval)
-import Core.Check (infer)
+import CoreFE.Syntax ( Exp, stringOfTyp, stringOfExp )
+import CoreFE.Parser.Lexer (lexer)
+import CoreFE.Parser.Parser (parseExp)
+import CoreFE.Eval (eval)
+import CoreFE.Check (infer)
 import System.Console.Haskeline
     ( InputT, defaultSettings, getInputLine, outputStrLn, runInputT )
 

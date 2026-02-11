@@ -1,5 +1,5 @@
 {
-module Core.Parser.Lexer (Token(..), lexer, alexScanTokens) where
+module CoreFE.Parser.Lexer (Token(..), lexer, alexScanTokens) where
 }
 
 %wrapper "basic"

@@ -7,8 +7,8 @@ extra/*
 src/Addition.hs
 src/FullIsorec/*
 .vscode/*
-rocq/core/*.aux
-rocq/core/*.glob
+rocq/CoreFE/*.aux
+rocq/CoreFE/*.glob
 rocq/Theories/*.mk
 src/EnvML/Parser/Interface/ParseInterface.info
 src/EnvML/Parser/Interface/ParseInterface.hs
@@ -56,8 +56,8 @@ extra/*
 src/Addition.hs
 src/FullIsorec/*
 .vscode/*
-proofs/core/*.aux
-proofs/core/*.glob
+proofs/CoreFE/*.aux
+proofs/CoreFE/*.glob
 src/EnvML/Parser/Interface/ParseInterface.info
 src/EnvML/Parser/Interface/ParseInterface.hs
 src/EnvML/Parser/Implementation/ParseImp.info
@@ -79,8 +79,8 @@ src/EnvML/Parser/Happy.info
 
 src/EnvML/Parser/Lexer.hs
 src/EnvML/Parser/Parser.hs
-src/Core/Parser/Lexer.hs
-src/Core/Parser/Parser.hs
+src/CoreFE/Parser/Lexer.hs
+src/CoreFE/Parser/Parser.hs
 .envml_history
 
 src/WASM_stub.h
@@ -90,4 +90,4 @@ src/WASM.o
 *.o
 *.hi
 src/EnvML/Parser/Parser.info
-src/Core/Parser/Parser.info
+src/CoreFE/Parser/Parser.info

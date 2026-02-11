@@ -1,7 +1,7 @@
 {-# LANGUAGE InstanceSigs #-}
-module Core.Named where
+module CoreFE.Named where
 
-import qualified Core.Syntax as Nameless
+import qualified CoreFE.Syntax as Nameless
 
 type Name = String
 

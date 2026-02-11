@@ -1,7 +1,7 @@
-module Core.Check where
+module CoreFE.Check where
 
 import Control.Monad (guard)
-import Core.Syntax
+import CoreFE.Syntax
 
 -- | Count type variable bindings (Etvar and Eteq) in an environment
 

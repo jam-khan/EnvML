@@ -10,19 +10,20 @@ library
     
     exposed-modules:    Utils
                         Repl
+                        PrettyWeb
                         EnvML.Elab
                         EnvML.Syntax
                         EnvML.Parse
                         EnvML.Parser.Parser
                         EnvML.Parser.Lexer
-                        Core.Eval
-                        Core.Check
-                        Core.Named
-                        Core.Syntax
-                        Core.DeBruijn
-                        Core.Repl
-                        Core.Parser.Parser
-                        Core.Parser.Lexer
+                        CoreFE.Eval
+                        CoreFE.Check
+                        CoreFE.Named
+                        CoreFE.Syntax
+                        CoreFE.DeBruijn
+                        CoreFE.Repl
+                        CoreFE.Parser.Parser
+                        CoreFE.Parser.Lexer
     
     build-depends:    base >= 4.17 && < 5,
                       QuickCheck,

@@ -3,11 +3,11 @@ HAPPY	= happy
 CABAL 	= cabal
 GHC_WASM = wasm32-wasi-ghc
 
-CORE_LEXER_IN	= src/Core/Parser/Lexer.x
-CORE_LEXER_OUT	= src/Core/Parser/Lexer.hs
-CORE_PARSER_IN 	= src/Core/Parser/Parser.y
-CORE_PARSER_OUT = src/Core/Parser/Parser.hs
-CORE_PARSER_INFO = src/Core/Parser/Parser.info
+CORE_LEXER_IN	= src/CoreFE/Parser/Lexer.x
+CORE_LEXER_OUT	= src/CoreFE/Parser/Lexer.hs
+CORE_PARSER_IN 	= src/CoreFE/Parser/Parser.y
+CORE_PARSER_OUT = src/CoreFE/Parser/Parser.hs
+CORE_PARSER_INFO = src/CoreFE/Parser/Parser.info
 
 ENVML_LEXER_IN  = src/EnvML/Parser/Lexer.x
 ENVML_LEXER_OUT = src/EnvML/Parser/Lexer.hs
