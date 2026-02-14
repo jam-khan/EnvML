@@ -1,7 +1,7 @@
 module CoreFE.CoreFESpec (spec) where
 
 import CoreFE.Eval (eval)
-import CoreFE.Check (infer, check)
+import CoreFE.Check (infer, check, teq)
 import CoreFE.Syntax
 import CoreFE.Parser.Lexer (lexer)
 import CoreFE.Parser.Parser (parseExp, parseTyp, parseEnv)
@@ -34,6 +34,9 @@ checkP expr typ = check [] (pExp expr) (pTyp typ)
 
 checkInCtx :: String -> String -> String -> Bool
 checkInCtx env expr typ = check (pEnv env) (pExp expr) (pTyp typ)
+
+isTypEq :: String -> String -> String -> String -> Bool
+isTypEq g1 a1 a2 g2 = teq (pEnv g1) (pTyp a1) (pTyp a2) (pEnv g2)
 
 -- ═══════════════════════════════════════════════════════════════════
 -- Eval tests
@@ -357,6 +360,316 @@ checkCtxTests =
     )
   ]
 
+typEqTests :: [(String, String, String, String, String, Bool)]
+typEqTests =
+  [ -- ═══════════════════════════════════════════════════════════
+    -- BASIC LITERAL EQUALITY
+    -- ═══════════════════════════════════════════════════════════
+    ( "Int = Int"
+    , "[]", "Int", "Int", "[]"
+    , True
+    )
+  , ( "Bool = Bool"
+    , "[]", "Bool", "Bool", "[]"
+    , True
+    )
+  , ( "String = String"
+    , "[]", "String", "String", "[]"
+    , True
+    )
+  , ( "Int /= Bool"
+    , "[]", "Int", "Bool", "[]"
+    , False
+    )
+  , ( "Int /= String"
+    , "[]", "Int", "String", "[]"
+    , False
+    )
+  , ( "Int /= Arrow"
+    , "[]", "Int", "Int -> Int", "[]"
+    , False
+    )
+
+    -- ═══════════════════════════════════════════════════════════
+    -- TYPE VARIABLES (de Bruijn indices)
+    -- ═══════════════════════════════════════════════════════════
+  , ( "type var same index, same context"
+    , "[*]", "0", "0", "[*]"
+    , True
+    )
+  , ( "type var in larger context"
+    , "[*, *]", "0", "0", "[*, *]"
+    , True
+    )
+  , ( "type var index 1 in two-element context"
+    , "[*, *]", "1", "1", "[*, *]"
+    , True
+    )
+  , ( "type vars with different indices"
+    , "[*, *]", "0", "1", "[*, *]"
+    , False
+    )
+  , ( "Evar (Type) is skipped for inner index"
+    , "[*, Int]", "0", "0", "[*]"
+    , True
+    )
+  , ( "multiple Evars skipped"
+    , "[*, Int, Bool, Int]", "0", "0", "[*]"
+    , True
+    )
+
+    -- ═══════════════════════════════════════════════════════════
+    -- ARROW TYPES
+    -- ═══════════════════════════════════════════════════════════
+  , ( "Int -> Int = Int -> Int"
+    , "[]", "Int -> Int", "Int -> Int", "[]"
+    , True
+    )
+  , ( "arrow with type var"
+    , "[*]", "0 -> Int", "0 -> Int", "[*]"
+    , True
+    )
+  , ( "arrow domain mismatch"
+    , "[]", "Int -> Int", "Bool -> Int", "[]"
+    , False
+    )
+  , ( "arrow codomain mismatch"
+    , "[]", "Int -> Int", "Int -> Bool", "[]"
+    , False
+    )
+  , ( "arrow arity mismatch"
+    , "[]", "Int -> Int", "Int -> Int -> Int", "[]"
+    , False
+    )
+  , ( "nested arrows"
+    , "[]", "(Int -> Int) -> Int", "(Int -> Int) -> Int", "[]"
+    , True
+    )
+  , ( "curried function"
+    , "[]", "Int -> Int -> Int", "Int -> Int -> Int", "[]"
+    , True
+    )
+
+    -- ═══════════════════════════════════════════════════════════
+    -- FORALL TYPES
+    -- ═══════════════════════════════════════════════════════════
+  , ( "forall identity"
+    , "[]", "forall. 0", "forall. 0", "[]"
+    , True
+    )
+  , ( "forall arrow"
+    , "[]", "forall. 0 -> 0", "forall. 0 -> 0", "[]"
+    , True
+    )
+  , ( "forall extends context"
+    , "[*]", "forall. 1", "forall. 1", "[*]"
+    , True
+    )
+  , ( "nested forall"
+    , "[]", "forall. forall. 0 -> 1", "forall. forall. 0 -> 1", "[]"
+    , True
+    )
+  , ( "forall with concrete return"
+    , "[]", "forall. Int", "forall. Int", "[]"
+    , True
+    )
+  , ( "forall body mismatch"
+    , "[]", "forall. 0", "forall. Int", "[]"
+    , False
+    )
+
+    -- ═══════════════════════════════════════════════════════════
+    -- TYPE EQUALITY (TypeEq / Eteq)
+    -- ═══════════════════════════════════════════════════════════
+  , ( "Eteq unfolds: 0 in [eq Int] = Int"
+    , "[eq Int]", "0", "Int", "[]"
+    , True
+    )
+  , ( "Eteq unfolds arrow type"
+    , "[eq Int -> Int]", "0", "Int -> Int", "[]"
+    , True
+    )
+  , ( "Eteq on right side"
+    , "[]", "Int", "0", "[eq Int]"
+    , True
+    )
+  , ( "Eteq both sides"
+    , "[eq Int]", "0", "0", "[eq Int]"
+    , True
+    )
+  , ( "nested Eteq unfolding"
+    , "[eq Int, eq 0]", "0", "Int", "[]"
+    , True
+    )
+  , ( "Eteq chain: 0 -> 1 -> Int"
+    , "[eq Int, eq 0]", "0", "1", "[eq Int, eq 0]"
+    , True
+    )
+
+    -- ═══════════════════════════════════════════════════════════
+    -- SUBSTITUTION TYPES (SubstT / #[A]B)
+    -- ═══════════════════════════════════════════════════════════
+  , ( "subst basic: #[Int]0 = Int"
+    , "[]", "#[Int]0", "Int", "[]"
+    , True
+    )
+  , ( "subst on right: Int = #[Int]0"
+    , "[]", "Int", "#[Int]0", "[]"
+    , True
+    )
+  , ( "subst arrow: #[Int](0 -> 0) = Int -> Int"
+    , "[]", "#[Int](0 -> 0)", "Int -> Int", "[]"
+    , True
+    )
+  , ( "subst in function domain"
+    , "[]", "#[Int]0 -> Bool", "Int -> Bool", "[]"
+    , True
+    )
+  , ( "subst preserves outer var"
+    , "[]", "#[Int]0", "Int", "[]"
+    , True
+    )
+  , ( "subst in Eteq binding"
+    , "[eq #[Int]0]", "0", "Int", "[]"
+    , True
+    )
+
+    -- ═══════════════════════════════════════════════════════════
+    -- BOX TYPES (BoxT / [env] |> A)
+    -- ═══════════════════════════════════════════════════════════
+  , ( "empty box: [] |> Int = Int"
+    , "[]", "[] |> Int", "Int", "[]"
+    , True
+    )
+  , ( "box with Eteq: [eq Int] |> 0 = Int"
+    , "[]", "[eq Int] |> 0", "Int", "[]"
+    , True
+    )
+  , ( "box on right"
+    , "[]", "Int", "[eq Int] |> 0", "[]"
+    , True
+    )
+  , ( "box multi-entry: [eq Int, eq 0] |> 0 = Int"
+    , "[]", "[eq Int, eq 0] |> 0", "Int", "[]"
+    , True
+    )
+  , ( "box multi-entry index 1"
+    , "[]", "[eq Int, eq 0] |> 1", "Int", "[]"
+    , True
+    )
+  , ( "box with arrow in Eteq"
+    , "[]", "[eq Int, eq (0 -> 0)] |> 0", "Int -> Int", "[]"
+    , True
+    )
+  , ( "box complex: [eq Int, eq (Int -> Int)] |> 0 -> 1"
+    , "[]", "[eq Int, eq (Int -> Int)] |> 0 -> 1", "(Int -> Int) -> Int", "[]"
+    , True
+    )
+  , ( "box triple Eteq"
+    , "[]", "[eq Int, eq 0, eq 1] |> 0", "Int", "[]"
+    , True
+    )
+
+    -- ═══════════════════════════════════════════════════════════
+    -- BOX WITH NON-CONCRETE ENV (should fail)
+    -- ═══════════════════════════════════════════════════════════
+  , ( "box with Kind fails"
+    , "[]", "[*] |> 0", "0", "[*]"
+    , False
+    )
+  , ( "box with Kind after Eteq fails"
+    , "[]", "[*, eq Int] |> 0", "Int", "[]"
+    , False
+    )
+  , ( "box with Kind before Eteq fails"
+    , "[]", "[eq Int, *] |> 1", "Int", "[]"
+    , False
+    )
+
+    -- ═══════════════════════════════════════════════════════════
+    -- RECORD TYPES
+    -- ═══════════════════════════════════════════════════════════
+  , ( "record same label and type"
+    , "[]", "{x : Int}", "{x : Int}", "[]"
+    , True
+    )
+  , ( "record different label"
+    , "[]", "{x : Int}", "{y : Int}", "[]"
+    , False
+    )
+  , ( "record different type"
+    , "[]", "{x : Int}", "{x : Bool}", "[]"
+    , False
+    )
+  , ( "record with type var"
+    , "[*]", "{val : 0}", "{val : 0}", "[*]"
+    , True
+    )
+  , ( "record with arrow type"
+    , "[]", "{f : Int -> Int}", "{f : Int -> Int}", "[]"
+    , True
+    )
+
+    -- ═══════════════════════════════════════════════════════════
+    -- ENVIRONMENT TYPES (TyEnvt / Env[...])
+    -- ═══════════════════════════════════════════════════════════
+  , ( "empty env type"
+    , "[]", "Env[]", "Env[]", "[]"
+    , True
+    )
+  , ( "env with Kind"
+    , "[]", "Env[*]", "Env[*]", "[]"
+    , True
+    )
+  , ( "env with Type"
+    , "[]", "Env[Int]", "Env[Int]", "[]"
+    , True
+    )
+  , ( "env with Kind and Type"
+    , "[]", "Env[0, *]", "Env[0, *]", "[]"
+    , True
+    )
+  , ( "env with multiple entries"
+    , "[]", "Env[Int, Bool]", "Env[Int, Bool]", "[]"
+    , True
+    )
+  , ( "env order matters"
+    , "[]", "Env[Int, Bool]", "Env[Bool, Int]", "[]"
+    , False
+    )
+  , ( "env with record"
+    , "[]", "Env[{x : Int}]", "Env[{x : Int}]", "[]"
+    , True
+    )
+
+    -- ═══════════════════════════════════════════════════════════
+    -- COMPLEX / COMBINED CASES
+    -- ═══════════════════════════════════════════════════════════
+  , ( "complex module-like type"
+    , "[]"
+    , "Env[eq Int, {x : 0}]"
+    , "Env[eq Int, {x : 0}]"
+    , "[]"
+    , True
+    )
+  , ( "functor-like type"
+    , "[]"
+    , "forall. Env[{x : 0}] -> Env[{y : 0}]"
+    , "forall. Env[{x : 0}] -> Env[{y : 0}]"
+    , "[]"
+    , True
+    )
+  , ( "asymmetric contexts with same inner index"
+    , "[*, eq Int]", "1", "1", "[*, *]"
+    , False
+    )
+  , ( "box in subst"
+    , "[]", "[eq ([] |> Int)] |> 0", "Int", "[]"
+    , True
+    )
+  ]
+
+
 spec :: Spec
 spec = do
   describe "CoreFE.Eval" $
@@ -372,6 +685,9 @@ spec = do
       mapM_ mkInferCtxTest inferCtxTests
     describe "checking in context" $
       mapM_ mkCheckCtxTest checkCtxTests
+  
+  describe "CoreFE Type Equality checking" $ do
+    mapM_ mkTypEqTest typEqTests
 
   where
     mkEvalTest (name, src, expected) =
@@ -393,3 +709,7 @@ spec = do
     mkCheckCtxTest (name, env, expr, typ, expected) =
       it name $
         checkInCtx env expr typ `shouldBe` expected
+    
+    mkTypEqTest (name, g1Str, aStr, bStr, g2Str, expected) =
+      it name $
+        isTypEq g1Str aStr bStr g2Str `shouldBe` expected
