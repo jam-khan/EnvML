@@ -63,8 +63,8 @@ teq g1 a (TyVar y) g2 =
   maybe False (\b -> teq g1 a b g2) (lookt g2 y)
 teq _g1 (TyBoxT g3 a) b g2 =
   concrete g3 && teq g3 a b g2
-teq _g1 a (TyBoxT g3 b) g2 =
-  concrete g3 && teq g3 a b g2
+teq g1 a (TyBoxT g3 b) _ =
+  concrete g3 && teq g1 a b g3
 teq g1 (TyArr a b) (TyArr c d) g2 =
   teq g1 a c g2 && teq g1 b d g2
 teq g1 (TyAll a) (TyAll b) g2 =
@@ -194,7 +194,7 @@ infer g (BinOp (EqEq e1 e2)) = do
   return (TyLit TyBool)
 
 -- List inference
-infer g (EList []) = Nothing  -- Cannot infer empty list type
+infer _ (EList []) = Nothing -- Cannot infer empty list type
 infer g (EList (e:es)) = do
   t <- infer g e
   -- Check all remaining elements have the same type
@@ -221,7 +221,10 @@ check g (TClos d e) (TyBoxT g1 (TyAll a)) =
     _ -> False
 check g (Fix e) (TyArr a b) =
   check (Type (TyArr a b) : g) e (TyArr a b)
-
+check g (App e1 e2) tyB   =
+  case infer g e2 of
+    Just tyA  -> check g e1 (TyArr tyA tyB)
+    Nothing   -> False
 -- List checking
 check _ (EList []) (TyList _) = True  -- Empty list checks against any list type
 check g (EList es) (TyList t) = all (\e -> check g e t) es

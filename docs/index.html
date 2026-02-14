@@ -512,13 +512,13 @@ module queryProcessor :
 
 let executeQuery : sig type a = int; val query : list a -> list a; end -> list int = 
   fun (processor) -> 
-    box [proc = processor] in (proc.query :: list int -> list int)(List[3, 1, 2]);
+    box [proc = processor] in proc.query(List[3, 1, 2]) :: list int;
 
 let previewResult : list int = 
-  executeQuery((queryProcessor(previewPolicy) :: sig type a = int; val query : list a -> list a; end));
+  executeQuery(queryProcessor(previewPolicy));
 
 let mockResult : list int = 
-  executeQuery((queryProcessor(mockPolicy) :: sig type a = int; val query : list a -> list a; end));
+  executeQuery(queryProcessor(mockPolicy));
 `},
   { id: "e1", label: "Policy Functors",
     code: `module type POLICY = 
