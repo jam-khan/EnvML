@@ -21,8 +21,7 @@
 
 5. **Implementation with interactive playground**
    - Full pipeline: parsing → elaboration → de Bruijn → type checking → evaluation
-   - Browser-based playground via WASM: https://jam-khan.github.io/EnvML/
-
+   
 ---
 
 ## First-Class Modules

@@ -1,8 +1,8 @@
 cabal-version:      2.4
 name:               EnvML
 version:            0.1.0.0
-author:             jam-khan
-maintainer:         jamkhan@connect.hku.hk
+author:             anonymous
+maintainer:         anonymous
 extra-source-files: CHANGELOG.md
 
 library
