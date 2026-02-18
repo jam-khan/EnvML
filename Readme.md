@@ -99,6 +99,35 @@ cabal run
 
 That's it! The `make` command handles all lexer and parser generation automatically.
 
+### Using the REPL
+
+After running `cabal run`, you will enter the interactive REPL. Type `:help` or `:h` to see all available commands:
+
+```
+envml> :h
+```
+
+**Available commands:**
+
+| Command          | Description                                    |
+|------------------|------------------------------------------------|
+| `:p <file>`      | Parse a source file and print the AST          |
+| `:e <file>`      | Parse → Elaborate → Print Named CoreFE         |
+| `:n <file>`      | Parse → Elaborate → De Bruijn → Print          |
+| `:check <file>`  | Full pipeline → Type check → Print result      |
+| `:eval <file>`   | Full pipeline → Evaluate → Print result        |
+| `:c <file>`      | Shorthand for `:check`                         |
+| `:v <file>`      | Shorthand for `:eval`                          |
+| `:help`, `:h`    | Show help                                      |
+| `:quit`, `:q`    | Exit the REPL                                  |
+
+Each command runs the file through a different stage of the compilation pipeline (Parse → Elaborate → De Bruijn → Check → Eval), so you can inspect intermediate representations at any point.
+
+**Example:** To evaluate an EnvML source file:
+```bash
+envml> :eval examples/test12.eml
+```
+
 ### Makefile Targets
 
 ```bash
@@ -131,11 +160,14 @@ EnvML/
 │   │   ├── Eval.hs      # Evaluator
 │   │   └── Parser/      # Core FE parser
 │   ├── PrettyWeb.hs     # Web-friendly pretty printing
-│   └── Utils.hs         # Utility functions
+│   ├── REPL.hs          # Read-eval-print-loop
+│   ├── Uitls.hs         # Utility functions
+│   └── WASM.hs          # WASM bindings (not part of cabal project)
 ├── app/
 │   └── Main.hs          # REPL entry point
 ├── test/                # Test suite
 ├── docs/                # WASM playground (pre-built)
+├── examples/            # EnvML (Source language) examples
 └── Makefile
 ```
 
