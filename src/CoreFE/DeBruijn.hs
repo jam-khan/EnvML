@@ -9,12 +9,6 @@ data BindingKind= TermBinding | ModBinding
 type ExpNames   = [(Name, BindingKind)]
 type TypNames   = [Name]
 
-{-
-  Separate contexts as lookupv ignores type equalities.
-    Γ : list of term Names   -- term variables only (ExpE and ModE bindings)
-    Δ : list of type Names   -- type variables only (TypE bindings)
--}
-
 -- index computation
 indexE :: Name -> ExpNames -> (Int, BindingKind)
 indexE x []    = error ("unbound: " ++ x)

@@ -161,8 +161,6 @@ prettyDeBruijnExpShort (CoreFE.Rec l e) = "{" ++ l ++ " = " ++ prettyDeBruijnExp
 prettyDeBruijnExpShort (CoreFE.RProj e l) = prettyDeBruijnExpShort e ++ "." ++ l
 prettyDeBruijnExpShort (CoreFE.FEnv env) = prettyDeBruijnEnvShort env
 prettyDeBruijnExpShort (CoreFE.Anno e _) = prettyDeBruijnExpShort e
-prettyDeBruijnExpShort (CoreFE.Fix _) = "fix ..."
-prettyDeBruijnExpShort (CoreFE.If {}) = "if ... then ... else ..."
 prettyDeBruijnExpShort (CoreFE.BinOp op) = prettyDeBruijnBinOpShort op
 prettyDeBruijnExpShort (CoreFE.EList es) = foldr (\e acc -> acc ++ prettyDeBruijnExpShort e ++ ",") "" es
 prettyDeBruijnExpShort (CoreFE.ETake i e) = "take(" ++ show i ++ "," ++ prettyDeBruijnExpShort e ++ ")"
@@ -205,8 +203,6 @@ prettyDeBruijnExp (CoreFE.Rec l e) = "{" ++ l ++ " = " ++ prettyDeBruijnExp e ++
 prettyDeBruijnExp (CoreFE.RProj e l) = parenIf (needsParenCore e) (prettyDeBruijnExp e) ++ "." ++ l
 prettyDeBruijnExp (CoreFE.FEnv env) = "[" ++ prettyDeBruijnEnv env ++ "]"
 prettyDeBruijnExp (CoreFE.Anno e t) = parenIf (needsParenCore e) (prettyDeBruijnExp e) ++ " : " ++ prettyDeBruijnTyp t
-prettyDeBruijnExp (CoreFE.Fix e) = "fix " ++ prettyDeBruijnExp e
-prettyDeBruijnExp (CoreFE.If e1 e2 e3) = "if " ++ prettyDeBruijnExp e1 ++ " then " ++ prettyDeBruijnExp e2 ++ " else " ++ prettyDeBruijnExp e3
 prettyDeBruijnExp (CoreFE.BinOp op) = prettyDeBruijnBinOp op
 prettyDeBruijnExp (CoreFE.EList es) = foldr (\e acc -> acc ++ prettyDeBruijnExpShort e ++ ",") "" es
 prettyDeBruijnExp (CoreFE.ETake i e) = "take(" ++ show i ++ "," ++ prettyDeBruijnExpShort e ++ ")"

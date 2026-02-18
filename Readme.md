@@ -14,9 +14,9 @@ The WASM playground provides an interactive web interface to explore EnvML's com
 
 ### Running the Playground
 
-The playground is pre-built and ready to use in the `docs/` directory.
+The playground is pre-built and ready to use in the `docs/` directory. You can serve it locally using either VS Code Live Server or a Python HTTP server.
 
-**Using VS Code Live Server:**
+**1) Using VS Code Live Server:**
 
 1. Install the **Live Server** extension in VS Code
    - Open VS Code Extensions (Ctrl+Shift+X / Cmd+Shift+X)
@@ -29,7 +29,7 @@ The playground is pre-built and ready to use in the `docs/` directory.
 
 4. The playground will open in your default browser at `http://localhost:5500/docs/index.html`
 
-**Alternative: Python HTTP Server**
+**2) Python HTTP Server:**
 ```bash
 cd docs
 python3 -m http.server 8000
@@ -43,8 +43,8 @@ python3 -m http.server 8000
   - **Core FE** - Write and execute Core FE expressions directly
 
 - **Display Options:**
-  - **Detailed** - Shows full AST with all internal representations
-  - **Simplified** - Shows user-friendly, readable output (default)
+  - **Detailed** - Shows full AST with all internal representations (default)
+  - **Simplified** - Shows user-friendly, readable output
 
 - **Pipeline Stages:**
   - **Parse** - View the parsed AST
@@ -78,6 +78,11 @@ make --version
 
 - **GHC Installation:** Follow the instructions at https://www.haskell.org/ghcup/install/
 - **Cabal Setup:** See the getting started guide at https://cabal.readthedocs.io/en/stable/getting-started.html
+- **Alex and Happy:** These are used for lexer and parser generation. Install them with:
+  ```bash
+  cabal install alex
+  cabal install happy
+  ```
 
 ### Build and Run
 

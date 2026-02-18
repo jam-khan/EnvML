@@ -2,6 +2,15 @@ module CoreFE.Check where
 
 import Control.Monad (guard)
 import CoreFE.Syntax
+    ( TyEnvE(Kind, TypeEq, Type),
+      EnvE(TypE, ExpE),
+      Exp(..),
+      Typ(..),
+      TyLit(TyBool, TyStr, TyInt),
+      Literal(LitStr, LitInt, LitBool),
+      BinOp(EqEq, Add, Sub, Mul),
+      TyEnv,
+      Env )
 
 -- | Count type variable bindings (Etvar and Eteq) in an environment
 keyLen :: TyEnv -> Int
@@ -182,12 +191,6 @@ infer g (BinOp (Mul e1 e2)) = do
   guard (check g e1 (TyLit TyInt))
   guard (check g e2 (TyLit TyInt))
   return (TyLit TyInt)
-infer g (If e1 e2 e3) = do
-  guard (check g e1 (TyLit TyBool))
-  t2 <- infer g e2
-  t3 <- infer g e3
-  guard (teq g t2 t3 g)
-  return t2
 infer g (BinOp (EqEq e1 e2)) = do
   t1 <- infer g e1
   guard (check g e2 t1)
@@ -219,8 +222,6 @@ check g (TClos d e) (TyBoxT g1 (TyAll a)) =
   case infer g (FEnv d) of
     Just (TyEnvt g2) -> g1 == g2 && lvalue d && check (Kind : g1) e a
     _ -> False
-check g (Fix e) (TyArr a b) =
-  check (Type (TyArr a b) : g) e (TyArr a b)
 check g (App e1 e2) tyB   =
   case infer g e2 of
     Just tyA  -> check g e1 (TyArr tyA tyB)

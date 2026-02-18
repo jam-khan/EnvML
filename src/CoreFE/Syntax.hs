@@ -46,8 +46,6 @@ data Exp
   | RProj Exp String
   | FEnv  Env
   | Anno  Exp Typ
-  | Fix   Exp
-  | If    Exp Exp Exp
   | BinOp BinOp
   -- List primitives
   | EList  [Exp]        -- [e1, e2, e3]
@@ -191,13 +189,6 @@ stringOfExpI lvl (Lam e) =
     "λ. " ++ stringOfExpI lvl e
 stringOfExpI lvl (TLam e) =
     "Λ. " ++ stringOfExpI lvl e
-stringOfExpI lvl (Fix e) =
-    "fix " ++ parensIf (expPrec e < 2) (stringOfExpI lvl e)
-
-stringOfExpI lvl (If e1 e2 e3) =
-    "if " ++ stringOfExpI lvl e1 ++ "\n"
-    ++ indent (lvl + 1) ++ "then " ++ stringOfExpI (lvl + 1) e2 ++ "\n"
-    ++ indent (lvl + 1) ++ "else " ++ stringOfExpI (lvl + 1) e3
 
 stringOfExpI lvl op@(Box env e) =
     let sEnv = showEnvInline env
@@ -308,8 +299,6 @@ expPrec (Anno _ _)  = 4
 expPrec (Box _ _)   = 3
 expPrec (Clos _ _)  = 3
 expPrec (TClos _ _) = 3
-expPrec (If {})     = 2
-expPrec (Fix _)     = 2
 expPrec (Lam _)     = 1
 expPrec (TLam _)    = 1
 

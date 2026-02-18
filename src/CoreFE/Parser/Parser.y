@@ -28,10 +28,6 @@ import CoreFE.Syntax
   num       { TokNum $$ }        -- Integer literal
   bool      { TokBool $$ }       -- Boolean literal
   string    { TokString $$ }     -- String literal
-  fix       { TokFix }
-  if        { TokIf }
-  then      { TokThen }
-  else      { TokElse }
   '->'      { TokArrow }
   '|>'      { TokTriangle }
   '#['      { TokHashBracket }
@@ -66,8 +62,6 @@ import CoreFE.Syntax
 Exp :: { Exp }
   : lam '.' Exp                         { Lam $3 }
   | TLam '.' Exp                        { TLam $3 }
-  | if Exp then Exp else Exp            { If $2 $4 $6 }
-  | fix Exp                             { Fix $2 }
   | AppExp ':' Typ                      { Anno $1 $3 }
   | AppExp '==' AppExp                  { BinOp (EqEq $1 $3) }
   | AppExp '-' AppExp                   { BinOp (Sub $1 $3) }

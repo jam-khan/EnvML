@@ -1,6 +1,14 @@
 module CoreFE.Eval where
 
 import CoreFE.Syntax
+    ( TyEnvE(TypeEq),
+      EnvE(TypE, ExpE),
+      Exp(..),
+      Typ(TyBoxT),
+      Literal(LitBool, LitInt),
+      BinOp(EqEq, Add, Sub, Mul),
+      TyEnv,
+      Env )
 
 lookupv :: Env -> Int -> Maybe Exp
 lookupv [] _ = Nothing
@@ -61,13 +69,6 @@ eval env = go
       rlookupv v l
     go (Anno e _) =
       eval env e
-    go (Fix e) = do
-        Clos env' e1 <- eval env e
-        let v_fix = Clos (ExpE v_fix : env') e1
-        pure v_fix
-    go (If cond e1 e2) = do
-        Lit (LitBool b) <- eval env cond
-        eval env (if b then e1 else e2)
     go (BinOp (Add e1 e2)) = do
         Lit (LitInt v1) <- eval env e1
         Lit (LitInt v2) <- eval env e2

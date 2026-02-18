@@ -58,8 +58,6 @@ isTypEq g1 a1 a2 g2 = teq (pEnv g1) (pTyp a1) (pTyp a2) (pEnv g2)
 --   Closure:  <[env] | lam. body>
 --   TClosure: <[env] | Lam. body>
 --   Anno:     e : T
---   Fix:      fix e
---   If:       if e then e else e
 --   TyEnv:    [*, Int, eq Int]  (Kind, Type, TypeEq)
 
 evalTests :: [(String, String, Maybe Exp)]
@@ -104,18 +102,6 @@ evalTests =
   , ( "equality false"
     , "1 == 2"
     , Just (Lit (LitBool False))
-    )
-  , ( "if-then-else true branch"
-    , "if true then 1 else 0"
-    , Just (Lit (LitInt 1))
-    )
-  , ( "if-then-else false branch"
-    , "if false then 1 else 0"
-    , Just (Lit (LitInt 0))
-    )
-  , ( "if with equality condition"
-    , "if 3 == 3 then 42 else 0"
-    , Just (Lit (LitInt 42))
     )
 
   -- ── Lambda and Application ────────────────────────────────

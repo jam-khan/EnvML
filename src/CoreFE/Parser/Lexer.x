@@ -22,10 +22,6 @@ tokens :-
   tdef                          { \_ -> TokTdef }
   lam                           { \_ -> TokLam }
   Lam                           { \_ -> TokBLam }
-  fix                           { \_ -> TokFix }
-  if                            { \_ -> TokIf }
-  then                          { \_ -> TokThen }
-  else                          { \_ -> TokElse }
   true                          { \_ -> TokBool True }
   false                         { \_ -> TokBool False }
 
@@ -73,10 +69,6 @@ data Token
   | TokTdef
   | TokLam
   | TokBLam
-  | TokFix
-  | TokIf
-  | TokThen
-  | TokElse
   | TokBool Bool
   | TokString String
   | TokVar Int
