@@ -1,23 +1,5 @@
 module SCE.Core where
 
-main :: IO ()
-main = print "Hello World"
-
-
-{-
-
-- [ ] LambdaE AST
-- [X] LambdaE Type-checking 
-- [ ] Small Step Semantics
-- [ ] Big Step Semantics
-
-- LambdaSCE AST
-- LambdaSCE elaboration to LambdaE
-- PBT
-- LambdaSCE semantics
-- PBT
--}
-
 -- Note: Context is a Type and Environment is an Expression
 type Ctx      = Typ 
 type Env      = Exp
