@@ -24,7 +24,7 @@ library
                         CoreFE.Repl
                         CoreFE.Parser.Parser
                         CoreFE.Parser.Lexer
-                        SCE.Proto
+                        SCE.Core
 
     build-depends:    base >= 4.17 && < 5,
                       QuickCheck,

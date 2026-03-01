@@ -1,4 +1,4 @@
-module SCE.Proto where
+module SCE.Core where
 
 main :: IO ()
 main = print "Hello World"
@@ -91,7 +91,8 @@ infer g e =
       infer g' e2
     Clos e1 tyA e2  -> do
       g' <- infer Unit e1
-      infer (TyAnd g' tyA) e2
+      tyB <- infer (TyAnd g' tyA) e2
+      pure $ TyArr tyA tyB
     App e1 e2       -> do
       ty1 <- infer g e1
       ty2 <- infer g e2
@@ -134,7 +135,8 @@ sel _ l = Left $ "sel: label " ++ l ++ " not found"
 -- SMALL-STEP SEMANTICS: env ⊢ e ↦ e'
 step :: Env -> Exp -> Result Exp
 step env e =
-  case e of
+  if isValue e then Left "already a value"
+  else case e of
     Query -> pure env
     Proj v1 n | isValue v1 ->
       lookupV v1 n
