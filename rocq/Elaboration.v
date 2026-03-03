@@ -1,9 +1,51 @@
 Require Import Arith.
-From Coq    Require Import Strings.String.
-From EnvML Require Import Syntax.
-Import Syntax.
+From Coq Require Import Strings.String.
 Require Import Coq.Lists.List.
 Require Import Coq.Classes.EquivDec.
+
+Inductive styp :=
+  | Sint : styp
+  | Stop : styp
+  | Sarr : styp -> styp -> styp
+  | Sand : styp -> styp -> styp
+  | Srcd : string -> styp -> styp
+  | Ssig : styp -> styp -> styp.
+
+Inductive sop := Sapp | Swith | SDmrg | SNmrg | SMapp.
+
+Inductive sexp :=
+  | Sctx        : sexp  
+  | Sunit       : sexp
+  | Slit        : nat   -> sexp
+  | Sbinop      : sop   -> sexp -> sexp -> sexp
+  | Slam        : styp  -> sexp -> sexp
+  | Sproj       : sexp  -> nat  -> sexp
+  | SClos       : sexp  -> styp -> sexp -> sexp
+  | SStruct     : styp  -> sexp -> sexp
+  | Srec        : string -> sexp -> sexp
+  | Srproj      : sexp -> string -> sexp
+  | Slet        : sexp -> styp -> sexp -> sexp
+  | Sopen       : sexp -> sexp -> sexp.
+
+Inductive typ :=
+  | int : typ
+  | top : typ
+  | arr : typ -> typ -> typ
+  | and : typ -> typ -> typ
+  | rcd : string -> typ -> typ.
+
+Inductive op := oapp | box | mrg.
+
+Inductive exp :=
+  | ctx         : exp
+  | lit         : nat -> exp
+  | unit        : exp
+  | binop       : op -> exp -> exp -> exp
+  | lam         : typ -> exp -> exp
+  | proj        : exp -> nat -> exp
+  | clos        : exp -> typ -> exp -> exp
+  | rec         : string -> exp -> exp
+  | rproj       : exp -> string -> exp.
 
 
 Fixpoint elaborate_typ (s : styp) : typ :=
@@ -70,7 +112,7 @@ Inductive elaborate_sexp : styp -> sexp -> styp -> exp -> Prop :=
   | infapp: forall E A B sE1 sE2 cE1 cE2,
       elaborate_sexp E sE1 (Sarr A B) cE1 ->
       elaborate_sexp E sE2 A cE2 ->
-      elaborate_sexp E (Sbinop Sapp sE1 sE2) B (binop Syntax.app cE1 cE2)
+      elaborate_sexp E (Sbinop Sapp sE1 sE2) B (binop oapp cE1 cE2)
   | infdmrg: forall E A1 A2 sE1 sE2 e1 e2, 
       elaborate_sexp E sE1 A1 e1 ->
       elaborate_sexp (Sand E A1) sE2 A2 e2 ->
@@ -80,7 +122,7 @@ Inductive elaborate_sexp : styp -> sexp -> styp -> exp -> Prop :=
       elaborate_sexp E sE2 A2 e2 ->
       elaborate_sexp E  (Sbinop SNmrg sE1 sE2)
                         (Sand A1 A2)
-                        (binop Syntax.app (lam (elaborate_typ E)
+                        (binop oapp (lam (elaborate_typ E)
                                         (binop mrg 
                                                (binop box (proj ctx 0) e1)
                                                (binop box (proj ctx 1) e2))) ctx)
@@ -90,7 +132,7 @@ Inductive elaborate_sexp : styp -> sexp -> styp -> exp -> Prop :=
   | infmodapp: forall E A B sE1 sE2 e1 e2,
       elaborate_sexp E sE1 (Ssig A B) e1  ->
       elaborate_sexp E sE2 A e2           ->
-      elaborate_sexp E (Sbinop SMapp sE1 sE2) B (binop Syntax.app e1 e2)
+      elaborate_sexp E (Sbinop SMapp sE1 sE2) B (binop oapp e1 e2)
   | infrcd: forall E A Se l e,
       elaborate_sexp E Se A e ->
       elaborate_sexp E (Srec l Se) (Srcd l A) (rec l e)
@@ -101,7 +143,7 @@ Inductive elaborate_sexp : styp -> sexp -> styp -> exp -> Prop :=
   | inflet: forall E A B Se1 Se2 e1 e2,
       elaborate_sexp E Se1 A e1 ->
       elaborate_sexp (Sand E A) Se2 B e2 ->
-      elaborate_sexp E (Slet Se1 A Se2) B (binop Syntax.app (lam (elaborate_typ A) e2) e1)
+      elaborate_sexp E (Slet Se1 A Se2) B (binop oapp (lam (elaborate_typ A) e2) e1)
   | infopen: forall E A B l Se1 e1 Se2 e2,
       Srlookup (Srcd l A) l A ->
       elaborate_sexp E Se1 (Srcd l A) e1 ->
@@ -109,7 +151,7 @@ Inductive elaborate_sexp : styp -> sexp -> styp -> exp -> Prop :=
       elaborate_sexp (Sand E A) Se2 B e2 ->
       elaborate_sexp E 
           (Sopen Se1 Se2) B 
-          (binop Syntax.app (lam (elaborate_typ A) e2) (rproj e1 l)).
+          (binop oapp (lam (elaborate_typ A) e2) (rproj e1 l)).
 
 Inductive lookup : typ -> nat -> typ -> Prop :=
   | lzero : forall A B, 
@@ -151,7 +193,7 @@ Inductive has_type : typ -> exp -> typ -> Prop :=
   | tint : forall E i, has_type E (lit i) int
   | tunit : forall E, has_type E unit top
   | tapp : forall E A B e1 e2,
-      has_type E e1 (arr A B) -> has_type E e2 A -> has_type E (binop Syntax.app e1 e2) B
+      has_type E e1 (arr A B) -> has_type E e2 A -> has_type E (binop oapp e1 e2) B
   | tbox : forall E A E1 e1 e2,
       has_type E e1 E1 -> has_type E1 e2 A -> has_type E (binop box e1 e2) A
   | tmrg : forall E e1 e2 A B,
@@ -204,7 +246,7 @@ Inductive step : exp -> exp -> exp -> Prop :=
       value v -> 
       value v1 -> 
       step v e2 e2' -> 
-      step v (binop Syntax.app v1 e2) (binop Syntax.app v1 e2')
+      step v (binop oapp v1 e2) (binop oapp v1 e2')
   | sbbox : forall v v1 e2 e2', 
       value v -> 
       value v1 -> 
@@ -222,7 +264,7 @@ Inductive step : exp -> exp -> exp -> Prop :=
       value v -> 
       value v1 ->
       value v2 -> 
-      step v (binop Syntax.app (clos v2 A e) v1) (binop box (binop mrg v2 v1) e)
+      step v (binop oapp (clos v2 A e) v1) (binop box (binop mrg v2 v1) e)
   | sboxv : forall v v1 v2,
       value v -> 
       value v1 -> 
