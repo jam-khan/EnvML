@@ -1,0 +1,801 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% METAVARIABLES
+
+metavar i, l, x, y, z, n ::= {{ coq nat }}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% GRAMMAR 
+
+grammar
+
+
+typ, A {{ tex A }}, B {{ tex B }}, C {{ tex C }}, D {{ tex D }}, F {{ tex \Gamma_1 }}, G {{ tex \Gamma }}, I {{ tex I }}, O {{ tex O }}, char {{ tex \mathsf{Char} }}, bool {{ tex \mathsf{Bool} }}:: 't_' ::= {{ com types }}
+  | int            ::  :: int     {{ tex \mathsf{Int}  }} {{ com int }} 
+  | Top            ::  :: top     {{ com top }}
+  | A -> B         ::  :: arrow   {{ com function types }}
+  | A & B          ::  :: and     {{ com intersection }}
+  | { l : A }      ::  :: rcd       
+  | Ref A          ::  :: tref    {{ tex \text{Ref} \, [[A]] }}
+  | lookup A n     :: M:: lookup  {{ tex \mathsf{lookup}([[A]], [[n]])  }}
+  | slookup Ga n   :: M:: slookup  {{ tex [[Ga]][ [[n]] ]  }}
+  | | Ga |         :: M:: trans   {{ tex | [[Ga]] |  }}
+  | | G |          :: M:: otrans   {{ tex | [[G]] |  }}
+
+mode, m {{ tex m }} :: 'm_' ::= {{ com Function modes }} 
+  | -             ::   :: minus {{ tex \bullet  }}
+  | +             ::   :: plus  {{ tex \circ  }}  
+
+exp, e {{ tex e }}, f {{ tex f }}, p {{ tex p }}, w {{ tex w }}, v {{ tex v }}, vl {{ tex v_{\lambda} }}, V {{ tex V }}, s {{ tex s }}, c {{ tex c }}, Cl {{ tex C }}, u {{ tex u }}, q {{ tex q }}, r {{ tex r }}, t {{ tex t }}, o {{ tex o }}, one_e {{ tex 1 }}, two_e {{ tex 2 }}, true_e {{ tex \mathsf{true} }}, zero {{ tex \underline{0} }} , varx {{tex x}}, emptys {{tex \emptyset }}, z {{tex z}}, a {{ tex a}}, b {{tex b}}, x_e {{ tex x }},f_e {{ tex f }}, y_e {{ tex y }}, z_e {{ tex z }}, vone {{tex \underline{1} }}, vzero {{tex \underline{0} }}, varl {{tex \underline{l} }}, int42 {{tex 42 }}, int3 {{tex 3 }}, int4 {{tex 4 }}, int10 {{tex 10 }} :: 'e_'  ::=      
+  | ctx                ::  :: ctx  {{ tex \textsf{?}  }}
+  | T                  ::  :: unit 
+  | x                  ::  :: rvar {{tex [[x]]}}
+  | var n              ::  :: var  {{ tex \underline{[[n]]} }}
+  | lit i              ::  :: lit  {{ tex [[i]] }}
+  | \ A . e            ::  :: lam  {{ tex [[\]]{[[A]]}.\,[[e]] }}
+  | \ x :  A . e            ::  :: nlam  {{ tex [[\]][[x]]:[[A]].\,[[e]] }}
+  | \ x . e            ::  :: nutlam  {{ tex [[\]][[x]].\,[[e]] }}
+  | \ . e              ::  :: utlam {{ tex [[\]].[[e]] }}
+  % | [ e1 , e2 ]        ::  :: bbox   {{ tex [[e1]] \triangleright [[e2]] }} 
+  | e1 |> e2           ::  :: box   {{ tex [[e1]] \triangleright [[e2]] }} 
+  | < e1 , \ A . e >   ::  :: clos  {{ tex \langle[[e1]], [[\]] [[A]] .\,[[e]] \rangle }} 
+  | << e1 ,  e >>      ::  :: utclos  {{ tex \langle[[e1]], [[\]].[[e]] \rangle }} 
+  | e1 e2              ::  :: app     {{ com applications }}
+  | e1 ,, e2           ::  :: merge   {{ com merge }}
+  | { l = e }          ::  :: rec     
+  | ;                 ::  :: space    {{ tex \, }}     
+  | { e / e1 }         ::  :: envv    {{ tex \{[[e]]/[[e1]]\} }}       
+  | e - l              ::  :: sel     {{ tex [[e]].[[l]] }}
+  | e . n              ::  :: proj    {{ tex [[e]].[[n]] }}
+  | ref e              ::  :: ref     {{ tex \text{ref} \,[[e]]}}
+  | ! e                ::  :: deref   {{ tex ! [[e]]}}
+  | e1 := e2           ::  :: assign  {{ tex [[e1]] := [[e2]]}}
+  | ( e )              :: S:: paren   {{ coq ([[e]]) }}
+  | F [ e ]              :: M:: evalctx {{ tex F [ [[e]] ]  }}
+  | | e |              :: M:: compile {{ tex | [[e]] |  }}
+  | C | e |            :: M:: compilec {{ tex \bra{[[e]]}_{c}  }}
+  | S | e |            :: M:: compiles {{ tex \bra{[[e]]}_{s}  }}
+  | lookup v x         :: M:: lookup {{ tex \mathsf{lookupv}([[v]], [[x]])  }}
+  | clos t s           :: M:: rclos {{tex [[t]] [ [[s]] ] }}
+  | t + s              :: M:: ccons {{tex [[t]] \cdot [[s]] }}
+  | vs                 :: M:: vs {{tex v_1 \cdots v_n \cdots v_m }}
+  | index v x          :: M:: cindex {{ tex [[v]]_[[x]]  }}
+  | e1 [ e2 ~> e3 ]    :: M:: subst   
+  | e1 [ e2 / e3 ]     :: M:: subst2   
+  | sig e1 e2 e3       :: M:: sigma  {{ tex \substf([[e1]],[[e2]],[[e3]]) }}
+  | e in V ( A )       :: M:: sem {{ tex [[e]] \in \sem{[[A]]} }}
+  | e1 [ e2 ]          :: M:: ebox {{ tex [[e1]] \bra{[[e2]]} }}
+  | [ e2 ]             :: M:: sbox {{ tex \bra{[[e2]]} }}
+  | { e } m            ::  :: eilam     {{ tex \{ [[e]] \}^[[m]] }} {{ com lam }}
+ 
+
+sctx, Ga {{ tex \Gamma_{\lambda} }} :: 'sctx_' ::= 
+  | []            ::  :: empty    {{ tex \cdot }}  
+  | Ga , A   ::  :: cons     {{ tex [[Ga]], [[A]]}}
+
+loc, Sig {{ tex \Sigma }} :: 'loc_' ::= 
+  | []            ::  :: empty    {{ tex \cdot }}  
+  | Sig , o : A   ::  :: cons     {{ tex [[Sig]], [[o]]:[[A]]}}
+  
+sto, mu {{ tex \mu }} :: 'sto_' ::= 
+  | []            ::  :: empty    {{ tex \cdot }}  
+  | mu , o = v    ::  :: cons     {{ tex [[mu]], [[o]]=[[v]]}}
+  | mu [ o ~> v ] :: M:: subst   
+
+parsing
+  t_arrow <= t_and
+  t_arrow right t_arrow
+  e_rclos <= e_ccons
+  e_sem <= e_box
+
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %% GRAMMAR  (non LNgen portion)
+
+grammar
+
+
+terminals :: 'terminals_' ::=
+  | |>           ::  :: box        {{ tex \triangleright}}
+  | \            ::  :: lambda     {{ tex \lambda }}
+  | ~>           ::  :: subst      {{ tex \mapsto }}
+  | ->           ::  :: arrow      {{ tex \rightarrow }}
+  | ~->          ::  :: sarrow     {{ tex \rightsquigarrow }}
+  | -->          ::  :: red        {{ tex \hookrightarrow }}
+  | -->>          ::  :: mred      {{ tex \hookrightarrow^* }}
+  | <=           ::  :: check      {{ tex \Leftarrow }}
+  | =>           ::  :: infer      {{ tex \Rightarrow }}
+  | <=>          ::  :: mode       {{ tex \Leftrightarrow }}
+  | ==>          ::  :: ptype      {{ tex \Longrightarrow }}
+  | |->          ::  :: switch     {{ tex \mapsto }}
+  | |-           ::  :: turnstile  {{ tex \vdash }}
+  | |=           ::  :: dash2      {{ tex \models }}
+  | T            ::  :: t          {{ tex \varepsilon }}
+  | Top          ::  :: top        {{ tex \varepsilon  }} 
+  | int          ::  :: int        {{ tex \mathsf{Int}  }}
+  | ,,           ::  :: Merge      {{ tex \fatcomma  }}
+  | &            ::  :: And        {{ tex \, \& \, }}
+  | :            ::  :: Typ        {{ tex : }}
+  | in           ::  :: in         {{ tex \in }}
+  | ;            ::  :: ctxAnd     {{ tex ; }}
+  | topLike      ::  :: topLike    {{ tex \mathsf{TOPLIKE} }}
+  | <*>          ::  :: disjointSpec    {{ tex * }}
+  | **           ::  :: disjoint        {{ tex * }}
+  | ~            ::  :: consistencySpec {{ tex \sim }}
+  | ~~           ::  :: consistent {{ tex \approx }}
+  | <            ::  :: lang      {{ tex \langle}}
+  | >            ::  :: rang  {{ tex \rangle}}
+  | <            ::  :: osub       {{ tex \leq }}
+  | topl         ::  :: topl       {{ tex \rceil }}
+  | topr         ::  :: topr       {{ tex \lceil }}
+  | extends      ::  :: extends    {{ tex \supseteq }}
+
+
+formula :: 'formula_' ::=
+  | judgement                ::   :: judgement
+  | not formula              :: M :: not {{ tex \neg [[formula]]  }}
+  | ( formula )              :: M :: brackets {{ tex ([[formula]]\!) }}  
+  | Sig |- mu                ::   :: sto_typing
+  | Sig1 extends Sig2        ::   :: extends
+  | o : A in Sig             ::   :: inSig
+  | o = v in mu              ::   :: inmu
+  | o notin mu               ::   :: notinmu
+    {{ tex [[o]] \notin dom([[mu]]) }}
+  | o in mu                  ::   :: oinmu
+    {{ tex [[o]] \in dom([[mu]]) }}
+  | e1 = e2                  :: M :: exp_eq
+  | A = B                    :: M :: typ_eq
+  | |- e                     :: M :: islc   {{ tex [[|-]]_{\lambda} [[e]]  }}
+  | |= e                     :: M :: islrh   {{ tex [[|-]]_{ \widehat{\rho} } [[e]]  }}
+  | |- A                     :: M :: islct  {{ tex [[|-]]_{\lambda} [[A]]  }}
+  | l notin A          :: M:: notlin {{ tex [[l]] \notin label([[A]]) }}
+  | v |= e : A         :: M:: semtyp {{ tex [[v]][[|=]][[e]]:[[A]] }}
+  | G |= e : A         :: M:: semtyp2 {{ tex [[G]][[|=]][[e]]:[[A]] }}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+defns
+conflict :: '' ::=
+
+defn
+A # B ::   :: cfl :: 'cfl_'
+{{ tex [[A]]\oslash[[B]] }}
+{{ com Conflict }}
+by
+
+-------------------- :: rcd
+{l:A} # {l:B}
+
+A # C
+-------------------- :: andl
+A & B # C
+
+
+B # C
+-------------------- :: andr
+A & B # C
+
+
+A # B
+-------------------- :: randl
+A # B & C
+
+
+A # C
+-------------------- :: randr
+A # B & C
+
+
+
+defns
+unique :: '' ::=
+
+defn
+ok A ::   :: uq :: 'uq_'
+{{ tex \mathsf{ok}\,[[A]] }}
+{{ com Uniqueness }}
+by
+
+
+--------------------- :: rcd
+ok {l:A}
+
+ok A 
+ok B 
+not (A # B)
+--------------------- :: and
+ok A & B
+
+
+
+defns
+ctm :: '' ::=
+
+defn
+l : A in B ::   :: ctm :: 'ctm_'
+{{ tex [[l]]:[[A]][[in]][[B]] }}
+{{ com Containment }}
+by
+
+
+------------------------- :: rcd
+l : A in {l:A}
+
+
+l : A in B
+% ok B & C
+l notin C
+------------------------- :: andl
+l : A in B & C
+
+l : A in C
+l notin B
+------------------------- :: andr
+l : A in B & C
+
+
+
+
+
+
+defns
+Typing :: '' ::=
+
+defn
+G |- e : A ::   :: Typing :: 'Typ_'
+{{ com Typing }}
+by
+
+----------------- :: ctx
+G |- ctx : G
+
+----------------- :: lit
+G |- lit i : int
+
+----------------- :: top
+G |- T : Top
+
+----------------------------------- :: var
+G |- var n : lookup G n 
+
+G |- e1 : A
+G & A |- e2 : B
+------------------------------ :: merge
+G |- e1 ,, e2 : A & B
+
+G |- e1 : A -> B
+G |- e2 : A
+----------------------- :: app
+G |- e1 e2 : B
+
+G & A |- e : B
+------------------------------------------- :: lam
+G |- \A.e  : A->B
+
+G |- e1 : F
+F |- e2 : A
+------------------------------------------- :: box
+G |- e1 |> e2 : A
+
+Top |- v : F
+F & A |- e : B
+------------------------------------------- :: clos
+G |- <v , \ A. e> : A -> B
+
+G |- e : B
+lookup B n = A
+-------------------------- :: proj
+G |- e. n : A
+
+
+G |- e : A
+-------------------------- :: rcd
+G |- {l=e} : {l:A}
+
+
+G |- e : B
+l : A in B
+-------------------------- :: sel
+G |- e - l : A
+
+
+
+defns
+Rtyping :: '' ::=
+
+defn
+Sig ; G |- e : A ::   :: Rtyping :: 'Rtyp_'
+{{ com Typing }}
+by
+
+----------------- :: ctx
+Sig;G |- ctx : G
+
+----------------- :: lit
+Sig;G |- lit i : int
+
+----------------- :: top
+Sig;G |- T : Top
+
+----------------------------------- :: var
+Sig;G |- var n : lookup G n 
+
+Sig;G |- e1 : A
+Sig;G & A |- e2 : B
+------------------------------ :: merge
+Sig;G |- e1 ,, e2 : A & B
+
+Sig;G |- e1 : A -> B
+Sig;G |- e2 : A
+----------------------- :: app
+Sig;G |- e1 e2 : B
+
+Sig;G & A |- e : B
+------------------------------------------- :: lam
+Sig;G |- \A.e  : A->B
+
+Sig;G |- e1 : F
+Sig;F |- e2 : A
+------------------------------------------- :: box
+Sig;G |- e1 |> e2 : A
+
+Sig;G |- v : F
+Sig;F & A |- e : B
+------------------------------------------- :: clos
+Sig;G |- <v , \ A. e> : A -> B
+
+Sig;G |- e : A
+-------------------------- :: proj
+Sig;G |- e. n : lookup A n
+
+
+Sig;G |- e : A
+-------------------------- :: rcd
+Sig;G |- {l=e} : {l:A}
+
+
+Sig;G |- e : B
+l : A in B
+-------------------------- :: sel
+Sig;G |- e - l : A
+
+o : A in Sig
+----------------------- :: loc
+Sig;G |- o : Ref A
+
+Sig;G |- e : A
+----------------------- :: ref
+Sig;G |- ref e : Ref A
+
+Sig;G |- e : Ref A
+----------------------- :: deref
+Sig;G |- !e :  A
+
+Sig;G |- e1 : Ref A
+Sig;G |- e2 : A
+----------------------- :: assign
+Sig;G |- e1 := e2 : Top
+
+
+defns
+select :: '' ::=
+
+defn
+v [ l ] ~-> v' ::   :: sel :: 'sel_'
+{{ tex [[v]].[[l]][[~->]][[v']] }}
+{{ com Selection }}
+by
+
+
+------------------------- :: rec
+{l = v}[l] ~-> v
+
+
+v1[l] ~-> v
+------------------------- :: mrgl
+(v1 ,, v2)[l] ~-> v
+
+
+v2[l] ~-> v
+------------------------- :: mrgr
+(v1 ,, v2)[l] ~-> v
+
+
+
+defns
+Reduction :: '' ::=
+
+
+defn
+v |- e -->  e'  :: :: step :: Step_
+{{ tex [[v]][[|-]][[e]][[-->]][[e']] }}
+{{ com Small-step Operational Semantics }}
+by
+
+
+v |- e --> e'
+------------------------------------------ :: eval
+v |- F[e]  --> F[e']
+
+-------------------------- :: ctx
+v |- ctx --> v
+
+-------------------------- :: var
+v |- var n --> lookup v n 
+
+v,,v1 |- e2  -->  e2'
+------------------------------------------ :: merger
+v |- v1 ,, e2  -->   v1 ,, e2'
+
+--------------------------------------  :: closure
+v |- \A.e --> <v, \A.e>
+
+-------------------------------------------------  :: beta
+v |- <v1,\A.e> v2 --> (v1 ,, v2) |> e
+
+v1 |- e  -->  e'
+------------------------------------------ :: box
+v |- v1 |> e  --> v1 |> e'
+
+------------------------------------------ :: boxv
+v |- v1 |> v2  --> v2
+
+------------------------------------------ :: proj
+v |- v1 . n --> lookup v1 n
+
+v1[l] ~-> v2
+------------------------------------------ :: sel
+v |- v1 - l --> v2
+
+
+
+defns
+Multi :: '' ::=
+
+defn
+v |- e -->>  e'  :: :: multi :: Multi_
+{{ tex [[v]][[|-]][[e]][[-->]]^*[[e']] }}
+{{ com Multistep Reduction }}
+by
+
+------------------------ :: refl
+v |- e -->> e
+
+v |- e --> e'
+v |- e' -->> e''
+------------------------ :: step
+v |- e -->> e''
+
+
+
+defns
+RMulti :: '' ::=
+
+defn
+v |- mu ; e -->> mu' ; e'  :: :: rmulti :: Rmulti_
+{{ tex [[v]][[|-]][[mu]];[[e]][[-->]]^*[[mu']];[[e']] }}
+{{ com Multistep Reduction }}
+by
+
+
+defns
+Bstep :: '' ::=
+
+defn
+v |- e ==>  e'  :: :: bstep :: Bstep_
+{{ tex [[v]][[|-]][[e]][[=>]][[e']] }}
+{{ com Big-step Operational Semantics }}
+by
+
+-------------------------- :: ctx
+v |- ctx ==> v
+
+-------------------------- :: var
+v |- var n ==> lookup v n 
+
+-------------------------- :: lit
+v |- lit i ==> lit i 
+
+-------------------------- :: unit
+v |- T ==> T 
+
+-------------------------  :: lam
+v |- \A.e ==> <v, \A.e>
+
+------------------------------  :: clos
+v |- <v1, \A.e> ==> <v1, \A.e>
+
+v |- e1 ==> v1
+v1 |- e2 ==> v2
+----------------------- :: box
+v |- e1 |> e2 ==> v2
+
+v |- e ==> v1
+----------------------------- :: proj
+v |- e . n ==> lookup v1 n
+
+v |- e1 ==> v1
+v,,v1 |- e2 ==> v2
+--------------------------- :: merge
+v |- e1 ,, e2 ==> v1 ,, v2 
+
+v |- e1 ==> <v1, \A.e>
+v |- e2 ==> v2
+v1 ,, v2 |- e ==> v'
+-------------------------- :: app
+v |- e1 e2 ==> v'
+
+v |- e ==> v1
+----------------------------- :: rec
+v |- {l=e} ==> {l=v1}
+
+v |- e ==> v1
+v1[l] ~-> v2
+----------------------------- :: sel
+v |- e - l ==> v2
+
+
+
+defns
+RRed :: '' ::=
+
+
+defn
+v |- mu ; e --> mu' ; e'  :: :: rstep :: Rstep_
+{{ tex [[v]][[|-]][[mu]];[[e]][[-->]] [[mu']] ; [[e']] }}
+{{ com Small-step Operational Semantics }}
+by
+
+
+v |- mu ; e --> mu' ; e'
+------------------------------------------ :: eval
+v |- mu; F[e]  --> mu'; F[e']
+
+-------------------------- :: ctx
+v |- mu; ctx --> mu; v
+
+-------------------------- :: var
+v |- mu; var n --> mu; lookup v n 
+
+v,,v1 |- mu; e2  --> mu'; e2'
+------------------------------------------ :: merger
+v |- mu; v1 ,, e2  -->   mu'; v1 ,, e2'
+
+--------------------------------------  :: closure
+v |- mu; \A.e --> mu; <v, \A.e>
+
+-------------------------------------------------  :: beta
+v |- mu; <v1,\A.e> v2 --> mu; (v1 ,, v2) |> e
+
+v1 |- mu; e  -->  mu'; e'
+------------------------------------------ :: box
+v |- mu; v1 |> e  --> mu'; v1 |> e'
+
+------------------------------------------ :: boxv
+v |- mu; v1 |> v2  --> mu; v2
+
+------------------------------------------ :: projv
+v |- mu; v1 . n --> mu; lookup v1 n
+
+v1[l] ~-> v2
+------------------------------------------ :: sel
+v |- mu; v1 - l --> mu; v2
+
+o notin mu   
+------------------------------------------ :: refv
+v |- mu ; ref v1  --> mu , o = v1 ; o
+
+o = v1 in mu   
+------------------------------------------ :: deref
+v |- mu ; !o  --> mu ; v1
+
+o in mu
+------------------------------------------ :: assign
+v |- mu ; o := v1  --> mu [ o ~> v1 ] ; T
+
+
+defns
+Brstep :: '' ::=
+
+defn
+v |- mu ; e  ==>  mu' ; e'  :: :: brstep :: Brstep_
+{{ tex [[v]][[|-]][[mu]];[[e]][[=>]][[mu']];[[e']] }}
+{{ com Extended Big-step Operational Semantics }}
+by
+
+---------------------------- :: loc
+v |- mu; o ==> mu; o
+  
+
+v |- mu ; e ==> mu' ; v1
+o notin mu'
+----------------------------------- :: ref
+v |- mu ; ref e  ==> mu' , o = v1 ; o
+
+v |- mu ; e ==> mu' ; o
+o = v1 in mu'   
+------------------------------------------ :: deref
+v |- mu ; !e  ==> mu' ; v1
+
+v |- mu ; e1 ==> mu1 ; o 
+v |- mu1; e2 ==> mu2 ; v1
+o in mu2
+------------------------------------------ :: assign
+v |- mu ; e1 := e2  ==> mu2 [ o ~> v1 ] ; T
+
+
+
+
+% lambda-rho-hat
+defns
+Red :: '' ::=
+
+defn
+c --> c'  :: :: red :: Red_
+{{ tex [[c]][[-->]][[c']] }}
+{{ com Reduction of $\lambda\,\widehat{\rho}$ }}
+by
+
+
+--------------------------------- :: var
+clos var n vs --> index v n
+
+----------------------------------------------------------------------:: beta
+(clos (\.e) s) v --> clos e v + s
+
+c1 --> c1'
+--------------------------------::appl
+c1 c2 --> c1' c2
+
+c2 --> c2'
+--------------------------------::appr
+v1 c2 --> v1 c2'
+
+--------------------------------------::appdist
+clos (e1 e2) s --> (clos e1 s) (clos e2 s) 
+
+
+%% STLC 
+defns
+Styp :: '' ::=
+
+defn
+Ga |- e : A  :: :: styp :: styp_
+% {{ tex [[Ga]][[|-]] [[e]]:[[A]] }}
+{{ tex [[Ga]] \Vdash [[e]]:[[A]] }}
+{{ com Typing of STLC }}
+by
+
+----------------- :: lit
+Ga |- lit i : int
+
+slookup Ga n = A
+------------------------- :: var
+Ga |- var n : A 
+
+Ga |- e1 : A -> B
+Ga |- e2 : A
+----------------------- :: app
+Ga |- e1 e2 : B
+
+Ga, A |- e : B
+------------------------------------------- :: lam
+Ga |- \A.e  : A->B
+
+
+defns
+Sred :: '' ::=
+
+defn
+e --> e'  :: :: sred :: sred_
+{{ tex [[e]][[-->]][[e']] }}
+{{ com Reduction of STLC }}
+by
+
+----------------------------------- :: beta
+(\A. e)  v --> e [ zero ~> v ]
+
+e1 --> e1'
+------------------- :: appl
+e1 e2 --> e1' e2
+
+e2 --> e2'
+------------------- :: appr
+v1 e2 --> v1 e2'
+
+
+
+defns
+Sbig :: '' ::=
+
+defn
+e ==> e'  :: :: sbig :: sbig_
+{{ tex [[e]][[=>]][[e']] }}
+{{ com Big-step semantics of STLC }}
+by
+
+
+----------------------------------- :: lit
+lit i ==> lit i
+
+
+----------------------------------- :: lam
+\A.e  ==> \A.e
+
+e1 ==> \A.e 
+e2 ==> v2
+e [ zero ~> v2 ] ==> v
+----------------------------------- :: app
+e1 e2 ==> v
+
+
+
+defns
+SMul :: '' ::=
+
+defn
+e -->> e'  :: :: sMul :: SMul_
+{{ tex [[e]][[-->]]^*[[e']] }}
+{{ com Multistep Reduction }}
+by
+
+
+defns
+crel :: '' ::=
+
+
+defn
+G ~~ Ga :: :: crel :: crel_
+{{ tex [[G]] \sim [[Ga]] }}
+{{ com Context Correspondence }}
+by
+
+
+------------------------ :: top
+Top ~~ []
+
+
+A ~~ Ga
+------------------------ :: and
+A & B ~~ Ga, B  
+
+
+defns
+vrel :: '' ::=
+
+
+defn
+v ~~ vl  :: :: vrel :: vrel_
+{{ tex [[v]] \sim [[vl]] }}
+{{ com Value Correspondence }}
+by
+
+
+------------------------ :: lit
+lit i ~~ lit i
+
+
+sig v e' one_e = e
+------------------------ :: lam
+<v, \A. e'> ~~ \A.e 
+
+
+defns
+erel :: '' ::=
+
+
+defn
+e ~~ c  :: :: erel :: erel_
+{{ tex [[e]] \sim [[c]] }}
+{{ com Correspondence }}
+by
+
+|= e
+------------------------ :: closure
+S|s| |> e ~~ clos e s
+
+
+e1 ~~ c1 
+e2 ~~ c2
+------------------------ :: app
+e1 e2 ~~ c1 c2
+

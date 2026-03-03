@@ -1,0 +1,82 @@
+\documentclass{article}
+
+\makeatletter
+\def\input@path{{./styles/}}
+\makeatother
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{ottalt}
+\usepackage{mathpartir}
+\usepackage{supertabular}
+
+\input{lambdaSCE.tex}
+
+%% Custom macros
+\newcommand{\fatcomma}{\mathbin{\,{,}{,}\,}}
+\newcommand{\tand}{\mathbin{\&}}
+\newcommand{\tarr}{\rightarrow}
+\newcommand{\lsem}{\llbracket}
+\newcommand{\rsem}{\rrbracket}
+
+\title{LambdaSCE: Separate Compilation, Capabilities,\\and First-Class Environments}
+\author{Jam Kabeer Ali Khan}
+\date{}
+
+\begin{document}
+\maketitle
+
+%%% ============================================================
+\section{Syntax}
+%%% ============================================================
+
+\[
+\begin{array}{lrcl}
+\text{Types}    & A, B & ::= & \mathsf{Int} \mid \varepsilon \mid A \tarr B \mid A \tand B \mid \{l : A\} \\[4pt]
+\text{Expressions} & e, v & ::= &
+    \textsf{?} \mid \varepsilon \mid i \mid \underline{n}
+    \mid \lambda\{A\}.\,e
+    \mid e_1\;e_2
+    \mid e_1 \fatcomma e_2 \\
+  & & \mid & e_1 \triangleright e_2
+    \mid \langle v,\,\lambda A.\,e \rangle
+    \mid \{l = e\}
+    \mid e\mathbin{.}l
+    \mid e\mathbin{.}n \\[4pt]
+\text{Contexts}  & \Gamma & ::= & \varepsilon \mid \Gamma \tand A
+\end{array}
+\]
+
+%%% ============================================================
+\section{Typing}
+%%% ============================================================
+
+\ottdefnTyping{}
+
+%%% ============================================================
+\section{Operational Semantics}
+%%% ============================================================
+
+\subsection*{Selection}
+\ottdefnsel{}
+
+\subsection*{Small-step}
+\ottdefnstep{}
+
+\subsection*{Big-step}
+\ottdefnbstep{}
+
+%%% ============================================================
+\section{Auxiliary Judgments}
+%%% ============================================================
+
+\subsection*{Conflict}
+\ottdefncfl{}
+
+\subsection*{Uniqueness}
+\ottdefnuq{}
+
+\subsection*{Containment}
+\ottdefnctm{}
+
+\end{document}
