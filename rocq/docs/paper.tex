@@ -4,13 +4,20 @@
 \def\input@path{{./styles/}}
 \makeatother
 
+\usepackage[margin=1in]{geometry}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{stmaryrd}
 \usepackage{ottalt}
 \usepackage{mathpartir}
 \usepackage{supertabular}
 
 \input{lambdaSCE.tex}
+
+%% Theorem environments
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
 
 %% Custom macros
 \newcommand{\fatcomma}{\mathbin{\,{,}{,}\,}}
@@ -18,8 +25,29 @@
 \newcommand{\tarr}{\rightarrow}
 \newcommand{\lsem}{\llbracket}
 \newcommand{\rsem}{\rrbracket}
+\newcommand{\kw}[1]{\mathsf{#1}}
+\newcommand{\smark}{\mathsf{S}}
+\newcommand{\omark}{\mathsf{O}}
+\newcommand{\shat}[1]{\hat{#1}}
+\newcommand{\query}{\textsf{?}}
+\newcommand{\squery}{\hat{\textsf{?}}}
+\newcommand{\slam}{\hat{\lambda}}
+\newcommand{\sbox}{\mathbin{\hat{\triangleright}}}
+\newcommand{\sdmrg}{\mathbin{\hat{\fatcomma}}}
+\newcommand{\snmrg}{\mathbin{\hat{\fatcomma}_n}}
+\newcommand{\mclos}[3]{\langle #1,\,#2,\,#3 \rangle_m}
+\newcommand{\sclos}[3]{\langle #1,\,\slam\,#2.\,#3 \rangle}
+\newcommand{\cclos}[3]{\langle #1,\,\lambda\,#2.\,#3 \rangle}
+\newcommand{\Link}[2]{\kw{Link}(#1,\,#2)}
+\newcommand{\Struct}[2]{\kw{struct}^{#1}\;#2}
+\newcommand{\Functor}[3]{\kw{functor}^{#1}(#2)\;#3}
+\newcommand{\slet}[3]{\kw{let}\;#1:#2\;\kw{in}\;#3}
+\newcommand{\sopen}[2]{\kw{open}\;#1\;\kw{in}\;#2}
+\newcommand{\srec}[2]{\{#1 = #2\}}
+\newcommand{\elmark}{\rightsquigarrow}
+\newcommand{\sval}{\kw{svalue}}
 
-\title{LambdaSCE: Separate Compilation, Capabilities,\\and First-Class Environments}
+\title{$\lambda_{\mathsf{SCE}}$: Separate Compilation, Capabilities,\\and First-Class Environments}
 \author{Jam Kabeer Ali Khan}
 \date{}
 
@@ -27,56 +55,459 @@
 \maketitle
 
 %%% ============================================================
-\section{Syntax}
+\section{Core Language $\lambda_E$}
 %%% ============================================================
+
+\subsection{Syntax}
 
 \[
 \begin{array}{lrcl}
-\text{Types}    & A, B & ::= & \mathsf{Int} \mid \varepsilon \mid A \tarr B \mid A \tand B \mid \{l : A\} \\[4pt]
+\text{Types}    & A, B & ::= & \kw{Int} \mid \varepsilon \mid A \tarr B \mid A \tand B \mid \{l : A\} \\[4pt]
 \text{Expressions} & e, v & ::= &
-    \textsf{?} \mid \varepsilon \mid i \mid \underline{n}
+    \query \mid \varepsilon \mid i \mid \underline{n}
     \mid \lambda\{A\}.\,e
     \mid e_1\;e_2
     \mid e_1 \fatcomma e_2 \\
   & & \mid & e_1 \triangleright e_2
-    \mid \langle v,\,\lambda A.\,e \rangle
+    \mid \cclos{v}{A}{e}
     \mid \{l = e\}
-    \mid e\mathbin{.}l
-    \mid e\mathbin{.}n \\[4pt]
+    \mid e.l
+    \mid e.n \\[4pt]
 \text{Contexts}  & \Gamma & ::= & \varepsilon \mid \Gamma \tand A
 \end{array}
 \]
 
-%%% ============================================================
-\section{Typing}
-%%% ============================================================
-
+\subsection{Typing}
 \ottdefnTyping{}
 
-%%% ============================================================
-\section{Operational Semantics}
-%%% ============================================================
+\subsection{Operational Semantics}
 
-\subsection*{Selection}
+\subsubsection*{Selection}
 \ottdefnsel{}
 
-\subsection*{Small-step}
+\subsubsection*{Small-step}
 \ottdefnstep{}
 
-\subsection*{Big-step}
+\subsubsection*{Big-step}
 \ottdefnbstep{}
+
+%%% ============================================================
+\section{Source Language $\lambda_{\mathsf{SCE}}$}
+%%% ============================================================
+
+\subsection{Syntax}
+
+\[
+\begin{array}{lrcl}
+\text{Module Types}  & \mathcal{M} & ::= & \kw{Intf}\;\mathcal{A}
+                                     \mid  \mathcal{A} \tarr_m \mathcal{M} \\[4pt]
+\text{Source Types}   & \mathcal{A}, \mathcal{B} & ::= &
+    \kw{Int} \mid \varepsilon
+    \mid \mathcal{A} \tarr \mathcal{B}
+    \mid \mathcal{A} \tand \mathcal{B}
+    \mid \{l : \mathcal{A}\}
+    \mid \kw{Mod}\;\mathcal{M} \\[4pt]
+\text{Sandbox}   & \sigma & ::= & \smark \mid \omark \\[4pt]
+\text{Source Exp.} & \shat{e}, \shat{v} & ::= &
+    \squery \mid \hat{\varepsilon} \mid \hat{i}
+    \mid \slam\,\mathcal{A}.\,\shat{e}
+    \mid \shat{e}_1\;\shat{e}_2
+    \mid \shat{e}_1 \sdmrg \shat{e}_2
+    \mid \shat{e}_1 \snmrg \shat{e}_2 \\
+  & & \mid & \shat{e}_1 \sbox \shat{e}_2
+    \mid \sclos{\shat{v}}{\mathcal{A}}{\shat{e}}
+    \mid \srec{l}{\shat{e}}
+    \mid \shat{e}.l
+    \mid \shat{e}.n \\
+  & & \mid & \slet{\shat{e}_1}{\mathcal{A}}{\shat{e}_2}
+    \mid \sopen{\shat{e}_1}{\shat{e}_2} \\
+  & & \mid & \Struct{\sigma}{\shat{e}}
+    \mid \Functor{\sigma}{\mathcal{A}}{\shat{e}} \\
+  & & \mid & \mclos{\shat{v}}{\mathcal{A}}{\shat{e}}
+    \mid \Link{\shat{e}_1}{\shat{e}_2}
+\end{array}
+\]
+
+
+\subsection{Source Values}
+
+\[
+  \shat{v} \;::=\; \hat{i} \mid \hat{\varepsilon}
+    \mid \sclos{\shat{v}}{\mathcal{A}}{\shat{e}}
+    \mid \mclos{\shat{v}}{\mathcal{A}}{\shat{e}}
+    \mid \shat{v}_1 \sdmrg \shat{v}_2
+    \mid \shat{v}_1 \snmrg \shat{v}_2
+    \mid \srec{l}{\shat{v}}
+\]
+
+\subsection{Type Elaboration}
+
+$\lsem \cdot \rsem$ maps source types to core types:
+\[
+\begin{array}{rcl@{\qquad\qquad}rcl}
+  \lsem \kw{Int} \rsem &=& \kw{Int}
+    & \lsem \{l:\mathcal{A}\} \rsem &=& \{l:\lsem \mathcal{A} \rsem\} \\
+  \lsem \varepsilon \rsem &=& \varepsilon
+    & \lsem \kw{Mod}\;(\kw{Intf}\;\mathcal{A}) \rsem &=& \lsem \mathcal{A} \rsem \\
+  \lsem \mathcal{A} \tarr \mathcal{B} \rsem &=& \lsem \mathcal{A} \rsem \tarr \lsem \mathcal{B} \rsem
+    & \lsem \kw{Mod}\;(\mathcal{A} \tarr_m \mathcal{M}) \rsem &=& \lsem \mathcal{A} \rsem \tarr \lsem \kw{Mod}\;\mathcal{M} \rsem \\
+  \lsem \mathcal{A} \tand \mathcal{B} \rsem &=& \lsem \mathcal{A} \rsem \tand \lsem \mathcal{B} \rsem
+\end{array}
+\]
+
+
+%%% ============================================================
+\subsection{Type-Directed Elaboration}
+%%% ============================================================
+
+Judgment: $\boxed{\mathcal{G} \vdash \shat{e} : \mathcal{A} \elmark e}$
+
+\subsubsection*{Core Expression Rules}
+
+\begin{mathpar}
+\inferrule*[Right=E-Ctx]
+  { }
+  { \mathcal{G} \vdash \squery : \mathcal{G} \elmark \query }
+
+\inferrule*[Right=E-Lit]
+  { }
+  { \mathcal{G} \vdash \hat{i} : \kw{Int} \elmark i }
+
+\inferrule*[Right=E-Unit]
+  { }
+  { \mathcal{G} \vdash \hat{\varepsilon} : \varepsilon \elmark \varepsilon }
+
+\inferrule*[Right=E-Proj]
+  { \mathcal{G} \vdash \shat{e} : \mathcal{B} \elmark e \\
+    \kw{lookup}(\mathcal{B}, n) = \mathcal{A} }
+  { \mathcal{G} \vdash \shat{e}.n : \mathcal{A} \elmark e.n }
+
+\inferrule*[Right=E-Lam]
+  { \mathcal{G} \tand \mathcal{A} \vdash \shat{e} : \mathcal{B} \elmark e }
+  { \mathcal{G} \vdash \slam\,\mathcal{A}.\,\shat{e} : \mathcal{A} \tarr \mathcal{B} \elmark \lambda\lsem\mathcal{A}\rsem.\,e }
+
+\inferrule*[Right=E-Box]
+  { \mathcal{G} \vdash \shat{e}_1 : \mathcal{G}' \elmark e_1 \\
+    \mathcal{G}' \vdash \shat{e}_2 : \mathcal{A} \elmark e_2 }
+  { \mathcal{G} \vdash \shat{e}_1 \sbox \shat{e}_2 : \mathcal{A} \elmark e_1 \triangleright e_2 }
+
+\inferrule*[Right=E-Clos]
+  { \mathcal{G} \vdash \shat{e}_1 : \mathcal{G}' \elmark e_1 \\
+    \mathcal{G}' \tand \mathcal{A} \vdash \shat{e}_2 : \mathcal{B} \elmark e_2 }
+  { \mathcal{G} \vdash \sclos{\shat{e}_1}{\mathcal{A}}{\shat{e}_2} : \mathcal{A} \tarr \mathcal{B} \elmark \cclos{e_1}{\lsem\mathcal{A}\rsem}{e_2} }
+
+\inferrule*[Right=E-App]
+  { \mathcal{G} \vdash \shat{e}_1 : \mathcal{A} \tarr \mathcal{B} \elmark e_1 \\
+    \mathcal{G} \vdash \shat{e}_2 : \mathcal{A} \elmark e_2 }
+  { \mathcal{G} \vdash \shat{e}_1\;\shat{e}_2 : \mathcal{B} \elmark e_1\;e_2 }
+
+\inferrule*[Right=E-DMrg]
+  { \mathcal{G} \vdash \shat{e}_1 : \mathcal{A} \elmark e_1 \\
+    \mathcal{G} \tand \mathcal{A} \vdash \shat{e}_2 : \mathcal{B} \elmark e_2 }
+  { \mathcal{G} \vdash \shat{e}_1 \sdmrg \shat{e}_2 : \mathcal{A} \tand \mathcal{B} \elmark e_1 \fatcomma e_2 }
+
+\inferrule*[Right=E-NMrg]
+  { \mathcal{G} \vdash \shat{e}_1 : \mathcal{A} \elmark e_1 \\
+    \mathcal{G} \vdash \shat{e}_2 : \mathcal{B} \elmark e_2 }
+  { \mathcal{G} \vdash \shat{e}_1 \snmrg \shat{e}_2 : \mathcal{A} \tand \mathcal{B} \elmark
+    (\lambda\lsem\mathcal{G}\rsem.\,(\query.0 \triangleright e_1) \fatcomma (\query.1 \triangleright e_2))\;\query }
+
+\inferrule*[Right=E-Rcd]
+  { \mathcal{G} \vdash \shat{e} : \mathcal{A} \elmark e }
+  { \mathcal{G} \vdash \srec{l}{\shat{e}} : \{l:\mathcal{A}\} \elmark \{l=e\} }
+
+\inferrule*[Right=E-RProj]
+  { \mathcal{G} \vdash \shat{e} : \mathcal{B} \elmark e \\
+    l : \mathcal{A} \in \mathcal{B} }
+  { \mathcal{G} \vdash \shat{e}.l : \mathcal{A} \elmark e.l }
+
+\inferrule*[Right=E-Let]
+  { \mathcal{G} \vdash \shat{e}_1 : \mathcal{A} \elmark e_1 \\
+    \mathcal{G} \tand \mathcal{A} \vdash \shat{e}_2 : \mathcal{B} \elmark e_2 }
+  { \mathcal{G} \vdash \slet{\shat{e}_1}{\mathcal{A}}{\shat{e}_2} : \mathcal{B} \elmark (\lambda\lsem\mathcal{A}\rsem.\,e_2)\;e_1 }
+
+\inferrule*[Right=E-Open]
+  { \mathcal{G} \vdash \shat{e}_1 : \{l:\mathcal{A}\} \elmark e_1 \\
+    \mathcal{G} \tand \mathcal{A} \vdash \shat{e}_2 : \mathcal{B} \elmark e_2 }
+  { \mathcal{G} \vdash \sopen{\shat{e}_1}{\shat{e}_2} : \mathcal{B} \elmark (\lambda\lsem\mathcal{A}\rsem.\,e_2)\;(e_1.l) }
+\end{mathpar}
+
+\subsubsection*{Module Rules}
+
+Helper for functor result types:
+\[
+  \kw{mkMT}(\mathcal{A}, \mathcal{B}) =
+  \begin{cases}
+    \mathcal{A} \tarr_m \mathcal{M} & \text{if } \mathcal{B} = \kw{Mod}\;\mathcal{M} \\
+    \mathcal{A} \tarr_m \kw{Intf}\;\mathcal{B} & \text{otherwise}
+  \end{cases}
+\]
+
+\begin{mathpar}
+\inferrule*[Right=E-Struct-S]
+  { \varepsilon \vdash \shat{e} : \mathcal{B} \elmark e }
+  { \mathcal{G} \vdash \Struct{\smark}{\shat{e}} : \kw{Mod}\;(\kw{Intf}\;\mathcal{B}) \elmark \varepsilon \triangleright e }
+
+\inferrule*[Right=E-Struct-O]
+  { \mathcal{G} \vdash \shat{e} : \mathcal{B} \elmark e }
+  { \mathcal{G} \vdash \Struct{\omark}{\shat{e}} : \kw{Mod}\;(\kw{Intf}\;\mathcal{B}) \elmark \query \triangleright e }
+
+\inferrule*[Right=E-Functor-S]
+  { \varepsilon \tand \mathcal{A} \vdash \shat{e} : \mathcal{B} \elmark e \\
+    \mathcal{M} = \kw{mkMT}(\mathcal{A}, \mathcal{B}) }
+  { \mathcal{G} \vdash \Functor{\smark}{\mathcal{A}}{\shat{e}} : \kw{Mod}\;\mathcal{M} \elmark \varepsilon \triangleright \lambda\lsem\mathcal{A}\rsem.\,e }
+
+\inferrule*[Right=E-Functor-O]
+  { \mathcal{G} \tand \mathcal{A} \vdash \shat{e} : \mathcal{B} \elmark e \\
+    \mathcal{M} = \kw{mkMT}(\mathcal{A}, \mathcal{B}) }
+  { \mathcal{G} \vdash \Functor{\omark}{\mathcal{A}}{\shat{e}} : \kw{Mod}\;\mathcal{M} \elmark \lambda\lsem\mathcal{A}\rsem.\,e }
+
+\inferrule*[Right=E-MClos]
+  { \mathcal{G} \vdash \shat{e}_1 : \mathcal{G}' \elmark e_1 \\
+    \mathcal{G}' \tand \mathcal{A} \vdash \shat{e}_2 : \mathcal{B} \elmark e_2 \\
+    \mathcal{M} = \kw{mkMT}(\mathcal{A}, \mathcal{B}) }
+  { \mathcal{G} \vdash \mclos{\shat{e}_1}{\mathcal{A}}{\shat{e}_2} : \kw{Mod}\;\mathcal{M} \elmark \cclos{e_1}{\lsem\mathcal{A}\rsem}{e_2} }
+
+\inferrule*[Right=E-Link]
+  { \mathcal{G} \vdash \shat{e}_1 : \kw{Mod}\;(\mathcal{A} \tarr_m \mathcal{M}) \elmark e_1 \\
+    \mathcal{G} \vdash \shat{e}_2 : \mathcal{A} \elmark e_2 }
+  { \mathcal{G} \vdash \Link{\shat{e}_1}{\shat{e}_2} : \kw{Mod}\;\mathcal{M} \elmark e_1\;e_2 }
+\end{mathpar}
+
+
+%%% ============================================================
+\subsection{Source Selection}
+%%% ============================================================
+
+Judgment: $\boxed{\shat{v}.l \leadsto \shat{v}'}$
+
+\begin{mathpar}
+\inferrule*[Right=SS-Rcd]
+  { }
+  { \srec{l}{\shat{v}}.l \leadsto \shat{v} }
+
+\inferrule*[Right=SS-DMrg-L]
+  { \shat{v}_1.l \leadsto \shat{v} }
+  { (\shat{v}_1 \sdmrg \shat{v}_2).l \leadsto \shat{v} }
+
+\inferrule*[Right=SS-DMrg-R]
+  { \shat{v}_2.l \leadsto \shat{v} }
+  { (\shat{v}_1 \sdmrg \shat{v}_2).l \leadsto \shat{v} }
+
+\inferrule*[Right=SS-NMrg-L]
+  { \shat{v}_1.l \leadsto \shat{v} }
+  { (\shat{v}_1 \snmrg \shat{v}_2).l \leadsto \shat{v} }
+
+\inferrule*[Right=SS-NMrg-R]
+  { \shat{v}_2.l \leadsto \shat{v} }
+  { (\shat{v}_1 \snmrg \shat{v}_2).l \leadsto \shat{v} }
+\end{mathpar}
+
+
+%%% ============================================================
+\subsection{Source Big-Step Semantics}
+%%% ============================================================
+
+Judgment: $\boxed{\shat{v} \vdash \shat{e} \Rightarrow \shat{v}'}$
+
+\subsubsection*{Base Cases}
+
+\begin{mathpar}
+\inferrule*[Right=S-Ctx]
+  { \sval\;\shat{v} }
+  { \shat{v} \vdash \squery \Rightarrow \shat{v} }
+
+\inferrule*[Right=S-Lit]
+  { \sval\;\shat{v} }
+  { \shat{v} \vdash \hat{i} \Rightarrow \hat{i} }
+
+\inferrule*[Right=S-Unit]
+  { \sval\;\shat{v} }
+  { \shat{v} \vdash \hat{\varepsilon} \Rightarrow \hat{\varepsilon} }
+
+\inferrule*[Right=S-ClosV]
+  { \sval\;\shat{v} \\ \sval\;\shat{v}_1 }
+  { \shat{v} \vdash \sclos{\shat{v}_1}{\mathcal{A}}{\shat{e}} \Rightarrow \sclos{\shat{v}_1}{\mathcal{A}}{\shat{e}} }
+
+\inferrule*[Right=S-MClosV]
+  { \sval\;\shat{v} \\ \sval\;\shat{v}_1 }
+  { \shat{v} \vdash \mclos{\shat{v}_1}{\mathcal{A}}{\shat{e}} \Rightarrow \mclos{\shat{v}_1}{\mathcal{A}}{\shat{e}} }
+\end{mathpar}
+
+\subsubsection*{Expression Rules}
+
+\begin{mathpar}
+\inferrule*[Right=S-Lam]
+  { \sval\;\shat{v} }
+  { \shat{v} \vdash \slam\,\mathcal{A}.\,\shat{e} \Rightarrow \sclos{\shat{v}}{\mathcal{A}}{\shat{e}} }
+
+\inferrule*[Right=S-Proj]
+  { \shat{v} \vdash \shat{e} \Rightarrow \shat{v}' \\
+    \kw{lookupv}(\shat{v}', n) = \shat{v}'' }
+  { \shat{v} \vdash \shat{e}.n \Rightarrow \shat{v}'' }
+
+\inferrule*[Right=S-Box]
+  { \shat{v} \vdash \shat{e}_1 \Rightarrow \shat{v}_1 \\
+    \shat{v}_1 \vdash \shat{e}_2 \Rightarrow \shat{v}' }
+  { \shat{v} \vdash \shat{e}_1 \sbox \shat{e}_2 \Rightarrow \shat{v}' }
+
+\inferrule*[Right=S-App]
+  { \shat{v} \vdash \shat{e}_1 \Rightarrow \sclos{\shat{v}_1}{\mathcal{A}}{\shat{e}} \\
+    \shat{v} \vdash \shat{e}_2 \Rightarrow \shat{v}_2 \\
+    \shat{v}_1 \sdmrg \shat{v}_2 \vdash \shat{e} \Rightarrow \shat{v}' }
+  { \shat{v} \vdash \shat{e}_1\;\shat{e}_2 \Rightarrow \shat{v}' }
+
+\inferrule*[Right=S-App-M]
+  { \shat{v} \vdash \shat{e}_1 \Rightarrow \mclos{\shat{v}_1}{\mathcal{A}}{\shat{e}} \\
+    \shat{v} \vdash \shat{e}_2 \Rightarrow \shat{v}_2 \\
+    \shat{v}_1 \sdmrg \shat{v}_2 \vdash \shat{e} \Rightarrow \shat{v}' }
+  { \shat{v} \vdash \shat{e}_1\;\shat{e}_2 \Rightarrow \shat{v}' }
+
+\inferrule*[Right=S-DMrg]
+  { \shat{v} \vdash \shat{e}_1 \Rightarrow \shat{v}_1 \\
+    \shat{v} \sdmrg \shat{v}_1 \vdash \shat{e}_2 \Rightarrow \shat{v}_2 }
+  { \shat{v} \vdash \shat{e}_1 \sdmrg \shat{e}_2 \Rightarrow \shat{v}_1 \sdmrg \shat{v}_2 }
+
+\inferrule*[Right=S-NMrg]
+  { \shat{v} \vdash \shat{e}_1 \Rightarrow \shat{v}_1 \\
+    \shat{v} \vdash \shat{e}_2 \Rightarrow \shat{v}_2 }
+  { \shat{v} \vdash \shat{e}_1 \snmrg \shat{e}_2 \Rightarrow \shat{v}_1 \snmrg \shat{v}_2 }
+
+\inferrule*[Right=S-Rcd]
+  { \shat{v} \vdash \shat{e} \Rightarrow \shat{v}' }
+  { \shat{v} \vdash \srec{l}{\shat{e}} \Rightarrow \srec{l}{\shat{v}'} }
+
+\inferrule*[Right=S-RProj]
+  { \shat{v} \vdash \shat{e} \Rightarrow \shat{v}' \\
+    \shat{v}'.l \leadsto \shat{v}'' }
+  { \shat{v} \vdash \shat{e}.l \Rightarrow \shat{v}'' }
+
+\inferrule*[Right=S-Let]
+  { \shat{v} \vdash \shat{e}_1 \Rightarrow \shat{v}_1 \\
+    \shat{v} \sdmrg \shat{v}_1 \vdash \shat{e}_2 \Rightarrow \shat{v}' }
+  { \shat{v} \vdash \slet{\shat{e}_1}{\mathcal{A}}{\shat{e}_2} \Rightarrow \shat{v}' }
+
+\inferrule*[Right=S-Open]
+  { \shat{v} \vdash \shat{e}_1 \Rightarrow \shat{v}_1 \\
+    \shat{v}_1.l \leadsto \shat{v}_f \\
+    \shat{v} \sdmrg \shat{v}_f \vdash \shat{e}_2 \Rightarrow \shat{v}' }
+  { \shat{v} \vdash \sopen{\shat{e}_1}{\shat{e}_2} \Rightarrow \shat{v}' }
+\end{mathpar}
+
+\subsubsection*{Module Rules}
+
+\begin{mathpar}
+\inferrule*[Right=S-Struct-S]
+  { \sval\;\shat{v} \\
+    \hat{\varepsilon} \vdash \shat{e} \Rightarrow \shat{v}' }
+  { \shat{v} \vdash \Struct{\smark}{\shat{e}} \Rightarrow \shat{v}' }
+
+\inferrule*[Right=S-Struct-O]
+  { \shat{v} \vdash \shat{e} \Rightarrow \shat{v}' }
+  { \shat{v} \vdash \Struct{\omark}{\shat{e}} \Rightarrow \shat{v}' }
+
+\inferrule*[Right=S-Functor-S]
+  { \sval\;\shat{v} }
+  { \shat{v} \vdash \Functor{\smark}{\mathcal{A}}{\shat{e}} \Rightarrow \mclos{\hat{\varepsilon}}{\mathcal{A}}{\shat{e}} }
+
+\inferrule*[Right=S-Functor-O]
+  { \sval\;\shat{v} }
+  { \shat{v} \vdash \Functor{\omark}{\mathcal{A}}{\shat{e}} \Rightarrow \mclos{\shat{v}}{\mathcal{A}}{\shat{e}} }
+
+\inferrule*[Right=S-Link]
+  { \shat{v} \vdash \shat{e}_1 \Rightarrow \mclos{\shat{v}_1}{\mathcal{A}}{\shat{e}} \\
+    \shat{v} \vdash \shat{e}_2 \Rightarrow \shat{v}_2 \\
+    \shat{v}_1 \sdmrg \shat{v}_2 \vdash \shat{e} \Rightarrow \shat{v}' }
+  { \shat{v} \vdash \Link{\shat{e}_1}{\shat{e}_2} \Rightarrow \shat{v}' }
+
+\inferrule*[Right=S-Link-C]
+  { \shat{v} \vdash \shat{e}_1 \Rightarrow \sclos{\shat{v}_1}{\mathcal{A}}{\shat{e}} \\
+    \shat{v} \vdash \shat{e}_2 \Rightarrow \shat{v}_2 \\
+    \shat{v}_1 \sdmrg \shat{v}_2 \vdash \shat{e} \Rightarrow \shat{v}' }
+  { \shat{v} \vdash \Link{\shat{e}_1}{\shat{e}_2} \Rightarrow \shat{v}' }
+\end{mathpar}
+
 
 %%% ============================================================
 \section{Auxiliary Judgments}
 %%% ============================================================
 
-\subsection*{Conflict}
+\subsection{Conflict}
 \ottdefncfl{}
 
-\subsection*{Uniqueness}
+\subsection{Uniqueness}
 \ottdefnuq{}
 
-\subsection*{Containment}
+\subsection{Core Containment}
 \ottdefnctm{}
+
+
+%%% ============================================================
+\section{Metatheory}
+%%% ============================================================
+
+All theorems are mechanized in Coq and validated via property-based
+testing in Haskell (500 tests each, all passing).
+
+\begin{theorem}[Type-Preserving Elaboration]
+If\; $\mathcal{G} \vdash \shat{e} : \mathcal{A} \elmark e$,
+then $\lsem \mathcal{G} \rsem \vdash e : \lsem \mathcal{A} \rsem$.
+\end{theorem}
+
+\begin{theorem}[Uniqueness of Elaboration]
+If\; $\mathcal{G} \vdash \shat{e} : \mathcal{A}_1 \elmark e_1$
+and  $\mathcal{G} \vdash \shat{e} : \mathcal{A}_2 \elmark e_2$,
+then $\mathcal{A}_1 = \mathcal{A}_2$ and $e_1 = e_2$.
+\end{theorem}
+
+\begin{theorem}[Semantics Preservation]
+If\; $\mathcal{G} \vdash \shat{e} : \mathcal{A} \elmark e$,
+$\sval\;\hat{\rho}$,
+$\hat{\rho} \vdash \shat{e} \Rightarrow \shat{v}$,
+and $\hat{\rho} \sim \rho$ at type $\mathcal{G}$,
+then there exists $v$ such that
+$\rho \vdash e \Rightarrow v$
+and $\shat{v} \sim v$ at type $\mathcal{A}$.
+\end{theorem}
+
+\begin{theorem}[Separate Compilation]
+If\; $\mathcal{G} \vdash \shat{e}_1 : \kw{Mod}\;(\mathcal{A} \tarr_m \mathcal{M}) \elmark e_1$
+and  $\mathcal{G} \vdash \shat{e}_2 : \mathcal{A} \elmark e_2$,
+then $\mathcal{G} \vdash \Link{\shat{e}_1}{\shat{e}_2} : \kw{Mod}\;\mathcal{M} \elmark e_1\;e_2$.
+\end{theorem}
+
+\begin{theorem}[Sandbox Struct Isolation]
+If\; $\sval\;\hat{\rho}_1$, $\sval\;\hat{\rho}_2$,
+$\hat{\rho}_1 \vdash \Struct{\smark}{\shat{e}} \Rightarrow \shat{v}_1$,
+and  $\hat{\rho}_2 \vdash \Struct{\smark}{\shat{e}} \Rightarrow \shat{v}_2$,
+then $\shat{v}_1 = \shat{v}_2$.
+\end{theorem}
+
+\begin{theorem}[Sandbox Functor Isolation]
+If\; $\sval\;\hat{\rho}_1$ and $\sval\;\hat{\rho}_2$,
+then
+$\hat{\rho}_1 \vdash \Functor{\smark}{\mathcal{A}}{\shat{e}} \Rightarrow \mclos{\hat{\varepsilon}}{\mathcal{A}}{\shat{e}}$
+and
+$\hat{\rho}_2 \vdash \Functor{\smark}{\mathcal{A}}{\shat{e}} \Rightarrow \mclos{\hat{\varepsilon}}{\mathcal{A}}{\shat{e}}$.
+\end{theorem}
+
+\begin{theorem}[Secure Linking]
+If a sandboxed functor's body is closed (does not depend on the argument),
+then the result of\/ $\kw{Link}$ is independent of both the linking
+environment and the argument value.
+\end{theorem}
+
+\begin{theorem}[NMrg Independence]
+If\; $\mathcal{G} \vdash \shat{e}_1 \snmrg \shat{e}_2 : \mathcal{A} \tand \mathcal{B} \elmark e$
+and  $\mathcal{G} \vdash \shat{e}_2 : \mathcal{B}' \elmark e_2$,
+then $\mathcal{B} = \mathcal{B}'$.
+\end{theorem}
+
+\begin{theorem}[Full Pipeline]
+If\; $\varepsilon \vdash \shat{e} : \mathcal{A} \elmark e$,
+then $\lsem\varepsilon\rsem \vdash e : \lsem\mathcal{A}\rsem$
+and there exists a value $v$ such that $\varepsilon \vdash e \hookrightarrow^* v$.
+\end{theorem}
+
 
 \end{document}

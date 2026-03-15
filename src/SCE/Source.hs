@@ -153,10 +153,14 @@ elaborate g e = case e of
         (b, ce2) <- elaborate (TyAnd g a) se2
         pure (b, C.App (C.Lam (elaborateTyp a) ce2) (C.RProj ce1 l))
       _ -> Left "Open: expected record type"
-  -- infstruct-sandboxed: Unit & A |- e : B ~> ce
-  --   ==> G |- struct[sandboxed] A. e : Sig(A, B) ~> box unit (lam [A] ce)
+  -- infstruct-sandboxed: Unit & A |- E : B ~> e
+  
+  --   ==> G |- struct[sandboxed] E : Intf A ~> box unit e
+
   -- infstruct-open: G & A |- e : B ~> ce
-  --   ==> G |- struct[open] A. e : Sig(A, B) ~> box ctx (lam [A] ce)
+  
+  --   ==> G |- struct[open] E : A ~> box ctx e
+
   MStruct sb se -> do
     let ctx' = case sb of
                  Sandboxed -> Unit
@@ -166,10 +170,13 @@ elaborate g e = case e of
                     Sandboxed -> C.UnitE
                     Open_     -> C.Query
     pure (TyMod (TyIntf tyB), C.Box envCore ce)
+  
   -- inffunctor-sandboxed: Unit & A |- e : B ~> ce
-  --   ==> G |- functor[sandboxed](A) e : A -> B ~> box unit (lam [A] ce)
+  --   ==> G |- functor[sandboxed](A) e : A ->m Intf ~> box unit (lam A ce)
+
   -- inffunctor-open: G & A |- e : B ~> ce
   --   ==> G |- functor[open](A) e : A -> B ~> lam [A] ce
+
   MFunctor sb tyA se -> do
     let ctx' = case sb of
                  Sandboxed -> TyAnd Unit tyA
@@ -183,6 +190,7 @@ elaborate g e = case e of
         pure (TyMod mt, C.Box C.UnitE (C.Lam (elaborateTyp tyA) ce))
       Open_ ->
         pure (TyMod mt, C.Lam (elaborateTyp tyA) ce)
+  
   -- Module closure typing (runtime construct, like Clos)
   MClos se1 tyA se2 -> do
     (g', ce1)  <- elaborate g se1
@@ -194,6 +202,18 @@ elaborate g e = case e of
 
   -- infmodapp / linking: G |- e1 : Sig(A,B) ~> ce1, G |- e2 : A ~> ce2
   --                      ==> G |- Link(e1, e2) : B ~> app ce1 ce2
+
+  -- Option 1: 
+  {-
+    m1 : A ->m Intf
+    m2 : A
+    -------------
+    m1 * m2  ~~~> m1 m2
+  
+  -- Option 2:
+
+    link(m1, m2) ~~> m1,, m2 m1
+  -}
   MLink se1 se2 -> do
     (ty1, ce1) <- elaborate g se1
     (ty2, ce2) <- elaborate g se2
@@ -293,7 +313,7 @@ bigStep env e = case e of
     v2    <- bigStep env e2
     case mclos of
       MClos v1 _ body -> bigStep (DMrg v1 v2) body
-      Clos  v1 _ body -> bigStep (DMrg v1 v2) body
+      -- Clos  v1 _ body -> bigStep (DMrg v1 v2) body
       _ -> Left "link: not a module closure"
 
   _ -> Left $ "bigStep: stuck on " ++ show e
