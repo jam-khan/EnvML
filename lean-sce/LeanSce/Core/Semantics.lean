@@ -2,6 +2,7 @@ import LeanSce.Core.Syntax
 
 open Core
 
+namespace C_Sem
 /--
   Positional lookup in merged values.
   `LookupV v n v'` means: in the merged value `v`,
@@ -166,3 +167,5 @@ inductive EBig : Exp → Exp → Exp → Prop where
     : EBig e a v₁
     → RLookupV v₁ l v₂
     → EBig e (.rproj a l) v₂
+
+end C_Sem

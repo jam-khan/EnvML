@@ -143,6 +143,22 @@ inductive elabExp : TyCtx → Exp → Typ → Core.Exp → Prop
     → elabExp (Typ.and ctx A) se2 B ce2
     → elabExp ctx (Exp.mrg se1 se2) (Typ.and A B) (Core.Exp.mrg ce1 ce2)
   /-
+    Γ ⊢ eˢ₁ : A ⤳ eᶜ₁
+    Γ ⊢ eˢ₂ : B ⤳ eᶜ₂
+    ──────────────────────────────────────────────────────────
+    Γ ⊢ eˢ₁ #n eˢ₂ : A & B ⤳ (λ⟦Γ⟧. mrg (box ?.0 eᶜ₁) (box ?.1 eᶜ₂)) ?
+  -/
+  | nmrg (ctx A B : Typ) (se1 se2 : Exp) (ce1 ce2 : Core.Exp)
+    : elabExp ctx se1 A ce1
+    → elabExp ctx se2 B ce2
+    → elabExp ctx (Exp.nmrg se1 se2) (Typ.and A B)
+        (Core.Exp.app
+          (Core.Exp.lam (elabTyp ctx)
+            (Core.Exp.mrg
+              (Core.Exp.box (Core.Exp.proj Core.Exp.query 0) ce1)
+              (Core.Exp.box (Core.Exp.proj Core.Exp.query 1) ce2)))
+          Core.Exp.query)
+  /-
     Γ ⊢ eˢ : A ⤳ eᶜ
     ──────────────────────────────────
     Γ ⊢ {l = eˢ} : {l : A} ⤳ {l = eᶜ}
@@ -196,7 +212,11 @@ inductive elabExp : TyCtx → Exp → Typ → Core.Exp → Prop
     → (sb = Sandbox.open_     → ctxInner = ctx)
     → elabExp ctxInner se B ce
     → elabExp ctx (Exp.mstruct sb se) (Typ.sig (ModTyp.TyIntf B))
-        (Core.Exp.box envCore ce)
+        (Core.Exp.box
+          (match sb with
+            | Sandbox.sandboxed => Core.Exp.unit
+            | Sandbox.open_     => Core.Exp.query)
+          ce)
   /-
     sandboxed: Unit & A ⊢ eˢ : B ⤳ eᶜ
     ─────────────────────────────────────────────────────────────────

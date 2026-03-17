@@ -2,6 +2,8 @@ import LeanSce.SCE.Syntax
 
 open SCE
 
+namespace S_Sem
+
 /-!
   ## Value Index Lookup
 
@@ -113,258 +115,211 @@ inductive Sel : Exp → String → Exp → Prop where
   then `⟦ρ⟧ ⊢ᶜ eᶜ ⇓ ⟦vˢ⟧`.
 -/
 inductive BigStep : Exp → Exp → Exp → Prop where
-
   /-
     ─────────────
     ρ ⊢ ? ⇓ ρ
   -/
   | query {ρ : Exp}
-    : BigStep ρ .query ρ
+    : Value ρ
+    → BigStep ρ .query ρ
 
   /-
     ─────────────────
     ρ ⊢ n ⇓ n
   -/
   | lit {ρ : Exp} {n : Nat}
-    : BigStep ρ (.lit n) (.lit n)
-
+    : Value ρ
+    → BigStep ρ (.lit n) (.lit n)
   /-
     ─────────────────
     ρ ⊢ () ⇓ ()
   -/
   | unit {ρ : Exp}
-    : BigStep ρ .unit .unit
-
+    : Value ρ
+    → BigStep ρ .unit .unit
   /-
     Value v
     ──────────────────────────────
     ρ ⊢ ⟨v, A, body⟩ ⇓ ⟨v, A, body⟩
-
-    Closures that are already values evaluate to themselves.
   -/
   | clos_val {ρ v : Exp} {A : Typ} {body : Exp}
-    : Value v
+    : Value ρ
+    → Value v
     → BigStep ρ (.clos v A body) (.clos v A body)
-
   /-
     Value v
     ──────────────────────────────────
     ρ ⊢ mclos(v, A, body) ⇓ mclos(v, A, body)
-
-    Module closures that are already values evaluate to themselves.
   -/
   | mclos_val {ρ v : Exp} {A : Typ} {body : Exp}
-    : Value v
+    : Value ρ
+    → Value v
     → BigStep ρ (.mclos v A body) (.mclos v A body)
-
   /-
     ρ ⊢ e ⇓ v       lookupV(v, n) = v'
     ────────────────────────────────────
     ρ ⊢ e.n ⇓ v'
   -/
   | proj {ρ e v v' : Exp} {n : Nat}
-    : BigStep ρ e v
+    : Value ρ
+    → BigStep ρ e v
     → LookupV v n v'
     → BigStep ρ (.proj e n) v'
-
   /-
     ──────────────────────────────
     ρ ⊢ λ A. body ⇓ ⟨ρ, A, body⟩
-
-    Lambda abstractions close over the current environment.
   -/
   | lam {ρ : Exp} {A : Typ} {body : Exp}
-    : BigStep ρ (.lam A body) (.clos ρ A body)
-
+    : Value ρ
+    → BigStep ρ (.lam A body) (.clos ρ A body)
   /-
     ρ ⊢ e₁ ⇓ v₁       v₁ ⊢ e₂ ⇓ v
     ──────────────────────────────────
     ρ ⊢ e₁ |> e₂ ⇓ v
-
-    Box evaluates `e₁` to get a new environment,
-    then evaluates `e₂` under that environment.
   -/
   | box {ρ e₁ e₂ v₁ v : Exp}
-    : BigStep ρ e₁ v₁
+    : Value ρ
+    → BigStep ρ e₁ v₁
     → BigStep v₁ e₂ v
     → BigStep ρ (.box e₁ e₂) v
-
   /-
     ρ ⊢ e₁ ⇓ ⟨v₁, _, body⟩       ρ ⊢ e₂ ⇓ v₂
     v₁ ,, v₂ ⊢ body ⇓ v
     ──────────────────────────────────────────────
     ρ ⊢ e₁ e₂ ⇓ v
-
-    Application: evaluate both sides, unpack the closure,
-    run the body under the closure's captured environment
-    extended with the argument.
   -/
   | app_clos {ρ e₁ e₂ v₁ v₂ v : Exp} {A : Typ} {body : Exp}
-    : BigStep ρ e₁ (.clos v₁ A body)
+    : Value ρ
+    → BigStep ρ e₁ (.clos v₁ A body)
     → BigStep ρ e₂ v₂
     → BigStep (.mrg v₁ v₂) body v
     → BigStep ρ (.app e₁ e₂) v
-
   /-
     ρ ⊢ e₁ ⇓ mclos(v₁, _, body)       ρ ⊢ e₂ ⇓ v₂
     v₁ ,, v₂ ⊢ body ⇓ v
     ──────────────────────────────────────────────────
     ρ ⊢ e₁ e₂ ⇓ v
-
-    Application also works on module closures — they behave
-    identically to regular closures at runtime.
   -/
   | app_mclos {ρ e₁ e₂ v₁ v₂ v : Exp} {A : Typ} {body : Exp}
-    : BigStep ρ e₁ (.mclos v₁ A body)
+    : Value ρ
+    → BigStep ρ e₁ (.mclos v₁ A body)
     → BigStep ρ e₂ v₂
     → BigStep (.mrg v₁ v₂) body v
     → BigStep ρ (.app e₁ e₂) v
-
   /-
     ρ ⊢ e₁ ⇓ v₁       ρ ,, v₁ ⊢ e₂ ⇓ v₂
     ────────────────────────────────────────
     ρ ⊢ e₁ #d e₂ ⇓ v₁ ,, v₂
-
-    Dependent merge: `e₂` is evaluated under the environment
-    **extended** with `v₁`, so `e₂` can refer to `e₁`'s result.
   -/
   | dmrg {ρ e₁ e₂ v₁ v₂ : Exp}
-    : BigStep ρ e₁ v₁
+    : Value ρ
+    → BigStep ρ e₁ v₁
     → BigStep (.mrg ρ v₁) e₂ v₂
     → BigStep ρ (.mrg e₁ e₂) (.mrg v₁ v₂)
-
   /-
     ρ ⊢ e₁ ⇓ v₁       ρ ⊢ e₂ ⇓ v₂
     ──────────────────────────────────
     ρ ⊢ e₁ #n e₂ ⇓ v₁ ,,ₙ v₂
-
-    Non-dependent merge: both sides evaluated under the
-    **same** environment. Neither can see the other's result.
   -/
   | nmrg {ρ e₁ e₂ v₁ v₂ : Exp}
-    : BigStep ρ e₁ v₁
+    : Value ρ
+    → BigStep ρ e₁ v₁
     → BigStep ρ e₂ v₂
     → BigStep ρ (.nmrg e₁ e₂) (.nmrg v₁ v₂)
-
   /-
     ρ ⊢ e ⇓ v
     ──────────────────────────
     ρ ⊢ {l = e} ⇓ {l = v}
   -/
   | lrec {ρ e v : Exp} {l : String}
-    : BigStep ρ e v
+    : Value ρ
+    → BigStep ρ e v
     → BigStep ρ (.lrec l e) (.lrec l v)
-
   /-
     ρ ⊢ e ⇓ v       sel(v, l) = v'
     ────────────────────────────────
     ρ ⊢ e.l ⇓ v'
   -/
   | rproj {ρ e v v' : Exp} {l : String}
-    : BigStep ρ e v
+    : Value ρ
+    → BigStep ρ e v
     → Sel v l v'
     → BigStep ρ (.rproj e l) v'
-
   /-
     ρ ⊢ e₁ ⇓ v₁       ρ ,, v₁ ⊢ e₂ ⇓ v
     ──────────────────────────────────────
     ρ ⊢ let e₁ : A in e₂ ⇓ v
-
-    Let binding: evaluate `e₁`, extend environment, evaluate `e₂`.
   -/
   | letb {ρ e₁ e₂ v₁ v : Exp} {A : Typ}
-    : BigStep ρ e₁ v₁
+    : Value ρ
+    → BigStep ρ e₁ v₁
     → BigStep (.mrg ρ v₁) e₂ v
     → BigStep ρ (.letb e₁ A e₂) v
-
   /-
     ρ ⊢ e₁ ⇓ {l = v'}       ρ ,, v' ⊢ e₂ ⇓ v
     ─────────────────────────────────────────────
     ρ ⊢ open e₁ in e₂ ⇓ v
-
-    Open unwraps a record value and extends the
-    environment with its contents.
   -/
   | openm {ρ e₁ e₂ v' v : Exp} {l : String}
-    : BigStep ρ e₁ (.lrec l v')
+    : Value ρ
+    → BigStep ρ e₁ (.lrec l v')
     → BigStep (.mrg ρ v') e₂ v
     → BigStep ρ (.openm e₁ e₂) v
-
   /-
     () ⊢ body ⇓ v
     ──────────────────────────────────────────
     ρ ⊢ struct[sandboxed] body ⇓ v
-
-    Sandboxed struct: body evaluates under the empty
-    environment (unit), **discarding** the current `ρ`.
-    This is the capability safety guarantee.
   -/
   | mstruct_sandboxed {ρ body v : Exp}
-    : BigStep .unit body v
+    : Value ρ
+    → BigStep .unit body v
     → BigStep ρ (.mstruct .sandboxed body) v
-
   /-
     ρ ⊢ body ⇓ v
     ──────────────────────────────────────
     ρ ⊢ struct[open] body ⇓ v
-
-    Open struct: body evaluates under the current
-    environment, with full access to the context.
   -/
   | mstruct_open {ρ body v : Exp}
-    : BigStep ρ body v
+    : Value ρ
+    → BigStep ρ body v
     → BigStep ρ (.mstruct .open_ body) v
-
   /-
     ──────────────────────────────────────────────────────
     ρ ⊢ functor[sandboxed](A) body ⇓ mclos((), A, body)
-
-    Sandboxed functor closes over the empty environment.
   -/
   | mfunctor_sandboxed {ρ : Exp} {A : Typ} {body : Exp}
-    : BigStep ρ (.mfunctor .sandboxed A body) (.mclos .unit A body)
-
+    : Value ρ
+    → BigStep ρ (.mfunctor .sandboxed A body) (.mclos .unit A body)
   /-
     ──────────────────────────────────────────────────
     ρ ⊢ functor[open](A) body ⇓ mclos(ρ, A, body)
-
-    Open functor closes over the current environment.
   -/
   | mfunctor_open {ρ : Exp} {A : Typ} {body : Exp}
-    : BigStep ρ (.mfunctor .open_ A body) (.mclos ρ A body)
-
-/-
+    : Value ρ
+    → BigStep ρ (.mfunctor .open_ A body) (.mclos ρ A body)
+  /-
     ρ ⊢ e₁ ⇓ mclos(v₁, _, body)       ρ ⊢ e₂ ⇓ v₂
     v₁ ,, v₂ ⊢ body ⇓ v
     ──────────────────────────────────────────────────
     ρ ⊢ mapp(e₁, e₂) ⇓ v
-
-    Module application: evaluate the functor to a module
-    closure, evaluate the argument, run the body.
-    Corresponds to `mapp` elaboration: `link(e₁, e₂) ⤳ app ce₁ ce₂`.
   -/
   | mapp {ρ e₁ e₂ v₁ v₂ v : Exp} {A : Typ} {body : Exp}
-    : BigStep ρ e₁ (.mclos v₁ A body)
+    : Value ρ
+    → BigStep ρ e₁ (.mclos v₁ A body)
     → BigStep ρ e₂ v₂
     → BigStep (.mrg v₁ v₂) body v
     → BigStep ρ (.mlink e₁ e₂) v
-
   /-
     ρ ⊢ e₁ ⇓ mclos(v₁, _, body)       ρ ⊢ e₂ ⇓ v₂
     v₁ ,, v₂ ⊢ body ⇓ v
     ──────────────────────────────────────────────────
     ρ ⊢ link(e₁, e₂) ⇓ v₂ ,, v
-
-    Module linking with accumulation: the result is the
-    argument `v₂` merged with the functor's output `v`.
-    This produces a first-class environment that carries
-    both the input and the computed result.
-
-    Corresponds to `mlink` elaboration:
-    `link(e₁, e₂) ⤳ mrg ce₂ (app ce₁ ce₂)`.
   -/
   | mlink {ρ e₁ e₂ v₁ v₂ v : Exp} {A : Typ} {body : Exp}
-    : BigStep ρ e₁ (.mclos v₁ A body)
+    : Value ρ
+    → BigStep ρ e₁ (.mclos v₁ A body)
     → BigStep ρ e₂ v₂
     → BigStep (.mrg v₁ v₂) body v
     → BigStep ρ (.mlink e₁ e₂) (.mrg v₂ v)
+
+end S_Sem
