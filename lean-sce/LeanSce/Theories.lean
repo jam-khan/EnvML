@@ -39,10 +39,6 @@ inductive ValTrans : SCE.Exp → SCE.Typ → Core.Exp → Prop where
     → elabExp (.and Γ' A) body B ce
     → ValTrans (.mclos v A body) (.sig mt) (.clos cv (elabTyp A) ce)
 
--- ============================================================
--- Simple uniqueness / determinism lemmas
--- ============================================================
-
 theorem type_elaboration_uniqueness
     {ST : SCE.Typ} {CT₁ CT₂ : Core.Typ}
     (h₁ : elabTyp ST = CT₁)
@@ -69,10 +65,6 @@ theorem record_lookup_uniqueness
     (h₂ : SCE.RecordLookup T l T₂)
     : T₁ = T₂ := by
     sorry
-
--- ============================================================
--- Type-safe elaboration of lookups
--- ============================================================
 
 theorem type_safe_index_lookup
     {ST₁ ST₂ : SCE.Typ} {n : Nat}
@@ -118,6 +110,13 @@ theorem type_safe_record_lookup
   --   exact Core.RLookup.landr ih
   --     ⟨type_safe_label_nonexistence.mp hnotA,
   --      type_safe_label_existence.mp hlinB⟩
+theorem val_trans_index_lookup
+    {v : SCE.Exp} {A B : SCE.Typ} {cv : Core.Exp} {i : Nat} {v' : SCE.Exp}
+    (hvt : ValTrans v A cv)
+    (hlook : SCE.IndexLookup A i B)
+    (hlookv : S_Sem.LookupV v i v')
+    : ∃ cv', ValTrans v' B cv' ∧ C_Sem.LookupV cv i cv' := by
+    sorry
 
 theorem inference_uniqueness
     {Γ T₁ T₂ : SCE.Typ} {e : SCE.Exp} {ce₁ ce₂ : Core.Exp}
@@ -183,10 +182,6 @@ theorem elaboration_uniqueness
     : ce₁ = ce₂ := by
   sorry -- follows same structure as inference_uniqueness
 
--- ============================================================
--- Type Preservation
--- ============================================================
-
 theorem type_preservation
     {Γ A : SCE.Typ} {es : SCE.Exp} {ec : Core.Exp}
     (h : elabExp Γ es A ec)
@@ -241,6 +236,10 @@ theorem semantics_preservation
     {es : SCE.Exp} {ec : Core.Exp}
     {rs vs : SCE.Exp}
     {cr : Core.Exp}
+    {hv1 : Core.Value cr}
+    {hv2 : SCE.Value vs}
+    {hv3 : SCE.Value rs}
+    {hv4 : Core.Value cv}
     (helab : elabExp Γ es A ec)
     (heval : S_Sem.BigStep rs es vs)
     (henv  : ValTrans rs Γ cr)
@@ -249,25 +248,43 @@ theorem semantics_preservation
   | query ctx =>
     cases heval with
     | query hv =>
-      exact ⟨cr, henv, C_Sem.EBig.equery (sorry)⟩
+      exists cr
+      constructor
+      · assumption
+      · refine C_Sem.EBig.equery ?_
+        assumption
   | lit ctx n =>
     cases heval with
     | lit hv =>
-      exact ⟨Core.Exp.lit n, ValTrans.vint, C_Sem.EBig.eblit (sorry)⟩
+      exists (Core.Exp.lit n)
+      constructor
+      · exact ValTrans.vint
+      · exact C_Sem.EBig.eblit hv1
   | unit ctx =>
     cases heval with
     | unit hv =>
-      exact ⟨Core.Exp.unit, ValTrans.vunit, C_Sem.EBig.ebunit (sorry)⟩
-  | lrec ctx A se ce l _ ih =>
-    cases heval with
-    | lrec hv heval_inner =>
-      obtain ⟨cv, hvt, hceval⟩ := ih heval_inner henv
-      exact ⟨Core.Exp.lrec l cv, ValTrans.vlrec hvt, C_Sem.EBig.ebrec hceval⟩
-  | proj ctx A B se ce i _ hlook ih =>
+      exists Core.Exp.unit
+      constructor
+      · exact ValTrans.vunit
+      · exact C_Sem.EBig.ebunit hv1
+  | lrec ctx A se ce l he ih =>
+      cases heval with
+      | lrec hv heval_inner =>
+          rename_i vi
+          have hv_inner : SCE.Value vi := by cases hv2; assumption
+          obtain ⟨cv', hvt, hceval⟩ := ih (hv1 := hv1) (hv2 := hv_inner) (hv3 := hv3) heval_inner henv
+          exact ⟨Core.Exp.lrec l cv', ValTrans.vlrec hvt, C_Sem.EBig.ebrec hceval⟩
+  | proj ctx A B se ce i he hlook ih =>
     cases heval with
     | proj hv heval_inner hlookv =>
-      obtain ⟨cv, hvt, hceval⟩ := ih heval_inner henv
-      sorry
+        rename_i vi
+        have hv_vi : SCE.Value vi := by
+          · sorry
+        obtain ⟨cv_mid, hvt_mid, hceval_mid⟩ :=
+          ih (hv1 := hv1) (hv2 := hv_vi) (hv3 := hv3) heval_inner henv
+        obtain ⟨cv', hvt', hlookv_core⟩ :=
+          val_trans_index_lookup hvt_mid hlook hlookv
+        exact ⟨cv', hvt', C_Sem.EBig.ebproj hceval_mid hlookv_core⟩
   | lam ctx A B se ce _ ih =>
     cases heval with
     | lam hv =>

@@ -17,4 +17,10 @@ let z = m1.x + m2.y
 
 temp = link(m1, m2)  
 result = link(temp, m3).x
+
+
+function f {..};;
+function g {..};
+x = f;
+x = g
 -/
