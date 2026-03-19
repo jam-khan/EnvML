@@ -103,6 +103,7 @@ value _ = False
 lvalue :: Env -> Bool
 lvalue [] = True
 lvalue (ExpE v : e) = lvalue e && value v
+lvalue (RecE _ : e) = lvalue e
 lvalue (TypE (TyBoxT _ _) : e) = lvalue e
 lvalue (TypE _ : _) = False
 
@@ -158,6 +159,10 @@ infer g (Box d e) = do
   TyBoxT g1 <$> infer g1 e
 infer _ (FEnv []) = pure (TyEnvt [])
 infer g (FEnv (ExpE e : d)) = do
+  TyEnvt g1 <- infer g (FEnv d)
+  a <- infer (g1 ++ g) e
+  return (TyEnvt (Type a : g1))
+infer g (FEnv (RecE e : d)) = do
   TyEnvt g1 <- infer g (FEnv d)
   a <- infer (g1 ++ g) e
   return (TyEnvt (Type a : g1))

@@ -33,6 +33,16 @@ spec = do
       let named = elabExp parsed
       named `shouldBe` Named.Lit (CoreFE.LitBool True)
 
+    it "elaborates if expression" $ do
+      let input = "if true then 1 else 0"
+      let parsed = parseExp (lexer input)
+      let named = elabExp parsed
+      named `shouldBe`
+        Named.If
+          (Named.Lit (CoreFE.LitBool True))
+          (Named.Lit (CoreFE.LitInt 1))
+          (Named.Lit (CoreFE.LitInt 0))
+
   describe "Elaborate Lambda Expressions" $ do
     
     it "elaborates single-arg lambda" $ do
@@ -165,3 +175,16 @@ spec = do
       case nameless of
         CoreFE.TLam body -> return ()
         _ -> expectationFailure "Expected TLam"
+
+    it "converts if expression" $ do
+      let named =
+            Named.If
+              (Named.Lit (CoreFE.LitBool True))
+              (Named.Lit (CoreFE.LitInt 1))
+              (Named.Lit (CoreFE.LitInt 0))
+      let nameless = DB.toDeBruijn named
+      nameless `shouldBe`
+        CoreFE.If
+          (CoreFE.Lit (CoreFE.LitBool True))
+          (CoreFE.Lit (CoreFE.LitInt 1))
+          (CoreFE.Lit (CoreFE.LitInt 0))

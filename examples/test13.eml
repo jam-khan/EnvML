@@ -1,0 +1,4 @@
+let idRec : int -> int -> int =
+	fun (y) -> (fix fun (x : int) -> x);
+
+let result : int = idRec(1)(42);

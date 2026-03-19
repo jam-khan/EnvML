@@ -99,6 +99,8 @@ prettyNamedBindingExp name e =
 prettyNamedExpShort :: Named.Exp -> String
 prettyNamedExpShort (Named.Lit l) = prettyLiteral l
 prettyNamedExpShort (Named.Var n) = n
+prettyNamedExpShort (Named.Fix _) = "fix ..."
+prettyNamedExpShort (Named.If _ _ _) = "if ... then ... else ..."
 prettyNamedExpShort (Named.Lam n _) = "λ" ++ n ++ ". ..."
 prettyNamedExpShort (Named.TLam n _) = "Λ" ++ n ++ ". ..."
 prettyNamedExpShort (Named.Clos _ _) = "<closure>"
@@ -137,6 +139,7 @@ prettyDeBruijnBinding :: CoreFE.EnvE -> String
 prettyDeBruijnBinding (CoreFE.TypE t) = 
     "type " ++ prettyDeBruijnTyp t
 prettyDeBruijnBinding (CoreFE.ExpE e) = prettyDeBruijnBindingExp e
+prettyDeBruijnBinding (CoreFE.RecE _) = "<recursive-binding>"
 
 prettyDeBruijnBindingExp :: CoreFE.Exp -> String
 prettyDeBruijnBindingExp (CoreFE.Rec label (CoreFE.Anno e t)) =
@@ -182,6 +185,7 @@ prettyDeBruijnEnvShort env
   where
     shortEntry (CoreFE.ExpE (CoreFE.Rec l _)) = l
     shortEntry (CoreFE.ExpE _) = "_"
+    shortEntry (CoreFE.RecE _) = "rec"
     shortEntry (CoreFE.TypE _) = "type"
 
 needsParenCore :: CoreFE.Exp -> Bool
@@ -225,6 +229,7 @@ prettyDeBruijnEnv es = intercalate ", " $ map prettyDeBruijnEnvE (reverse es)
 prettyDeBruijnEnvE :: CoreFE.EnvE -> String
 prettyDeBruijnEnvE (CoreFE.ExpE (CoreFE.Rec l e)) = l ++ " = " ++ prettyDeBruijnExp e
 prettyDeBruijnEnvE (CoreFE.ExpE e) = prettyDeBruijnExp e
+prettyDeBruijnEnvE (CoreFE.RecE _) = "<rec>"
 prettyDeBruijnEnvE (CoreFE.TypE t) = "type " ++ prettyDeBruijnTyp t
 
 prettyDeBruijnTyp :: CoreFE.Typ -> String
@@ -275,6 +280,7 @@ prettyEvalResult (CoreFE.FEnv env) =
     formatBinding :: CoreFE.EnvE -> String
     formatBinding (CoreFE.TypE t) = "  type " ++ prettyDeBruijnTyp t
     formatBinding (CoreFE.ExpE e) = formatExpBinding e
+    formatBinding (CoreFE.RecE _) = "  <recursive-binding>"
     
     formatExpBinding :: CoreFE.Exp -> String
     formatExpBinding (CoreFE.Rec label val) = 

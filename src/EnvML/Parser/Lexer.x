@@ -23,6 +23,10 @@ tokens :-
   type        { \_ -> TokType }
   Type        { \_ -> TokBType }
   fun         { \_ -> TokFun  }
+  fix         { \_ -> TokFix  }
+  if          { \_ -> TokIf }
+  then        { \_ -> TokThen }
+  else        { \_ -> TokElse }
   clos        { \_ -> TokClos }
   tclos       { \_ -> TokTClos}
   box         { \_ -> TokBox  }
@@ -85,6 +89,10 @@ data Token
   | TokLet
   | TokVal
   | TokFun
+  | TokFix
+  | TokIf
+  | TokThen
+  | TokElse
   | TokAt
   | TokClos
   | TokTClos

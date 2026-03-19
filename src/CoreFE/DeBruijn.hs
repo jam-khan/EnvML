@@ -36,6 +36,13 @@ toNamelessExp eNames tNames e =
       in  case b of
             TermBinding -> Nameless.Var i
             ModBinding  -> Nameless.RProj (Nameless.FEnv [Nameless.ExpE (Nameless.Var i)]) n
+    (Named.Fix e1)   ->
+      Nameless.Fix (toNamelessExp eNames tNames e1)
+    (Named.If e1 e2 e3) ->
+      Nameless.If
+        (toNamelessExp eNames tNames e1)
+        (toNamelessExp eNames tNames e2)
+        (toNamelessExp eNames tNames e3)
     (Named.Lam x e1) ->
       Nameless.Lam (toNamelessExp ((x, TermBinding):eNames) tNames e1)
     (Named.Clos env e1)  ->

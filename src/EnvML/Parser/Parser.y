@@ -28,6 +28,10 @@ import qualified CoreFE.Syntax as CoreFE
   id        { TokVar $$ }
   num       { TokInt $$ }
   fun       { TokFun   }
+  fix       { TokFix   }
+  if        { TokIf    }
+  then      { TokThen  }
+  else      { TokElse  }
   clos      { TokClos  }
   tclos     { TokTClos }
   box       { TokBox   }
@@ -114,6 +118,8 @@ IntfE :: { IntfE }
 
 Exp :: { Exp }
   : fun FunArgs '->' Exp                  { Lam $2 $4 }
+  | fix Exp                               { Fix $2 }
+  | if Exp then Exp else Exp              { If $2 $4 $6 }
   | clos '[' Env ']' FunArgs '->' Exp     { Clos $3 $5 $7 }
   | tclos '[' Env ']' FunArgs '->' Exp    { TClos $3 $5 $7 }
   | box '[' Env ']' in Exp                { Box $3 $6 }

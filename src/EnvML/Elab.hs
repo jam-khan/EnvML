@@ -70,6 +70,8 @@ elabExp e =
   case e of
     (EnvML.Lit i)           -> CoreFE.Lit i
     (EnvML.Var n)           -> CoreFE.Var n
+    (EnvML.Fix e1)          -> CoreFE.Fix (elabExp e1)
+    (EnvML.If e1 e2 e3)     -> CoreFE.If (elabExp e1) (elabExp e2) (elabExp e3)
     (EnvML.Lam args e1)     -> 
       elabLambda args e1
     (EnvML.TLam _ _)        -> 

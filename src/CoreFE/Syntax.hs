@@ -29,7 +29,7 @@ data TyLit
 
 type Env = [EnvE]
 
-data EnvE = ExpE Exp | TypE Typ
+data EnvE = ExpE Exp | RecE Exp | TypE Typ -- RecE is internal (used for fixpoints)
   deriving (Eq, Show)
 
 data Exp
@@ -163,6 +163,7 @@ stringOfEnvE = stringOfEnvEI 0
 
 stringOfEnvEI :: Int -> EnvE -> String
 stringOfEnvEI lvl (ExpE e) = stringOfEnvExpI lvl e
+stringOfEnvEI _   (RecE _) = "<rec>"
 stringOfEnvEI _   (TypE t) = "type " ++ stringOfTyp t
 
 stringOfEnvExpI :: Int -> Exp -> String
@@ -212,10 +213,10 @@ stringOfExpI lvl op@(App e1 e2) =
 stringOfExpI lvl (BinOp binOp) = stringOfBinOpI lvl binOp
 
 stringOfExpI lvl (Clos env e) =
-    "⟨[" ++ showEnvInline env ++ "] | λ. " ++ stringOfExpI lvl e ++ "⟩"
+  "⟨[" ++ showEnvInline env ++ "] | λ. " ++ stringOfExpI lvl e ++ "⟩"
 
 stringOfExpI lvl (TClos env e) =
-    "⟨[" ++ showEnvInline env ++ "] | Λ. " ++ stringOfExpI lvl e ++ "⟩"
+  "⟨[" ++ showEnvInline env ++ "] | Λ. " ++ stringOfExpI lvl e ++ "⟩"
 
 stringOfExpI lvl op@(TApp e t) =
     let sE = parensIf (expPrec e < expPrec op) (stringOfExpI lvl e)
@@ -251,6 +252,7 @@ isSmallEnv entries =
 
 isSimpleEnvE :: EnvE -> Bool
 isSimpleEnvE (ExpE e) = isSimpleExp e
+isSimpleEnvE (RecE _) = False
 isSimpleEnvE (TypE _) = True
 
 isSimpleExp :: Exp -> Bool

@@ -65,11 +65,11 @@ data Module
 
 type Structures = [Structure]
 data Structure
-  = Let           Name (Maybe Typ) Exp 
-  | TypDecl       Name Typ
-  | ModTypDecl    Name ModuleTyp
-  | ModStruct     Name (Maybe ModuleTyp) Module
-  | FunctStruct   Name FunArgs (Maybe ModuleTyp) Module 
+  = Let           Name (Maybe Typ) Exp  -- let x : A = e
+  | TypDecl       Name Typ -- type t = A
+  | ModTypDecl    Name ModuleTyp -- module type S = ...
+  | ModStruct     Name (Maybe ModuleTyp) Module -- module M : S = struct ... endj
+  | FunctStruct   Name FunArgs (Maybe ModuleTyp) Module  -- functor F (type t) (x : A) : S = struct ... end
   deriving (Eq, Show)
 
 type Env = [EnvE]
@@ -85,6 +85,8 @@ data EnvE
 data Exp
   = Lit   CoreFE.Literal    -- Literals: int, double, bool, string
   | Var   Name              -- Var x, y, hello
+  | Fix   Exp               -- fix e
+  | If    Exp Exp Exp       -- if e1 then e2 else e3
   | Lam   FunArgs Exp       -- fun (x: A) (y : B) -> x + 1
   | TLam  FunArgs Exp       -- fun 
   | Clos  Env FunArgs Exp   -- clos [type t = int, x = 1] (y: t) -> x + y
@@ -128,9 +130,11 @@ typPrec t = case t of
 expPrec :: Exp -> Precedence
 expPrec e = case e of
   Anno _ _  -> 0
+  If {}     -> 1
   Box _ _   -> 1
   Clos {}   -> 1
   TClos {}  -> 1
+  Fix _     -> 2
   Lam {}    -> 2
   App _ _   -> 3
   TApp _ _  -> 3
@@ -316,6 +320,10 @@ prettyModule (MAnno m1 mty) =
 prettyExp :: Exp -> String
 prettyExp (Lit l) = CoreFE.pretty l
 prettyExp (Var n) = n
+prettyExp (Fix e) =
+  "fix " ++ parensIf (expPrec e < expPrec (Fix e)) (prettyExp e)
+prettyExp (If e1 e2 e3) =
+  "if " ++ prettyExp e1 ++ " then " ++ prettyExp e2 ++ " else " ++ prettyExp e3
 prettyExp (Lam args e) = 
   "fun " ++ prettyFunArgs args ++ " -> " ++ 
   parensIf (expPrec e < expPrec (Lam args e)) (prettyExp e)
