@@ -56,6 +56,7 @@ import qualified CoreFE.Syntax as CoreFE
   '===>'    { TokTripleArrow }
   '->m'     { TokArrowM }
   '@'       { TokAt }
+  '|'       { TokPipe }
   ','       { TokComma }
   '.'       { TokDot }
   '('       { TokLParen }
@@ -97,6 +98,7 @@ ModuleStruct :: { Structure }
   : let    id          '=' Exp       ';' { Let $2 Nothing $4              }
   | let    id ':' Typ  '=' Exp       ';' { Let $2 (Just $4) $6            }
   | type   id          '=' Typ       ';' { TypDecl $2 $4                  }
+  | type   id '<' TypeVars '>' '=' Constructors ';' { AdtDecl $2 $4 $7            }
   | module id          '=' ModuleExp ';' { ModStruct $2 Nothing $4        }
   | module id ':' ModuleTyp 
                        '=' ModuleExp ';' { ModStruct $2 (Just $4) $6      }
@@ -104,6 +106,23 @@ ModuleStruct :: { Structure }
   | functor id FunArgs '=' ModuleExp ';' { FunctStruct $2 $3 Nothing $5   }
   | functor id FunArgs ':' ModuleTyp 
                        '=' ModuleExp ';' { FunctStruct $2 $3 (Just $5) $7 }
+
+TypeVars :: { [Name] }
+  : id TypeVars { $1 : $2 }
+  | id          { [$1] }
+  |             { [] }
+
+Constructors :: { [Constructor] }
+  : Constructor '|' Constructors { $1 : $3 }
+  | Constructor                  { [$1] }
+
+Constructor :: { Constructor }
+  : id FieldTypes { Constructor $1 $2 }
+
+FieldTypes :: { [Typ] }
+  : Typ FieldTypes { $1 : $2 }
+  | Typ            { [$1] }
+  |                { [] }
 
 InterfaceBody :: { ModuleTyp }
   : Intf                          { TySig $1 }

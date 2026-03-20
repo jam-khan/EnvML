@@ -30,6 +30,7 @@ data Exp
   | RProj Exp String
   | FEnv  Env
   | Anno  Exp Typ
+  | DataCon Name [Exp]
   -- List primitives
   | EList  [Exp]        -- [e1, e2, e3]
   | ETake  Int Exp      -- take(n, ls)
@@ -62,6 +63,7 @@ data Typ
   | TyBoxT   TyEnv Typ      -- Γ ▷ A
   | TySubstT Name Typ Typ   -- [t = A] B
   | TyRcd    String Typ     -- {l : A}
+  | TySum    [(String, [Typ])]  -- Tagged union: [(tag, field_types)]
   | TyEnvt   TyEnv          -- Γ
   | TyList   Typ            -- [A]
   deriving (Eq, Show)
@@ -102,6 +104,10 @@ prettyTyp (TyBoxT env t) =
 prettyTyp (TySubstT n t1 t2) = 
     "[" ++ n ++ " = " ++ prettyTyp t1 ++ "] " ++ prettyTyp t2
 prettyTyp (TyRcd label t) = "{" ++ label ++ " : " ++ prettyTyp t ++ "}"
+prettyTyp (TySum ctors) =
+  let showCtor (tag, []) = tag
+      showCtor (tag, ts) = tag ++ " " ++ unwords (map prettyTyp ts)
+  in intercalate " | " (map showCtor ctors)
 prettyTyp (TyEnvt env) = "Env[" ++ prettyTyEnv env ++ "]"
 prettyTyp (TyList t) = "[" ++ prettyTyp t ++ "]"
 
@@ -157,6 +163,10 @@ prettyExp (RProj e label) =
 prettyExp (FEnv env) = "[" ++ prettyEnv env ++ "]"
 prettyExp (Anno e t) =
     parenIf (needsParenExp e) (prettyExp e) ++ " : " ++ prettyTyp t
+prettyExp (DataCon ctor args) =
+  case args of
+    [] -> ctor
+    _ -> ctor ++ "(" ++ intercalate ", " (map prettyExp args) ++ ")"
 prettyExp (EList []) = "List[]"
 prettyExp (EList es) = "List[" ++ intercalate ", " (map prettyExp es) ++ "]"
 prettyExp (ETake n ls) = "take(" ++ show n ++ ", " ++ prettyExp ls ++ ")"
@@ -177,6 +187,7 @@ needsParenProj (Var _) = False
 needsParenProj (RProj _ _) = False
 needsParenProj (FEnv _) = False
 needsParenProj (Rec _ _) = False
+needsParenProj (DataCon _ _) = False
 needsParenProj (EList _) = False
 needsParenProj _ = True
 

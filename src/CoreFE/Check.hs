@@ -2,6 +2,7 @@ module CoreFE.Check where
 
 import Control.Monad (guard)
 import CoreFE.Syntax
+import Debug.Trace (trace, traceM)
 
 -- | Count type variable bindings (Etvar and Eteq) in an environment
 keyLen :: TyEnv -> Int
@@ -20,7 +21,8 @@ tshift _ (TyBoxT t a) = TyBoxT t a
 tshift x (TySubstT a1 a2) = TySubstT (tshift x a1) (tshift (1 + x) a2)
 tshift x (TyRcd l a) = TyRcd l (tshift x a)
 tshift x (TyEnvt bs) = TyEnvt (tshiftBinds x bs)
-tshift x (TyList a) = TyList (tshift x a)  -- ADD THIS
+tshift x (TyList a) = TyList (tshift x a) -- ADD THIS
+tshift x (TySum ctors) = TySum [(l, map (tshift x) ts) | (l, ts) <- ctors] -- TODO: CHECK
 
 tshiftBinds :: Int -> TyEnv -> TyEnv
 tshiftBinds _ [] = []
@@ -77,7 +79,14 @@ teq g1 (TyEnvt e1) (TyEnvt e2) g2 =
   teqEnv g1 e1 e2 g2
 teq g1 (TyRcd l1 a) (TyRcd l2 b) g2 =
   l1 == l2 && teq g1 a b g2
-teq g1 (TyList a) (TyList b) g2 =  -- ADD THIS
+teq g1 (TySum c1) (TySum c2) g2 =
+  length c1 == length c2
+    && and
+      [ n1 == n2 && length ts1 == length ts2 && and (zipWith (\t1 t2 -> teq g1 t1 t2 g2) ts1 ts2)
+      | ((n1, ts1), (n2, ts2)) <- zip c1 c2
+      ]
+teq g1 (TyList a) (TyList b) g2 =
+  -- ADD THIS
   teq g1 a b g2
 teq _ _ _ _ = False
 
@@ -97,7 +106,8 @@ value (Clos e _) = lvalue e
 value (TClos e _) = lvalue e
 value (FEnv e) = lvalue e
 value (Rec _ v) = value v
-value (EList es) = all value es  -- ADD THIS
+value (DataCon _ vs) = all value vs
+value (EList es) = all value es -- ADD THIS
 value _ = False
 
 lvalue :: Env -> Bool
@@ -147,10 +157,14 @@ infer _ (Lit lit) = pure $ TyLit $ inferLit lit
     inferLit (LitStr _) = TyStr
 infer g (Var x) = getVar g x
 infer g (App e1 e2) = do
+  traceM $ ("hello") ++ (show $ infer g e1)
   TyArr a b <- infer g e1
+  traceM ("Inferring type of application1: " ++ show (App e1 e2))
   guard (check g e2 a)
+  traceM ("Inferring type of application2: " ++ show (App e1 e2))
   return b
-infer g (TLam e) = TyAll <$> infer (Kind : g) e
+infer g (TLam e) =
+    TyAll <$> infer (Kind : g) e
 infer g (TApp e t) = do
   TyAll b <- infer g e
   return (TySubstT t b)
@@ -159,19 +173,20 @@ infer g (Box d e) = do
   TyBoxT g1 <$> infer g1 e
 infer _ (FEnv []) = pure (TyEnvt [])
 infer g (FEnv (ExpE e : d)) = do
-  TyEnvt g1 <- infer g (FEnv d)
-  a <- infer (g1 ++ g) e
-  return (TyEnvt (Type a : g1))
+    TyEnvt g1 <- infer g (FEnv d)
+    a <- infer (g1 ++ g) e
+    return (TyEnvt (Type a : g1))
 infer g (FEnv (RecE e : d)) = do
-  TyEnvt g1 <- infer g (FEnv d)
-  a <- infer (g1 ++ g) e
-  return (TyEnvt (Type a : g1))
+    TyEnvt g1 <- infer g (FEnv d)
+    a <- infer (g1 ++ g) e
+    return (TyEnvt (Type a : g1))
 infer g (FEnv (TypE t : d)) = do
-  TyEnvt g1 <- infer g (FEnv d)
-  return (TyEnvt (TypeEq t : g1))
+    TyEnvt g1 <- infer g (FEnv d)
+    return (TyEnvt (TypeEq t : g1))
 infer g (Rec l e) = TyRcd l <$> infer g e
 infer g (RProj e l) = do
   TyEnvt g1 <- infer g e
+  traceM (show (rlk g1 l))
   rlk g1 l
 infer g (Anno e t) =
   if check g e t then Just t else Nothing
@@ -217,19 +232,17 @@ infer g (BinOp (Ge e1 e2)) = do
   guard (check g e1 (TyLit TyInt))
   guard (check g e2 (TyLit TyInt))
   return (TyLit TyBool)
-
+infer _ (DataCon _ _) = Nothing
 -- List inference
 infer _ (EList []) = Nothing -- Cannot infer empty list type
-infer g (EList (e:es)) = do
+infer g (EList (e : es)) = do
   t <- infer g e
   -- Check all remaining elements have the same type
   guard (all (\ei -> check g ei t) es)
   return (TyList t)
-
 infer g (ETake _ e) = do
   TyList t <- infer g e
   return (TyList t)
-
 infer _ _ = Nothing
 
 -- | Check an expression against a type
@@ -246,15 +259,32 @@ check g (TClos d e) (TyBoxT g1 (TyAll a)) =
     _ -> False
 check g (Fix e) (TyArr a b) =
   check (Type (TyArr a b) : g) e (TyArr a b)
-check g (App e1 e2) tyB   =
+check g (DataCon ctor args) ty =
+  case resolveTySum g ty of
+    Just ctors ->
+      case lookup ctor ctors of
+        Just fieldTys -> length fieldTys == length args && and (zipWith (check g) args fieldTys)
+        Nothing -> False
+    Nothing -> False
+check g (App e1 e2) tyB =
   case infer g e2 of
-    Just tyA  -> check g e1 (TyArr tyA tyB)
-    Nothing   -> False
+    Just tyA -> check g e1 (TyArr tyA tyB)
+    Nothing -> False
 -- List checking
-check _ (EList []) (TyList _) = True  -- Empty list checks against any list type
+check _ (EList []) (TyList _) = True -- Empty list checks against any list type
 check g (EList es) (TyList t) = all (\e -> check g e t) es
-
+check g (FEnv d) (TyEnvt g1) =
+  case infer g (FEnv d) of
+    Just (TyEnvt g2) -> g1 == g2 && lvalue d
+    _ -> False
 check g e t =
   case infer g e of
     Just t' -> teq g t' t g
-    _ -> False
+    _ -> 
+      trace ("FAILED to check: " ++ show e ++ " against type: " ++ show t) $
+      False
+
+resolveTySum :: TyEnv -> Typ -> Maybe [(String, [Typ])]
+resolveTySum _ (TySum ctors) = Just ctors
+resolveTySum g (TyVar x) = lookt g x >>= resolveTySum g
+resolveTySum _ _ = Nothing

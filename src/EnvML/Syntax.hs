@@ -48,6 +48,7 @@ data Typ
   | TyAll     Name  Typ       -- forall a'. T
   | TyBoxT    TyCtx Typ       -- [t1 : int, t2 : int, t3: bool] ==> A
   | TyRcd     [(Name, Typ)]   -- {l1 : A1, l2 : A2, ln : An}
+  | TySum     [(Name, [Typ])] -- Tagged union: [(tag, field_types)]
   | TyCtx     TyCtx           -- [t : A, t1 : Type, t2 : A=]
   | TyModule  ModuleTyp       -- Note: First-class modules
   | TyList    Typ             -- [A]
@@ -67,9 +68,14 @@ type Structures = [Structure]
 data Structure
   = Let           Name (Maybe Typ) Exp  -- let x : A = e
   | TypDecl       Name Typ -- type t = A
+  | AdtDecl       Name [Name] [Constructor]  -- type List a = Nil | Cons a (List a)
   | ModTypDecl    Name ModuleTyp -- module type S = ...
   | ModStruct     Name (Maybe ModuleTyp) Module -- module M : S = struct ... endj
   | FunctStruct   Name FunArgs (Maybe ModuleTyp) Module  -- functor F (type t) (x : A) : S = struct ... end
+  deriving (Eq, Show)
+
+data Constructor
+  = Constructor Name [Typ]  -- Name with field types (empty list for nullary)
   deriving (Eq, Show)
 
 type Env = [EnvE]
@@ -99,6 +105,7 @@ data Exp
   | FEnv  Env               -- [type a = int, x = 1]
   | Anno  Exp Typ           -- (e::A)
   | Mod   Module            -- functor or struct
+  | DataCon Name [Exp]      -- Green 2 "Hello"
   -- Lists
   | EList [Exp]             -- [e1, e2, e3]
   | ETake Int Exp           -- take(n, ls)
@@ -125,6 +132,7 @@ typPrec t = case t of
   TyLit _     -> 4
   TyVar _     -> 4
   TyRcd {}    -> 4
+  TySum {}    -> 4
   TyCtx _     -> 4
   TyModule _  -> 4
   TyList _    -> 4
@@ -149,6 +157,7 @@ expPrec e = case e of
   Rec {}    -> 5
   FEnv _    -> 5
   Mod _     -> 5
+  DataCon _ _ -> 5
   EList _   -> 5
   ETake _ _ -> 5
   _ -> 4 -- TODO: Extensions
@@ -198,6 +207,11 @@ intercalateComma :: [String] -> String
 intercalateComma [] = ""
 intercalateComma [x] = x
 intercalateComma (x:xs) = x ++ ", " ++ intercalateComma xs
+
+intercalateWith :: String -> [String] -> String
+intercalateWith _ [] = ""
+intercalateWith _ [x] = x
+intercalateWith sep (x:xs) = x ++ sep ++ intercalateWith sep xs
 
 -- TyCtx pretty printing (updated for new TyCtxE constructors)
 prettyTyCtxE :: TyCtxE -> String
@@ -282,8 +296,14 @@ prettyTyp (TyCtx ctx) = "[" ++ prettyTyCtx ctx ++ "]"
 prettyTyp (TyRcd []) = "{}"
 prettyTyp (TyRcd fields) = 
   "{" ++ intercalateComma (map (\(l, t) -> l ++ " : " ++ prettyTyp t) fields) ++ "}"
+prettyTyp (TySum ctors) =
+  intercalateWith " | " (map prettyCtorSpec ctors)
 prettyTyp (TyModule mt) = prettyModuleTyp mt
 prettyTyp (TyList t) = "[" ++ prettyTyp t ++ "]"
+
+prettyCtorSpec :: (Name, [Typ]) -> String
+prettyCtorSpec (ctor, []) = ctor
+prettyCtorSpec (ctor, tys) = ctor ++ " " ++ unwords (map prettyTyp tys)
 
 prettyStructures :: Structures -> String
 prettyStructures = concatMap (\s -> prettyStructure s ++ "\n")
@@ -296,6 +316,9 @@ prettyStructure (Let n (Just t) e) =
   "let " ++ n ++ " : " ++ prettyTyp t ++ " = " ++ prettyExp e
 prettyStructure (TypDecl n t) = 
   "type " ++ n ++ " = " ++ prettyTyp t
+prettyStructure (AdtDecl n tys ctors) =
+  let params = if null tys then "" else " " ++ unwords tys
+  in "type " ++ n ++ params ++ " = " ++ intercalateWith " | " (map prettyConstructor ctors)
 prettyStructure (ModTypDecl n mt) = 
   "module type " ++ n ++ " = " ++ prettyModuleTyp mt
 prettyStructure (ModStruct n Nothing s) = 
@@ -306,6 +329,10 @@ prettyStructure (FunctStruct n args Nothing s) =
   "functor " ++ n ++ " " ++ prettyFunArgs args ++ " = " ++ prettyModule s
 prettyStructure (FunctStruct n args (Just mt) s) = 
   "functor " ++ n ++ " " ++ prettyFunArgs args ++ " : " ++ prettyModuleTyp mt ++ " = " ++ prettyModule s
+
+prettyConstructor :: Constructor -> String
+prettyConstructor (Constructor n []) = n
+prettyConstructor (Constructor n tys) = n ++ " " ++ unwords (map prettyTyp tys)
 
 -- Module pretty printing
 prettyModule :: Module -> String
@@ -359,6 +386,10 @@ prettyExp (FEnv env) = "[" ++ prettyEnv env ++ "]"
 prettyExp (Anno e t) = 
   parensIf (expPrec e < expPrec (Anno e t)) (prettyExp e) ++ " :: " ++ prettyTyp t
 prettyExp (Mod m) = prettyModule m
+prettyExp (DataCon ctor args) =
+  if null args
+    then ctor
+    else ctor ++ "(" ++ intercalateComma (map prettyExp args) ++ ")"
 prettyExp (EList []) = "List[]"
 prettyExp (EList es) = "List[" ++ intercalateComma (map prettyExp es) ++ "]"
 prettyExp (ETake n ls) = "take(" ++ show n ++ ", " ++ prettyExp ls ++ ")"

@@ -105,6 +105,16 @@ spec = do
       named `shouldBe`
         Named.Fix "f" (Named.Lam "x" (Named.App (Named.Var "f") (Named.Var "x")))
 
+  describe "ADT Constructor Elaboration" $ do
+
+    it "builds constructor body as DataCon" $ do
+      buildConstructorBody "Some" ["field0"]
+        `shouldBe` Src.DataCon "Some" [Src.Var "field0"]
+
+    it "builds nullary constructor body as DataCon" $ do
+      buildConstructorBody "None" []
+        `shouldBe` Src.DataCon "None" []
+
   describe "Elaborate Binary Operators" $ do
 
     it "elaborates comparison operators" $ do

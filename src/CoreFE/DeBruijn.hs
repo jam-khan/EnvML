@@ -122,6 +122,8 @@ toNamelessExp eNames tNames e =
       Nameless.Anno
         (toNamelessExp eNames tNames e1)
         (toNamelessTyp eNames tNames ty)
+    (Named.DataCon ctor args) ->
+      Nameless.DataCon ctor (map (toNamelessExp eNames tNames) args)
     (Named.EList es)     ->
       Nameless.EList (map (toNamelessExp eNames tNames) es)
     (Named.ETake i e1)    ->
@@ -200,6 +202,11 @@ toNamelessTyp eNames tNames ty =
         (toNamelessTyp eNames (n:tNames) b)
     Named.TyRcd l a     ->
       Nameless.TyRcd l (toNamelessTyp eNames tNames a)
+    Named.TySum ctors   ->
+      Nameless.TySum
+        [ (ctorName, map (toNamelessTyp eNames tNames) ctorTypes)
+        | (ctorName, ctorTypes) <- ctors
+        ]
     Named.TyEnvt env    ->
       Nameless.TyEnvt (toNamelessTyEnv eNames tNames env)
     Named.TyList a      ->

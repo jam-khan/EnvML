@@ -110,6 +110,9 @@ eval env = go
       Lit (LitInt v1) <- eval env e1
       Lit (LitInt v2) <- eval env e2
       pure $ Lit (LitBool (v1 >= v2))
+    go (DataCon ctor args) = do
+      vals <- mapM (eval env) args
+      pure $ DataCon ctor vals
     go (EList es) = do
         vs <- mapM (eval env) es
         pure $ EList vs

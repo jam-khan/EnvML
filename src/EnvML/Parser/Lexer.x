@@ -71,6 +71,7 @@ tokens :-
   "-"         { \_ -> TokDash     }
   "*"         { \_ -> TokStar     }
   "@"         { \_ -> TokAt    }
+  "|"         { \_ -> TokPipe   }
 
   -- Literals and Identifiers
   $digit+             { \s -> TokInt (read s) }
@@ -140,6 +141,7 @@ data Token
   | TokPlus
   | TokDash
   | TokStar
+  | TokPipe
   deriving (Eq, Show)
 
 lexer :: String -> [Token]
