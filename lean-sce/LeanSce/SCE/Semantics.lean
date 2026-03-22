@@ -205,7 +205,7 @@ inductive BigStep : Exp → Exp → Exp → Prop where
     → BigStep ρ e₁ (.mclos v₁ A body)
     → BigStep ρ e₂ v₂
     → BigStep (.mrg v₁ v₂) body v
-    → BigStep ρ (.app e₁ e₂) v
+    → BigStep ρ (.mapp e₁ e₂) v
   /-
     ρ ⊢ e₁ ⇓ v₁       ρ ,, v₁ ⊢ e₂ ⇓ v₂
     ────────────────────────────────────────
@@ -297,18 +297,6 @@ inductive BigStep : Exp → Exp → Exp → Prop where
   | mfunctor_open {ρ : Exp} {A : Typ} {body : Exp}
     : Value ρ
     → BigStep ρ (.mfunctor .open_ A body) (.mclos ρ A body)
-  /-
-    ρ ⊢ e₁ ⇓ mclos(v₁, _, body)       ρ ⊢ e₂ ⇓ v₂
-    v₁ ,, v₂ ⊢ body ⇓ v
-    ──────────────────────────────────────────────────
-    ρ ⊢ mapp(e₁, e₂) ⇓ v
-  -/
-  | mapp {ρ e₁ e₂ v₁ v₂ v : Exp} {A : Typ} {body : Exp}
-    : Value ρ
-    → BigStep ρ e₁ (.mclos v₁ A body)
-    → BigStep ρ e₂ v₂
-    → BigStep (.mrg v₁ v₂) body v
-    → BigStep ρ (.mlink e₁ e₂) v
   /-
     ρ ⊢ e₁ ⇓ mclos(v₁, _, body)       ρ ⊢ e₂ ⇓ v₂
     v₁ ,, v₂ ⊢ body ⇓ v

@@ -267,13 +267,10 @@ theorem semantics_preservation
       constructor
       · exact ValTrans.vunit
       · exact C_Sem.EBig.ebunit hv1
-  | lrec ctx A se ce l he ih =>
-      cases heval with
-      | lrec hv heval_inner =>
-          rename_i vi
-          have hv_inner : SCE.Value vi := by cases hv2; assumption
-          obtain ⟨cv', hvt, hceval⟩ := ih (hv1 := hv1) (hv2 := hv_inner) (hv3 := hv3) heval_inner henv
-          exact ⟨Core.Exp.lrec l cv', ValTrans.vlrec hvt, C_Sem.EBig.ebrec hceval⟩
+  | clos ctx v A body hp hv hce1 hce2 ihel1 ihel2 ih1 ih2 =>
+      sorry
+  | mclos ctx A A' B mty se1 se2 ce1 ce2 ihel1 ihel2 ih1 ih2 =>
+      sorry
   | proj ctx A B se ce i he hlook ih =>
     cases heval with
     | proj hv heval_inner hlookv =>
@@ -285,32 +282,29 @@ theorem semantics_preservation
         obtain ⟨cv', hvt', hlookv_core⟩ :=
           val_trans_index_lookup hvt_mid hlook hlookv
         exact ⟨cv', hvt', C_Sem.EBig.ebproj hceval_mid hlookv_core⟩
-  | lam ctx A B se ce _ ih =>
+  | lam ctx A B se ce elh ih =>
     cases heval with
     | lam hv =>
-      refine ⟨Core.Exp.clos cr (elabTyp A) ce, ?_, C_Sem.EBig.ebclos (sorry)⟩
-      exact ValTrans.vclos henv (by assumption)
-  | app ctx A B se1 se2 ce1 ce2 _ _ ih1 ih2 =>
+      sorry
+  | box ctx e1 e2 v1 v ce1 ce2 ihel1 ihel2 ih1 ih2 =>
+    sorry
+  | lrec ctx A se ce l he ih =>
+      cases heval with
+      | lrec hv heval_inner =>
+          rename_i vi
+          have hv_inner : SCE.Value vi := by cases hv2; assumption
+          obtain ⟨cv', hvt, hceval⟩ := ih (hv1 := hv1) (hv2 := hv_inner) (hv3 := hv3) heval_inner henv
+          exact ⟨Core.Exp.lrec l cv', ValTrans.vlrec hvt, C_Sem.EBig.ebrec hceval⟩
+  | app ctx A B se1 se2 ce1 ce2 elh1 elh2 ih1 ih2 =>
     cases heval with
     | app_clos hv heval1 heval2 heval_body =>
-      obtain ⟨cv1, hvt1, hceval1⟩ := ih1 heval1 henv
-      obtain ⟨cv2, hvt2, hceval2⟩ := ih2 heval2 henv
-      cases hvt1 with
-      | vclos henv_clos helab_body =>
         sorry
-    | app_mclos hv heval1 heval2 heval_body =>
-      sorry
+  | mapp ctx A mty se1 se2 ce1 ce2 ihe1 ihe2 ih1 ih2 =>
+    sorry
   | dmrg ctx A B se1 se2 ce1 ce2 _ _ ih1 ih2 =>
     cases heval with
     | dmrg hv heval1 heval2 =>
-      obtain ⟨cv1, hvt1, hceval1⟩ := ih1 heval1 henv
       sorry
-  | box ctx ctx' A se1 se2 ce1 ce2 _ _ ih1 ih2 =>
-    cases heval with
-    | box hv heval1 heval2 =>
-      obtain ⟨cv1, hvt1, hceval1⟩ := ih1 heval1 henv
-      obtain ⟨cv2, hvt2, hceval2⟩ := ih2 heval2 hvt1
-      exact ⟨cv2, hvt2, C_Sem.EBig.ebbox hceval1 hceval2⟩
   | _ => sorry -- remaining cases
 
 /-

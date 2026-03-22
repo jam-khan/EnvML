@@ -42,6 +42,7 @@ inductive Exp where
   | mfunctor : Sandbox → Typ → Exp → Exp
   | mclos : Exp → Typ → Exp → Exp
   | mlink : Exp → Exp → Exp
+  | mapp : Exp → Exp → Exp
   -- more terms
   | nmrg  : Exp → Exp → Exp
   | letb  : Exp → Typ → Exp → Exp
