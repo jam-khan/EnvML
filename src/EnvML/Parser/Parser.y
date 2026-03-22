@@ -4,6 +4,7 @@ module EnvML.Parser.Parser where
 import EnvML.Parser.Lexer
 import EnvML.Syntax
 import qualified CoreFE.Syntax as CoreFE
+import Data.Char (isUpper)
 }
 
 %name parseModule ModuleBody
@@ -30,6 +31,8 @@ import qualified CoreFE.Syntax as CoreFE
   fun       { TokFun   }
   fix       { TokFix   }
   if        { TokIf    }
+  case      { TokCase  }
+  of        { TokOf    }
   then      { TokThen  }
   else      { TokElse  }
   clos      { TokClos  }
@@ -37,6 +40,7 @@ import qualified CoreFE.Syntax as CoreFE
   box       { TokBox   }
   in        { TokIn    }
   forall    { TokForall }
+  mu        { TokMu }
   module    { TokModule }
   sig       { TokSig }
   end       { TokEnd }
@@ -52,6 +56,7 @@ import qualified CoreFE.Syntax as CoreFE
   ';'       { TokSemi }
   '::'      { TokDoubleColon }
   ':='      { TokColonEqual }
+  '=>'      { TokFatArrow }
   '->'      { TokArrow }
   '===>'    { TokTripleArrow }
   '->m'     { TokArrowM }
@@ -97,8 +102,9 @@ ModuleStructs :: { Structures }
 ModuleStruct :: { Structure }
   : let    id          '=' Exp       ';' { Let $2 Nothing $4              }
   | let    id ':' Typ  '=' Exp       ';' { Let $2 (Just $4) $6            }
+  | type   id '<' TypeVars '>' '=' Constructors ';' { TypDecl $2 (foldr TyAll (TySum $7) $4) }
+  | type   id          '=' Constructors ';' { TypDecl $2 (TySum $4)       }
   | type   id          '=' Typ       ';' { TypDecl $2 $4                  }
-  | type   id '<' TypeVars '>' '=' Constructors ';' { AdtDecl $2 $4 $7            }
   | module id          '=' ModuleExp ';' { ModStruct $2 Nothing $4        }
   | module id ':' ModuleTyp 
                        '=' ModuleExp ';' { ModStruct $2 (Just $4) $6      }
@@ -107,22 +113,16 @@ ModuleStruct :: { Structure }
   | functor id FunArgs ':' ModuleTyp 
                        '=' ModuleExp ';' { FunctStruct $2 $3 (Just $5) $7 }
 
-TypeVars :: { [Name] }
-  : id TypeVars { $1 : $2 }
-  | id          { [$1] }
-  |             { [] }
-
-Constructors :: { [Constructor] }
+Constructors :: { [(Name, Typ)] }
   : Constructor '|' Constructors { $1 : $3 }
   | Constructor                  { [$1] }
 
-Constructor :: { Constructor }
-  : id FieldTypes { Constructor $1 $2 }
+TypeVars :: { [Name] }
+  : id ',' TypeVars { $1 : $3 }
+  | id              { [$1] }
 
-FieldTypes :: { [Typ] }
-  : Typ FieldTypes { $1 : $2 }
-  | Typ            { [$1] }
-  |                { [] }
+Constructor :: { (Name, Typ) }
+  : id ':' Typ { ($1, $3) }
 
 InterfaceBody :: { ModuleTyp }
   : Intf                          { TySig $1 }
@@ -146,6 +146,7 @@ Exp :: { Exp }
   : fun FunArgs '->' Exp                  { Lam $2 $4 }
   | fix id '.' Exp                        { Fix $2 $4 }
   | if Exp then Exp else Exp              { If $2 $4 $6 }
+  | case Exp of CaseBranches              { Case $2 $4 }
   | clos '[' Env ']' FunArgs '->' Exp     { Clos $3 $5 $7 }
   | tclos '[' Env ']' FunArgs '->' Exp    { TClos $3 $5 $7 }
   | box '[' Env ']' in Exp                { Box $3 $6 }
@@ -170,7 +171,7 @@ ModuleExp :: { Module }
   | '(' ModuleExp ')'                     { $2 }
 
 Term :: { Exp }
-  : Term '(' Exp ')'     { App $1 $3 }
+  : Term '(' Exp ')'     { mkAppOrCtor $1 $3 }
   | Term '@' Typ         { TApp $1 $3 }
   | Term '.' id          { RProj $1 $3 }
   | Atom                 { $1 }
@@ -188,6 +189,13 @@ Atom :: { Exp }
   | take '(' num ',' Exp ')'  { ETake $3 $5 }
   | '(' Exp ')'               { $2 }
   | ModuleExp                 { Mod $1 }
+
+CaseBranches :: { [CaseBranch] }
+  : CaseBranch '|' CaseBranches { $1 : $3 }
+  | CaseBranch                  { [$1] }
+
+CaseBranch :: { CaseBranch }
+  : '<' id '=' id '>' '=>' Exp  { CaseBranch $2 $4 $7 }
 
 ListElems :: { [Exp] }
   : Exp ',' ListElems    { $1 : $3 }
@@ -224,6 +232,7 @@ EnvElem :: { EnvE }
 Typ :: { Typ }
   : BaseTyp '->' Typ                   { TyArr $1 $3 }
   | forall id '.' Typ                  { TyAll $2 $4 }
+  | mu id '.' Typ                      { TyMu $2 $4 }
   | '[' TyCtx ']' '===>' Typ           { TyBoxT $2 $5 }
   | BaseTyp                            { $1 }
 
@@ -272,4 +281,9 @@ TyCtxElem :: { TyCtxE }
 {
 parseError :: [Token] -> a
 parseError tokens = error $ "Parse error: " ++ show tokens
+
+mkAppOrCtor :: Exp -> Exp -> Exp
+mkAppOrCtor (Var n) e
+  | not (null n) && isUpper (head n) = DataCon n e
+mkAppOrCtor f e = App f e
 }

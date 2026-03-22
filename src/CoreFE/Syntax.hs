@@ -15,10 +15,11 @@ data Typ
   | TyVar Int
   | TyArr Typ Typ
   | TyAll Typ
+  | TyMu Typ
   | TyBoxT TyEnv Typ
   | TySubstT Typ Typ
   | TyRcd String Typ
-  | TySum [(String, [Typ])] -- Tagged union: [(tag, field_types)]
+  | TySum [(String, Typ)]
   | TyEnvt TyEnv
   | TyList Typ -- [A]
   deriving (Eq, Show)
@@ -48,13 +49,20 @@ data Exp
   | RProj Exp String
   | FEnv Env
   | Anno Exp Typ
+  | Fold Typ Exp
+  | Unfold Exp
   | Fix Exp
   | If Exp Exp Exp
   | BinOp BinOp
-  | DataCon String [Exp]
+  | DataCon String Exp
+  | Case Exp [CaseBranch]
   | -- List primitives
     EList [Exp] -- [e1, e2, e3]
   | ETake Int Exp -- take(n, ls)
+  deriving (Eq, Show)
+
+data CaseBranch
+  = CaseBranch String Exp
   deriving (Eq, Show)
 
 data BinOp
@@ -134,6 +142,8 @@ stringOfTyp (TyArr t1 t2) =
    in s1 ++ " → " ++ s2
 stringOfTyp (TyAll t) =
   "∀. " ++ stringOfTyp t
+stringOfTyp (TyMu t) =
+  "μ. " ++ stringOfTyp t
 stringOfTyp (TyBoxT bs t) =
   let sBinds = showTyEnv bs
       sTyp = parensIf (typPrec t < typPrec (TyBoxT bs t)) (stringOfTyp t)
@@ -145,8 +155,7 @@ stringOfTyp (TySubstT t1 t2) =
 stringOfTyp (TyEnvt bs) = "Env[" ++ showTyEnv bs ++ "]"
 stringOfTyp (TyRcd label t) = "{" ++ label ++ " : " ++ stringOfTyp t ++ "}"
 stringOfTyp (TySum ctors) =
-  let showCtor (tag, []) = tag
-      showCtor (tag, ts) = tag ++ " " ++ unwords (map stringOfTyp ts)
+  let showCtor (tag, t) = tag ++ " : " ++ stringOfTyp t
    in stringOfCons showCtor ctors
   where
     stringOfCons _ [] = ""
@@ -165,6 +174,7 @@ typPrec (TySubstT _ _) = 8
 typPrec (TyBoxT _ _) = 8
 typPrec (TyArr _ _) = 4
 typPrec (TyAll _) = 2
+typPrec (TyMu _) = 2
 
 stringOfTyEnvE :: TyEnvE -> String
 stringOfTyEnvE (Type t) = stringOfTyp t
@@ -237,10 +247,9 @@ stringOfExpI lvl op@(App e1 e2) =
       s2 = parensIf (expPrec e2 <= expPrec op) (stringOfExpI lvl e2)
    in s1 ++ " " ++ s2
 stringOfExpI lvl (BinOp binOp) = stringOfBinOpI lvl binOp
-stringOfExpI lvl (DataCon ctor args) =
-  case args of
-    [] -> ctor
-    _ -> ctor ++ "(" ++ stringOfList (stringOfExpI lvl) args ++ ")"
+stringOfExpI lvl (DataCon ctor arg) = ctor ++ "(" ++ stringOfExpI lvl arg ++ ")"
+stringOfExpI lvl (Case e branches) =
+  "case " ++ stringOfExpI lvl e ++ " of " ++ stringOfCaseBranchesI lvl branches
 stringOfExpI lvl (Clos env e) =
   "⟨[" ++ showEnvInline env ++ "] | λ. " ++ stringOfExpI lvl e ++ "⟩"
 stringOfExpI lvl (TClos env e) =
@@ -261,6 +270,10 @@ stringOfExpI lvl op@(RProj e label) =
 stringOfExpI lvl op@(Anno e t) =
   let sE = parensIf (expPrec e < expPrec op) (stringOfExpI lvl e)
    in sE ++ " : " ++ stringOfTyp t
+stringOfExpI lvl (Fold t e) =
+  "fold [" ++ stringOfTyp t ++ "] " ++ stringOfExpI lvl e
+stringOfExpI lvl (Unfold e) =
+  "unfold " ++ stringOfExpI lvl e
 -- List expressions
 stringOfExpI _lvl (EList []) = "List[]"
 stringOfExpI lvl (EList es) = "List[" ++ stringOfList (stringOfExpI lvl) es ++ "]"
@@ -283,7 +296,7 @@ isSimpleExp (Var _) = True
 isSimpleExp (Rec _ e) = isSimpleExp e
 isSimpleExp (RProj e _) = isSimpleExp e
 isSimpleExp (EList es) = length es <= 3 && all isSimpleExp es
-isSimpleExp (DataCon _ es) = length es <= 3 && all isSimpleExp es
+isSimpleExp (DataCon _ e) = isSimpleExp e
 isSimpleExp _ = False
 
 showEnvInline :: Env -> String
@@ -346,11 +359,14 @@ expPrec (Rec _ _) = 10
 expPrec (EList _) = 10
 expPrec (ETake _ _) = 10
 expPrec (DataCon _ _) = 10
+expPrec (Case _ _) = 2
 expPrec (RProj _ _) = 9
 expPrec (App _ _) = 8
 expPrec (TApp _ _) = 8
 expPrec (BinOp _) = 6
 expPrec (Anno _ _) = 4
+expPrec (Fold _ _) = 4
+expPrec (Unfold _) = 4
 expPrec (Box _ _) = 3
 expPrec (Clos _ _) = 3
 expPrec (TClos _ _) = 3
@@ -382,3 +398,12 @@ stringOfMaybeTyp (Just t) = stringOfTyp t
 stringOfMaybeExp :: Maybe Exp -> String
 stringOfMaybeExp Nothing = "None"
 stringOfMaybeExp (Just e) = stringOfExp e
+
+stringOfCaseBranchI :: Int -> CaseBranch -> String
+stringOfCaseBranchI lvl (CaseBranch ctor body) =
+  "<" ++ ctor ++ "> => " ++ stringOfExpI lvl body
+
+stringOfCaseBranchesI :: Int -> [CaseBranch] -> String
+stringOfCaseBranchesI _ [] = ""
+stringOfCaseBranchesI lvl [b] = stringOfCaseBranchI lvl b
+stringOfCaseBranchesI lvl (b : bs) = stringOfCaseBranchI lvl b ++ " | " ++ stringOfCaseBranchesI lvl bs

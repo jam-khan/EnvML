@@ -105,15 +105,20 @@ spec = do
       named `shouldBe`
         Named.Fix "f" (Named.Lam "x" (Named.App (Named.Var "f") (Named.Var "x")))
 
-  describe "ADT Constructor Elaboration" $ do
+    it "elaborates explicit source fold" $ do
+      let input = "fold [mu x. (Nil : int | Cons : x)] Nil(0)"
+      let parsed = parseExp (lexer input)
+      let named = elabExp parsed
+      named
+        `shouldBe` Named.Fold
+          (Named.TyMu "x" (Named.TySum [("Nil", Named.TyLit CoreFE.TyInt), ("Cons", Named.TyVar "x")]))
+          (Named.DataCon "Nil" (Named.Lit (CoreFE.LitInt 0)))
 
-    it "builds constructor body as DataCon" $ do
-      buildConstructorBody "Some" ["field0"]
-        `shouldBe` Src.DataCon "Some" [Src.Var "field0"]
-
-    it "builds nullary constructor body as DataCon" $ do
-      buildConstructorBody "None" []
-        `shouldBe` Src.DataCon "None" []
+    it "elaborates explicit source unfold" $ do
+      let input = "unfold x"
+      let parsed = parseExp (lexer input)
+      let named = elabExp parsed
+      named `shouldBe` Named.Unfold (Named.Var "x")
 
   describe "Elaborate Binary Operators" $ do
 
@@ -160,6 +165,12 @@ spec = do
       named `shouldBe` Named.TyAll "a" 
                          (Named.TyAll "b" 
                            (Named.TyArr (Named.TyVar "a") (Named.TyVar "b")))
+
+    it "elaborates recursive mu types" $ do
+      let input = "mu a. (a -> a)"
+      let parsed = parseTyp (lexer input)
+      let named = elabTyp parsed
+      named `shouldBe` Named.TyMu "a" (Named.TyArr (Named.TyVar "a") (Named.TyVar "a"))
 
   describe "Elaborate Modules" $ do
     

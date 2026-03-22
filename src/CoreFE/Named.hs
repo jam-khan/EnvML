@@ -30,10 +30,17 @@ data Exp
   | RProj Exp String
   | FEnv  Env
   | Anno  Exp Typ
-  | DataCon Name [Exp]
+  | Fold  Typ Exp
+  | Unfold Exp
+  | DataCon Name Exp
+  | Case Exp [CaseBranch]
   -- List primitives
   | EList  [Exp]        -- [e1, e2, e3]
   | ETake  Int Exp      -- take(n, ls)
+  deriving (Eq, Show)
+
+data CaseBranch
+  = CaseBranch Name Name Exp
   deriving (Eq, Show)
 
 data BinOp
@@ -60,10 +67,11 @@ data Typ
   | TyVar    Name           -- t
   | TyArr    Typ Typ        -- A -> A
   | TyAll    Name Typ       -- ∀t. A
+  | TyMu     Name Typ       -- μt. A
   | TyBoxT   TyEnv Typ      -- Γ ▷ A
   | TySubstT Name Typ Typ   -- [t = A] B
   | TyRcd    String Typ     -- {l : A}
-  | TySum    [(String, [Typ])]  -- Tagged union: [(tag, field_types)]
+  | TySum    [(String, Typ)]
   | TyEnvt   TyEnv          -- Γ
   | TyList   Typ            -- [A]
   deriving (Eq, Show)
@@ -99,14 +107,14 @@ prettyTyp (TyArr t1 t2) =
         s2 = prettyTyp t2
     in s1 ++ " -> " ++ s2
 prettyTyp (TyAll n t) = "forall " ++ n ++ ". " ++ prettyTyp t
+prettyTyp (TyMu n t) = "mu " ++ n ++ ". " ++ prettyTyp t
 prettyTyp (TyBoxT env t) = 
     "[" ++ prettyTyEnv env ++ "] => " ++ prettyTyp t
 prettyTyp (TySubstT n t1 t2) = 
     "[" ++ n ++ " = " ++ prettyTyp t1 ++ "] " ++ prettyTyp t2
 prettyTyp (TyRcd label t) = "{" ++ label ++ " : " ++ prettyTyp t ++ "}"
 prettyTyp (TySum ctors) =
-  let showCtor (tag, []) = tag
-      showCtor (tag, ts) = tag ++ " " ++ unwords (map prettyTyp ts)
+  let showCtor (tag, t) = tag ++ " : " ++ prettyTyp t
   in intercalate " | " (map showCtor ctors)
 prettyTyp (TyEnvt env) = "Env[" ++ prettyTyEnv env ++ "]"
 prettyTyp (TyList t) = "[" ++ prettyTyp t ++ "]"
@@ -163,10 +171,11 @@ prettyExp (RProj e label) =
 prettyExp (FEnv env) = "[" ++ prettyEnv env ++ "]"
 prettyExp (Anno e t) =
     parenIf (needsParenExp e) (prettyExp e) ++ " : " ++ prettyTyp t
-prettyExp (DataCon ctor args) =
-  case args of
-    [] -> ctor
-    _ -> ctor ++ "(" ++ intercalate ", " (map prettyExp args) ++ ")"
+prettyExp (Fold t e) = "fold [" ++ prettyTyp t ++ "] " ++ prettyExp e
+prettyExp (Unfold e) = "unfold " ++ prettyExp e
+prettyExp (DataCon ctor arg) = ctor ++ "(" ++ prettyExp arg ++ ")"
+prettyExp (Case e branches) =
+  "case " ++ prettyExp e ++ " of " ++ intercalate " | " (map prettyCaseBranch branches)
 prettyExp (EList []) = "List[]"
 prettyExp (EList es) = "List[" ++ intercalate ", " (map prettyExp es) ++ "]"
 prettyExp (ETake n ls) = "take(" ++ show n ++ ", " ++ prettyExp ls ++ ")"
@@ -180,6 +189,8 @@ needsParenExp (Fix _ _) = True
 needsParenExp (If _ _ _) = True
 needsParenExp (BinOp _) = True
 needsParenExp (Anno _ _) = True
+needsParenExp (Fold _ _) = True
+needsParenExp (Unfold _) = True
 needsParenExp _ = False
 
 needsParenProj :: Exp -> Bool
@@ -190,6 +201,10 @@ needsParenProj (Rec _ _) = False
 needsParenProj (DataCon _ _) = False
 needsParenProj (EList _) = False
 needsParenProj _ = True
+
+prettyCaseBranch :: CaseBranch -> String
+prettyCaseBranch (CaseBranch ctor binder body) =
+  "<" ++ ctor ++ "=" ++ binder ++ "> => " ++ prettyExp body
 
 prettyEnv :: Env -> String
 prettyEnv [] = ""

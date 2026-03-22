@@ -42,8 +42,6 @@ prettyEnvMLStructure (EnvML.Let n (Just t) e) =
     "let " ++ n ++ " : " ++ EnvML.prettyTyp t ++ " = " ++ prettyEnvMLExpShort e
 prettyEnvMLStructure (EnvML.TypDecl n t) = 
     "type " ++ n ++ " = " ++ EnvML.prettyTyp t
-prettyEnvMLStructure (EnvML.AdtDecl n tys ctors) =
-    EnvML.prettyStructure (EnvML.AdtDecl n tys ctors)
 prettyEnvMLStructure (EnvML.ModTypDecl n mt) = 
     "module type " ++ n ++ " = " ++ EnvML.prettyModuleTyp mt
 prettyEnvMLStructure (EnvML.ModStruct n Nothing m) = 
@@ -114,8 +112,10 @@ prettyNamedExpShort (Named.Rec l e) = "{" ++ l ++ " = " ++ prettyNamedExpShort e
 prettyNamedExpShort (Named.RProj e l) = prettyNamedExpShort e ++ "." ++ l
 prettyNamedExpShort (Named.FEnv env) = prettyNamedEnvShort env
 prettyNamedExpShort (Named.Anno e _) = prettyNamedExpShort e
-prettyNamedExpShort (Named.DataCon ctor args) =
-    if null args then ctor else ctor ++ "(" ++ intercalate ", " (map prettyNamedExpShort args) ++ ")"
+prettyNamedExpShort (Named.Fold _ e) = "fold(...) " ++ prettyNamedExpShort e
+prettyNamedExpShort (Named.Unfold e) = "unfold " ++ prettyNamedExpShort e
+prettyNamedExpShort (Named.DataCon ctor arg) = ctor ++ "(" ++ prettyNamedExpShort arg ++ ")"
+prettyNamedExpShort (Named.Case _ _) = "case ... of ..."
 prettyNamedExpShort (Named.BinOp _) = "..."
 prettyNamedExpShort (Named.EList es) = foldr (\e acc -> acc ++ prettyNamedExpShort e ++ ",") "" es
 prettyNamedExpShort (Named.ETake i e) = "take(" ++ show i ++ "," ++ prettyNamedExpShort e ++ ")"
@@ -169,8 +169,10 @@ prettyDeBruijnExpShort (CoreFE.Rec l e) = "{" ++ l ++ " = " ++ prettyDeBruijnExp
 prettyDeBruijnExpShort (CoreFE.RProj e l) = prettyDeBruijnExpShort e ++ "." ++ l
 prettyDeBruijnExpShort (CoreFE.FEnv env) = prettyDeBruijnEnvShort env
 prettyDeBruijnExpShort (CoreFE.Anno e _) = prettyDeBruijnExpShort e
-prettyDeBruijnExpShort (CoreFE.DataCon ctor args) =
-    if null args then ctor else ctor ++ "(" ++ intercalate ", " (map prettyDeBruijnExpShort args) ++ ")"
+prettyDeBruijnExpShort (CoreFE.Fold _ e) = "fold(...) " ++ prettyDeBruijnExpShort e
+prettyDeBruijnExpShort (CoreFE.Unfold e) = "unfold " ++ prettyDeBruijnExpShort e
+prettyDeBruijnExpShort (CoreFE.DataCon ctor arg) = ctor ++ "(" ++ prettyDeBruijnExpShort arg ++ ")"
+prettyDeBruijnExpShort (CoreFE.Case _ _) = "case ... of ..."
 prettyDeBruijnExpShort (CoreFE.Fix _) = "fix ..."
 prettyDeBruijnExpShort (CoreFE.If {}) = "if ... then ... else ..."
 prettyDeBruijnExpShort (CoreFE.BinOp op) = prettyDeBruijnBinOpShort op
@@ -205,6 +207,8 @@ needsParenCore (CoreFE.App _ _) = True
 needsParenCore (CoreFE.TApp _ _) = True
 needsParenCore (CoreFE.Lam _) = True
 needsParenCore (CoreFE.TLam _) = True
+needsParenCore (CoreFE.Fold _ _) = True
+needsParenCore (CoreFE.Unfold _) = True
 needsParenCore _ = False
 
 prettyDeBruijnExp :: CoreFE.Exp -> String
@@ -221,8 +225,10 @@ prettyDeBruijnExp (CoreFE.Rec l e) = "{" ++ l ++ " = " ++ prettyDeBruijnExp e ++
 prettyDeBruijnExp (CoreFE.RProj e l) = parenIf (needsParenCore e) (prettyDeBruijnExp e) ++ "." ++ l
 prettyDeBruijnExp (CoreFE.FEnv env) = "[" ++ prettyDeBruijnEnv env ++ "]"
 prettyDeBruijnExp (CoreFE.Anno e t) = parenIf (needsParenCore e) (prettyDeBruijnExp e) ++ " : " ++ prettyDeBruijnTyp t
-prettyDeBruijnExp (CoreFE.DataCon ctor args) =
-    if null args then ctor else ctor ++ "(" ++ intercalate ", " (map prettyDeBruijnExp args) ++ ")"
+prettyDeBruijnExp (CoreFE.Fold t e) = "fold [" ++ prettyDeBruijnTyp t ++ "] " ++ prettyDeBruijnExp e
+prettyDeBruijnExp (CoreFE.Unfold e) = "unfold " ++ prettyDeBruijnExp e
+prettyDeBruijnExp (CoreFE.DataCon ctor arg) = ctor ++ "(" ++ prettyDeBruijnExp arg ++ ")"
+prettyDeBruijnExp (CoreFE.Case e _) = "case " ++ prettyDeBruijnExp e ++ " of ..."
 prettyDeBruijnExp (CoreFE.Fix e) = "fix " ++ prettyDeBruijnExp e
 prettyDeBruijnExp (CoreFE.If e1 e2 e3) = "if " ++ prettyDeBruijnExp e1 ++ " then " ++ prettyDeBruijnExp e2 ++ " else " ++ prettyDeBruijnExp e3
 prettyDeBruijnExp (CoreFE.BinOp op) = prettyDeBruijnBinOp op
@@ -259,14 +265,14 @@ prettyDeBruijnTyp (CoreFE.TyArr t1 t2) =
         s2 = prettyDeBruijnTyp t2
     in s1 ++ " -> " ++ s2
 prettyDeBruijnTyp (CoreFE.TyAll t) = "forall. " ++ prettyDeBruijnTyp t
+prettyDeBruijnTyp (CoreFE.TyMu t) = "mu. " ++ prettyDeBruijnTyp t
 prettyDeBruijnTyp (CoreFE.TyBoxT env t) = "[" ++ prettyDeBruijnTyEnv env ++ "] => " ++ prettyDeBruijnTyp t
 prettyDeBruijnTyp (CoreFE.TySubstT t1 t2) = "#[" ++ prettyDeBruijnTyp t1 ++ "] " ++ prettyDeBruijnTyp t2
 prettyDeBruijnTyp (CoreFE.TyRcd l t) = "{" ++ l ++ " : " ++ prettyDeBruijnTyp t ++ "}"
 prettyDeBruijnTyp (CoreFE.TySum ctors) =
         intercalate " | " (map prettyCtor ctors)
     where
-        prettyCtor (ctor, []) = ctor
-        prettyCtor (ctor, tys) = ctor ++ " " ++ unwords (map prettyDeBruijnTyp tys)
+    prettyCtor (ctor, ty) = ctor ++ " : " ++ prettyDeBruijnTyp ty
 prettyDeBruijnTyp (CoreFE.TyEnvt env) = "Env[" ++ prettyDeBruijnTyEnv env ++ "]"
 prettyDeBruijnTyp (CoreFE.TyList es) = "list " ++ prettyDeBruijnTyp es
 

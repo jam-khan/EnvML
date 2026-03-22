@@ -22,7 +22,8 @@ tshift x (TySubstT a1 a2) = TySubstT (tshift x a1) (tshift (1 + x) a2)
 tshift x (TyRcd l a) = TyRcd l (tshift x a)
 tshift x (TyEnvt bs) = TyEnvt (tshiftBinds x bs)
 tshift x (TyList a) = TyList (tshift x a) -- ADD THIS
-tshift x (TySum ctors) = TySum [(l, map (tshift x) ts) | (l, ts) <- ctors] -- TODO: CHECK
+tshift x (TySum ctors) = TySum [(l, tshift x t) | (l, t) <- ctors]
+tshift x (TyMu t) = TyMu (tshift (1 + x) t) -- TODO: Verify
 
 tshiftBinds :: Int -> TyEnv -> TyEnv
 tshiftBinds _ [] = []
@@ -71,6 +72,8 @@ teq g1 (TyArr a b) (TyArr c d) g2 =
   teq g1 a c g2 && teq g1 b d g2
 teq g1 (TyAll a) (TyAll b) g2 =
   teq (Kind : g1) a b (Kind : g2)
+teq g1 (TyMu a) (TyMu b) g2 =
+  teq (Kind : g1) a b (Kind : g2)
 teq g1 (TySubstT a b) c g2 =
   teq (TypeEq a : g1) b c g2
 teq g1 b (TySubstT a c) g2 =
@@ -82,8 +85,8 @@ teq g1 (TyRcd l1 a) (TyRcd l2 b) g2 =
 teq g1 (TySum c1) (TySum c2) g2 =
   length c1 == length c2
     && and
-      [ n1 == n2 && length ts1 == length ts2 && and (zipWith (\t1 t2 -> teq g1 t1 t2 g2) ts1 ts2)
-      | ((n1, ts1), (n2, ts2)) <- zip c1 c2
+      [ n1 == n2 && teq g1 t1 t2 g2
+      | ((n1, t1), (n2, t2)) <- zip c1 c2
       ]
 teq g1 (TyList a) (TyList b) g2 =
   -- ADD THIS
@@ -106,7 +109,8 @@ value (Clos e _) = lvalue e
 value (TClos e _) = lvalue e
 value (FEnv e) = lvalue e
 value (Rec _ v) = value v
-value (DataCon _ vs) = all value vs
+value (Fold _ v) = value v
+value (DataCon _ v) = value v
 value (EList es) = all value es -- ADD THIS
 value _ = False
 
@@ -148,14 +152,13 @@ getVar (TypeEq _ : g) x = tshift 0 <$> getVar g x
 getVar (Type a : _) 0 = Just a
 getVar (Type _ : g) x = getVar g (x - 1)
 
--- TySubst (TyArr a b) ====> TyArr (TySubst a) (TySubst b)
--- TODO: Verify that this won't ruin things
-asArrowTy :: Typ -> Maybe (Typ, Typ)
-asArrowTy (TyArr a b) = Just (a, b)
-asArrowTy (TySubstT s t) = do
-  (a, b) <- asArrowTy t
-  pure (TySubstT s a, TySubstT s b)
-asArrowTy _ = Nothing
+resolveMuBody :: TyEnv -> Typ -> Maybe Typ
+resolveMuBody _ (TyMu body) = Just body
+resolveMuBody g (TyVar x) = lookt g x >>= resolveMuBody g
+resolveMuBody g (TySubstT s t) = do
+  body <- resolveMuBody (TypeEq s : g) t
+  pure (TySubstT s body)
+resolveMuBody _ _ = Nothing
 
 -- | Infer the type of an expression
 infer :: TyEnv -> Exp -> Maybe Typ
@@ -166,8 +169,7 @@ infer _ (Lit lit) = pure $ TyLit $ inferLit lit
     inferLit (LitStr _) = TyStr
 infer g (Var x) = getVar g x
 infer g (App e1 e2) = do
-  funTy <- infer g e1
-  (a, b) <- asArrowTy funTy
+  TyArr a b <- infer g e1
   guard (check g e2 a)
   return b
 infer g (TLam e) =
@@ -195,6 +197,14 @@ infer g (RProj e l) = do
   TyEnvt g1 <- infer g e
   traceM (show (rlk g1 l))
   rlk g1 l
+infer g (Fold t e) = do
+  body <- resolveMuBody g t
+  guard (check g e (TySubstT t body))
+  pure t
+infer g (Unfold e) = do
+  t <- infer g e
+  body <- resolveMuBody g t
+  pure (TySubstT t body)
 infer g (Anno e t) =
   if check g e t then Just t else Nothing
 infer g (BinOp (Add e1 e2)) = do
@@ -240,6 +250,10 @@ infer g (BinOp (Ge e1 e2)) = do
   guard (check g e2 (TyLit TyInt))
   return (TyLit TyBool)
 infer _ (DataCon _ _) = Nothing
+infer g (Case e branches) = do
+  t <- infer g e
+  ctors <- resolveTySum g t
+  inferCaseBranches g ctors branches
 -- List inference
 infer _ (EList []) = Nothing -- Cannot infer empty list type
 infer g (EList (e : es)) = do
@@ -254,6 +268,7 @@ infer _ _ = Nothing
 
 -- | Check an expression against a type
 check :: TyEnv -> Exp -> Typ -> Bool
+check g e (TySubstT a b) = check (TypeEq a : g) e b
 check g (Lam e) (TyArr a b) = check (Type a : g) e b
 check g (TLam e) (TyAll a) = check (Kind : g) e a
 check g (Clos d e) (TyBoxT g1 (TyArr a b)) =
@@ -270,7 +285,7 @@ check g (DataCon ctor args) ty =
   case resolveTySum g ty of
     Just ctors ->
       case lookup ctor ctors of
-        Just fieldTys -> length fieldTys == length args && and (zipWith (check g) args fieldTys)
+        Just payloadTy -> check g args payloadTy
         Nothing -> False
     Nothing -> False
 check g (App e1 e2) tyB =
@@ -291,7 +306,26 @@ check g e t =
       trace ("FAILED to check: " ++ show e ++ " against type: " ++ show t) $
       False
 
-resolveTySum :: TyEnv -> Typ -> Maybe [(String, [Typ])]
+inferCaseBranches :: TyEnv -> [(String, Typ)] -> [CaseBranch] -> Maybe Typ
+inferCaseBranches _ _ [] = Nothing
+inferCaseBranches g ctors (CaseBranch ctor body : rest) = do
+  payloadTy <- lookup ctor ctors
+  branchTy <- infer (Type payloadTy : g) body
+  inferRemaining branchTy rest
+  pure branchTy
+  where
+    inferRemaining _ [] = Just ()
+    inferRemaining expectedTy (CaseBranch ctor' body' : bs) = do
+      payloadTy' <- lookup ctor' ctors
+      branchTy' <- infer (Type payloadTy' : g) body'
+      guard (teq g expectedTy branchTy' g)
+      inferRemaining expectedTy bs
+
+resolveTySum :: TyEnv -> Typ -> Maybe [(String, Typ)]
 resolveTySum _ (TySum ctors) = Just ctors
 resolveTySum g (TyVar x) = lookt g x >>= resolveTySum g
+resolveTySum g (TySubstT a b) = do
+  ctors <- resolveTySum g b
+  pure [(name, TySubstT a payloadTy) | (name, payloadTy) <- ctors]
+resolveTySum g (TyMu a) = resolveTySum g (TySubstT (TyMu a) a)
 resolveTySum _ _ = Nothing

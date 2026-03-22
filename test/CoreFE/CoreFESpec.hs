@@ -719,6 +719,29 @@ spec = do
   describe "CoreFE Type Equality checking" $ do
     mapM_ mkTypEqTest typEqTests
 
+  describe "CoreFE explicit isorecursive terms" $ do
+    it "types fold into recursive type" $ do
+      let natTy = TyMu (TySum [("Z", TyLit TyBool), ("S", TyVar 0)])
+      let zVal = DataCon "Z" (Lit (LitBool True))
+      infer [] (Fold natTy zVal) `shouldBe` Just natTy
+
+    it "types and evaluates explicit unfold for case analysis" $ do
+      let natTy = TyMu (TySum [("Z", TyLit TyBool), ("S", TyVar 0)])
+      let scrutinee = Unfold (Fold natTy (DataCon "Z" (Lit (LitBool True))))
+      let expr =
+            Case
+              scrutinee
+              [ CaseBranch "Z" (Lit (LitInt 1))
+              , CaseBranch "S" (Lit (LitInt 0))
+              ]
+      infer [] expr `shouldBe` Just (TyLit TyInt)
+
+    it "types explicit unfold of recursive function type at application" $ do
+      let muArrow = TyMu (TyArr (TyLit TyInt) (TyLit TyInt))
+      let funVal = Fold muArrow (Lam (Var 0))
+      let expr = App (Unfold funVal) (Lit (LitInt 1))
+      check [] expr (TyLit TyInt) `shouldBe` True
+
   where
     mkEvalTest (name, src, expected) =
       it name $

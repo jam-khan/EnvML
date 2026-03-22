@@ -38,65 +38,7 @@ elabFunctor ((name, arg) : rest) body =
 
 -- Structures elaboration
 elabStructures :: EnvML.Structures -> CoreFE.Env
-elabStructures = reverse . map elabStructure . expandAdtDecls
-
--- Expand ADT declarations into type definition + constructor function definitions
-expandAdtDecls :: EnvML.Structures -> EnvML.Structures
-expandAdtDecls [] = []
-expandAdtDecls (EnvML.AdtDecl name typeParams constructors : rest) =
-  let typeBinding = EnvML.TypDecl name (buildAdtType typeParams constructors)
-      ctorBindings = map (elaborateConstructor typeParams constructors) constructors
-   in typeBinding : ctorBindings ++ expandAdtDecls rest
-expandAdtDecls (s : rest) = s : expandAdtDecls rest
-
--- Create a constructor function binding
-elaborateConstructor :: [EnvML.Name] -> [EnvML.Constructor] -> EnvML.Constructor -> EnvML.Structure
-elaborateConstructor typeParams allConstructors (EnvML.Constructor ctorName fieldTypes) =
-  let ctorFunc = buildConstructorFunction ctorName typeParams fieldTypes
-      ctorType = buildConstructorType typeParams allConstructors fieldTypes
-   in EnvML.Let ctorName (Just ctorType) ctorFunc
-
--- Build a constructor type: ∀typeParams. field1 -> field2 -> ... -> TySum
--- The return type must be the full ADT sum type so DataCon can be checked against it
-buildConstructorType :: [EnvML.Name] -> [EnvML.Constructor] -> [EnvML.Typ] -> EnvML.Typ
-buildConstructorType typeParams allConstructors fieldTypes =
-  let sumTy = EnvML.TySum (map (\(EnvML.Constructor ctorName ctorFieldTypes) -> (ctorName, ctorFieldTypes)) allConstructors)
-      returnTypeWithFields = buildArrowType fieldTypes sumTy
-      quantifiedType =
-        foldr
-          (\tp rest -> EnvML.TyAll tp rest)
-          returnTypeWithFields
-          typeParams
-   in quantifiedType
-
-buildArrowType :: [EnvML.Typ] -> EnvML.Typ -> EnvML.Typ
-buildArrowType [] result = result
-buildArrowType (t : ts) result = EnvML.TyArr t (buildArrowType ts result)
-
--- Build a constructor function as a lambda
--- For constructor Some with fields [a], it becomes: fun (type a) -> fun (x: a) -> Some(x)
-buildConstructorFunction :: EnvML.Name -> [EnvML.Name] -> [EnvML.Typ] -> EnvML.Exp
-buildConstructorFunction ctorName typeParams fieldTypes =
-  let typeArgs = map (\tp -> (tp, EnvML.TyArg)) typeParams
-      fieldArgs =
-        zip
-          (map (\i -> "field" ++ show i) ([0 :: Int ..]))
-          (map (\t -> EnvML.TmArgType t) fieldTypes)
-      allArgs = typeArgs ++ fieldArgs
-      body = buildConstructorBody ctorName (map fst fieldArgs)
-   in EnvML.Lam allArgs body
-
--- Build the body of a constructor: CtorName(field0, field1, ...)
-buildConstructorBody :: EnvML.Name -> [EnvML.Name] -> EnvML.Exp
-buildConstructorBody ctorName fieldNames =
-  EnvML.DataCon ctorName (map EnvML.Var fieldNames)
-
--- Build the ADT type representation: TySum [(name, types)]
-buildAdtType :: [EnvML.Name] -> [EnvML.Constructor] -> EnvML.Typ
-buildAdtType typeParams constructors =
-  let ctorSpecs = map (\(EnvML.Constructor name types) -> (name, types)) constructors
-      sumTy = EnvML.TySum ctorSpecs
-   in foldr EnvML.TyAll sumTy typeParams
+elabStructures = reverse . map elabStructure
 
 -- Structure elaboration
 elabStructure :: EnvML.Structure -> CoreFE.EnvE
@@ -118,8 +60,6 @@ elabStructure struct =
       case maybeTyp of
         Nothing -> CoreFE.ModE name (elabFunctor args mod1)
         Just mty -> CoreFE.ModE name (CoreFE.Anno (elabFunctor args mod1) (elabModTyp mty))
-    (EnvML.AdtDecl {}) ->
-      error "AdtDecl should have been expanded before elaboration"
 
 elabExp :: EnvML.Exp -> CoreFE.Exp
 elabExp e =
@@ -149,10 +89,15 @@ elabExp e =
       CoreFE.RProj (elabExp e1) n
     (EnvML.FEnv env) ->
       CoreFE.FEnv (elabEnv env)
+    (EnvML.Fold ty e1) ->
+      CoreFE.Fold (elabTyp ty) (elabExp e1)
+    (EnvML.Unfold e1) ->
+      CoreFE.Unfold (elabExp e1)
     (EnvML.Anno e1 ty) ->
       CoreFE.Anno (elabExp e1) (elabTyp ty)
     (EnvML.Mod m) -> elabModuleExp m
-    (EnvML.DataCon ctor args) -> CoreFE.DataCon ctor (map elabExp args)
+    (EnvML.DataCon ctor arg) -> CoreFE.DataCon ctor (elabExp arg)
+    (EnvML.Case scrutinee branches) -> CoreFE.Case (elabExp scrutinee) (map elabCaseBranch branches)
     (EnvML.BinOp (EnvML.Add e1 e2)) ->
       CoreFE.BinOp (CoreFE.Add (elabExp e1) (elabExp e2))
     (EnvML.BinOp (EnvML.Sub e1 e2)) ->
@@ -210,9 +155,10 @@ elabTyp ty =
     (EnvML.TyVar n) -> CoreFE.TyVar n
     (EnvML.TyArr ta tb) -> CoreFE.TyArr (elabTyp ta) (elabTyp tb)
     (EnvML.TyAll n ty1) -> CoreFE.TyAll n (elabTyp ty1)
+    (EnvML.TyMu n ty1) -> CoreFE.TyMu n (elabTyp ty1)
     (EnvML.TyBoxT ctx ty1) -> CoreFE.TyBoxT (elabTyCtx ctx) (elabTyp ty1)
     (EnvML.TyRcd fields) -> CoreFE.TyEnvt $ map (CoreFE.Type "_") $ elabRcdFieldsTy fields
-    (EnvML.TySum ctors) -> CoreFE.TySum [(name, map elabTyp types) | (name, types) <- ctors]
+    (EnvML.TySum ctors) -> CoreFE.TySum [(name, elabTyp payloadTy) | (name, payloadTy) <- ctors]
     (EnvML.TyCtx ctx) -> CoreFE.TyEnvt (elabTyCtx ctx)
     (EnvML.TyModule mty) -> elabModTyp mty
     (EnvML.TyList ty1) -> CoreFE.TyList $ elabTyp ty1
@@ -240,6 +186,10 @@ elabRcdFieldsTy :: [(EnvML.Name, EnvML.Typ)] -> [CoreFE.Typ]
 elabRcdFieldsTy [] = []
 elabRcdFieldsTy ((n, ty) : rest) =
   CoreFE.TyRcd n (elabTyp ty) : elabRcdFieldsTy rest
+
+elabCaseBranch :: EnvML.CaseBranch -> CoreFE.CaseBranch
+elabCaseBranch (EnvML.CaseBranch ctor binder body) =
+  CoreFE.CaseBranch ctor binder (elabExp body)
 
 elabModTyp :: EnvML.ModuleTyp -> CoreFE.Typ
 elabModTyp mty =

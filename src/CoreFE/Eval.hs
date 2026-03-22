@@ -65,6 +65,14 @@ eval env = go
     go (RProj e l) = do
       v <- eval env e
       rlookupv v l
+    go (Fold t e) = do
+      v <- eval env e
+      pure (Fold t v)
+    go (Unfold e) = do
+      v <- eval env e
+      case v of
+        Fold _ inner -> pure inner
+        _ -> Nothing
     go (Anno e _) =
       eval env e
     go (Fix e) = do
@@ -110,12 +118,22 @@ eval env = go
       Lit (LitInt v1) <- eval env e1
       Lit (LitInt v2) <- eval env e2
       pure $ Lit (LitBool (v1 >= v2))
-    go (DataCon ctor args) = do
-      vals <- mapM (eval env) args
-      pure $ DataCon ctor vals
+    go (DataCon ctor arg) = do
+      val <- eval env arg
+      pure $ DataCon ctor val
+    go (Case e branches) = do
+      DataCon ctor payload <- eval env e
+      branchBody <- lookupCaseBranch ctor branches
+      eval (ExpE payload : env) branchBody
     go (EList es) = do
         vs <- mapM (eval env) es
         pure $ EList vs
     go (ETake n e) = do
         EList vs <- eval env e
         pure $ EList (take n vs)
+
+lookupCaseBranch :: String -> [CaseBranch] -> Maybe Exp
+lookupCaseBranch _ [] = Nothing
+lookupCaseBranch ctor (CaseBranch ctor' body : rest)
+  | ctor == ctor' = Just body
+  | otherwise = lookupCaseBranch ctor rest

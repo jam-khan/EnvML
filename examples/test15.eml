@@ -1,0 +1,11 @@
+
+type NatList = forall t. mu x. (Nil : t | Cons : x);
+
+-- Explicit fold at introduction
+let a = fold [NatList] Nil(2);
+
+-- Explicit unfold at elimination
+let res =
+	case unfold a of
+		<Nil = x> => x
+	| <Cons = x> => 0;

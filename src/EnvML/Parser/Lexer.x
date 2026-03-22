@@ -25,13 +25,18 @@ tokens :-
   fun         { \_ -> TokFun  }
   fix         { \_ -> TokFix  }
   if          { \_ -> TokIf }
+  case        { \_ -> TokCase }
+  of          { \_ -> TokOf }
   then        { \_ -> TokThen }
   else        { \_ -> TokElse }
   clos        { \_ -> TokClos }
   tclos       { \_ -> TokTClos}
   box         { \_ -> TokBox  }
+  fold        { \_ -> TokFold }
+  unfold      { \_ -> TokUnfold }
   in          { \_ -> TokIn  }
   forall      { \_ -> TokForall }
+  mu          { \_ -> TokMu }
   module      { \_ -> TokModule }
   sig         { \_ -> TokSig  }
   end         { \_ -> TokEnd  }
@@ -52,6 +57,7 @@ tokens :-
   "="         { \_ -> TokEq       }
   ":"         { \_ -> TokColon    }
   ":="        { \_ -> TokColonEqual    }
+  "=>"        { \_ -> TokFatArrow    }
   "("         { \_ -> TokLParen   }
   ")"         { \_ -> TokRParen   }
   "["         { \_ -> TokLBracket }
@@ -96,14 +102,19 @@ data Token
   | TokFun
   | TokFix
   | TokIf
+  | TokCase
+  | TokOf
   | TokThen
   | TokElse
   | TokAt
   | TokClos
   | TokTClos
   | TokBox
+  | TokFold
+  | TokUnfold
   | TokIn
   | TokForall
+  | TokMu
   | TokModule
   | TokSig
   | TokEnd
@@ -137,6 +148,7 @@ data Token
   | TokTripleArrow
   | TokDoubleColon
   | TokColonEqual
+  | TokFatArrow
   | TokLink
   | TokPlus
   | TokDash
