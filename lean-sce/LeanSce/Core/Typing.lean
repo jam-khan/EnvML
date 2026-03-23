@@ -11,7 +11,7 @@ inductive HasType : Typ → Exp → Typ → Prop where
     : HasType Γ .unit .top
   | tapp {Γ A B : Typ} {e₁ e₂ : Exp}
     : HasType Γ e₁ (.arr A B)
-    → HasType Γ e₂ B
+    → HasType Γ e₂ A
     → HasType Γ (.app e₁ e₂) B
   | tbox {Γ Γ₁ A B : Typ} {e₁ e₂ : Exp}
     : HasType Γ e₁ Γ₁
@@ -28,7 +28,7 @@ inductive HasType : Typ → Exp → Typ → Prop where
     : HasType Γ e A
     → Lookup A n B
     → HasType Γ (.proj e n) B
-  | tclos {Γ Γ₁ A B : Typ} {v e : Exp} {n : Nat}
+  | tclos {Γ Γ₁ A B : Typ} {v e : Exp}
     : Value v
     → HasType .top v Γ₁
     → HasType (.and Γ₁ A) e B

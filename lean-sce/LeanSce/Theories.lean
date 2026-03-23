@@ -241,7 +241,7 @@ theorem semantics_preservation
     {hv3 : SCE.Value rs}
     {hv4 : Core.Value cv}
     (helab : elabExp Γ es A ec)
-    (heval : S_Sem.BigStep rs es vs)
+    (heval : S_Sem.BStep rs es vs)
     (henv  : ValTrans rs Γ cr)
     : ∃ cv, ValTrans vs A cv ∧ C_Sem.EBig cr ec cv := by
   induction helab generalizing rs vs cr with
@@ -320,7 +320,7 @@ theorem separate_compilation
     {rs vs : SCE.Exp} {cr : Core.Exp}
     (h₁ : elabExp Γ e₁ (.sig (.TyArrM A mt)) ce₁)
     (h₂ : elabExp Γ e₂ A ce₂)
-    (heval : S_Sem.BigStep rs (.mlink e₁ e₂) vs)
+    (heval : S_Sem.BStep rs (.mlink e₁ e₂) vs)
     (henv : ValTrans rs Γ cr)
     : ∃ cv, ValTrans vs (.sig (.TyArrM A mt)) cv
           ∧ C_Sem.EBig cr (.mrg ce₂ (.app ce₁ ce₂)) cv := by
