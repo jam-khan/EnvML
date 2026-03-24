@@ -224,6 +224,49 @@ theorem rlookup_pres {E l A} :
   exact value_weaken h (rlookupv_value hlv hv)
 
 @[simp]
+theorem lookup_prog {n A B} :
+  Lookup A n B
+  → ∀ {v}, HasType .top v A → Value v
+  → ∃ e', LookupV v n e' := by
+  intro hl
+  induction hl with
+  | zero =>
+    intro v ht hv
+    cases ht <;> cases hv
+    · rename_i v1 v2 h1 h2 hv1 hv2
+      exact ⟨_, LookupV.lvzero⟩
+  | succ _ ih =>
+    intro v ht hv
+    cases ht <;> cases hv
+    · rename_i v1 v2 h1 h2 hv1 hv2
+      have ⟨e', he⟩ := ih (value_weaken h1 hv1) hv1
+      exact ⟨_, LookupV.lvsucc he⟩
+
+@[simp]
+theorem rlookup_prog {l A B} :
+  RLookup A l B
+  → ∀ {v}, HasType .top v A → Value v
+  → ∃ e', RLookupV v l e' := by
+  intro hl
+  induction hl with
+  | zero =>
+    intro v ht hv
+    cases ht <;> cases hv
+    · exact ⟨_, RLookupV.rvlzero⟩
+  | landl _ _ ih =>
+    intro v ht hv
+    cases ht <;> cases hv
+    · rename_i v1 v2 h1 h2 hv1 hv2
+      have ⟨e', he⟩ := ih (value_weaken h1 hv1) hv1
+      exact ⟨_, RLookupV.vlandl he⟩
+  | landr _ _ ih =>
+    intro v ht hv
+    cases ht <;> cases hv
+    · rename_i v1 v2 h1 h2 hv1 hv2
+      have ⟨e', he⟩ := ih (value_weaken h2 hv2) hv2
+      exact ⟨_, RLookupV.vlandr he⟩
+
+@[simp]
 theorem gpreservation
   {e e' v : Exp}
   (hstep : Step v e e') :
@@ -367,4 +410,157 @@ theorem gprogress
   Value v
   → HasType .top v E
   → (Value e) ∨ (∃ e' : Exp, Step v e e') := by
-  sorry
+  induction htype with
+  | tquery =>
+    rename_i Γ
+    intro v hv henv
+    right
+    exists v
+    exact Step.squery hv
+  | tint =>
+    rename_i Γ n
+    intro v hv henv
+    left
+    exact Value.vint
+  | tunit =>
+    rename_i Γ
+    intro v hv henv
+    left
+    exact Value.vunit
+  | tapp htype1 htype2 ih1 ih2 =>
+    rename_i Γ A B e1 e2
+    intro v hv henv
+    have h1 := ih1 hv henv
+    have h2 := ih2 hv henv
+    cases h1 with
+    | inr h =>
+      obtain ⟨e', hstep1⟩ := h
+      right
+      exists (.app e' e2)
+      exact Step.sappl hv hstep1
+    | inl hve1 =>
+      right
+      cases h2 with
+      | inr h =>
+        obtain ⟨e', hstep1⟩ := h
+        exists (.app e1 e')
+        exact Step.sappr hv hve1 hstep1
+      | inl h =>
+          cases hve1 with
+          | vclos hvc =>
+            cases htype1 with
+            | tclos hv' ht' hb =>
+              exact ⟨_, Step.sbeta hv h hvc⟩
+          | _ =>
+            cases htype1
+  | tbox htyp1 htyp2 ih1 ih2 =>
+    rename_i Γ Γ₁ A B e1 e2
+    intro v hv henv
+    have h1 := ih1 hv henv
+    cases h1 with
+    | inr h =>
+      obtain ⟨e'', hstep⟩ := h
+      right <;> exact ⟨_, Step.sboxl hv hstep⟩
+    | inl hv1 =>
+      right
+      have henv2 : HasType .top e1 Γ₁ := value_weaken htyp1 hv1
+      have h2 := ih2 hv1 henv2
+      cases h2 with
+      | inr h =>
+        have ⟨e', hstep⟩ := h
+        exists (.box e1 e')
+        exact Step.sboxr hv hv1 hstep
+      | inl hv' =>
+        exists e2
+        exact Step.sboxv hv hv1 hv'
+  | tmrg htyp1 htyp2 ih1 ih2 =>
+    rename_i Γ A B e1 e2
+    intro v hv henv
+    have h1 := ih1 hv henv
+    cases h1 with
+    | inr h =>
+      obtain ⟨e', hstep⟩ := h
+      right
+      exact ⟨_, Step.smrgl hv hstep⟩
+    | inl hve1 =>
+      have henv' : HasType .top (.mrg v e1) (Γ.and A) :=
+        HasType.tmrg henv (value_weaken htyp1 hve1)
+      have h2 := ih2 (Value.vmrg hv hve1) henv'
+      cases h2 with
+      | inr h =>
+        obtain ⟨e', hstep⟩ := h
+        right
+        exact ⟨_, Step.smrgr hv hve1 hstep⟩
+      | inl hve2 =>
+        left
+        exact Value.vmrg hve1 hve2
+  | tlam htyp ih1 =>
+    rename_i Γ A1 B e1
+    intro v hv henv
+    right
+    exists (.clos v A1 e1)
+    exact Step.sclos hv
+  | tclos hv htyp1 htyp2 ih1 ih2 =>
+    rename_i Γ Γ₁ A1 B1 e1 e2
+    intro v hv henv
+    left
+    (expose_names; exact Value.vclos hv_1)
+  | tproj htyp1 hlookup ih1 =>
+    rename_i Γ A B e1 n
+    intro v hv henv
+    right
+    have h1 := ih1 hv henv
+    cases h1 with
+    | inr h =>
+      obtain ⟨e', hstep⟩ := h
+      exists (.proj e' n)
+      exact Step.sproj hv hstep
+    | inl h =>
+      have htyp_top : HasType .top e1 A := value_weaken htyp1 h
+      have ⟨v', hlv⟩ := lookup_prog hlookup htyp_top h
+      exact ⟨_, Step.sprojv hv h hlv⟩
+  | trcd htype ih1 =>
+    intro v hv henv
+    rename_i Γ A1 l e1
+    have h1 := ih1 hv henv
+    cases h1 with
+    | inr h =>
+      obtain ⟨e', hstep⟩ := h
+      right
+      exists (.lrec l e')
+      exact Step.slrec hv hstep
+    | inl h =>
+      left
+      exact Value.vrcd h
+  | trproj htyp1 hlookup ih1 =>
+    rename_i Γ A B l e1
+    intro v hv henv
+    have h1 := ih1 hv henv
+    cases h1 with
+    | inr h =>
+      obtain ⟨e', hstep⟩ := h
+      right
+      exists (.rproj e' l)
+      exact Step.srproj hv hstep
+    | inl h =>
+      right
+      have htyp_top : HasType .top e1 B := value_weaken htyp1 h
+      have ⟨v', hlv⟩ := rlookup_prog hlookup htyp_top h
+      exact ⟨_, Step.srprojv hv h hlv⟩
+
+theorem preservation {e e' A}
+  : HasType .top e A
+  → Step .unit e e'
+  → HasType .top e' A := by
+  intros htyp hstep
+  apply gpreservation <;> try assumption
+  exact HasType.tunit
+
+theorem progress {e A}
+  : HasType .top e A
+  →   Value e
+    ∨ ∃ e', Step .unit e e' := by
+  intros htype
+  apply gprogress <;> try assumption
+  · exact Value.vunit
+  · exact HasType.tunit
