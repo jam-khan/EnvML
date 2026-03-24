@@ -46,7 +46,6 @@ data Typ
   | TyVar     Name            -- x
   | TyArr     Typ   Typ       -- A -> B
   | TyAll     Name  Typ       -- forall a'. T
-  | TyMu      Name  Typ       -- mu a'. T
   | TyBoxT    TyCtx Typ       -- [t1 : int, t2 : int, t3: bool] ==> A
   | TyRcd     [(Name, Typ)]   -- {l1 : A1, l2 : A2, ln : An}
   | TySum     [(Name, Typ)] -- Tagged union: [(tag, field_type)]
@@ -104,10 +103,8 @@ data Exp
   | RProj Exp Name          -- e.l
   | FEnv  Env               -- [type a = int, x = 1]
   | Anno  Exp Typ           -- (e::A)
-  | Fold  Typ Exp           -- fold [A] e
-  | Unfold Exp              -- unfold e
   | Mod   Module            -- functor or struct
-  | DataCon Name Exp
+  | DataCon Name Exp Typ    -- Ctor(e) as T
   | Case Exp [CaseBranch]
   -- Lists
   | EList [Exp]             -- [e1, e2, e3]
@@ -142,7 +139,6 @@ typPrec t = case t of
   TyArr _ _   -> 2
   TyBoxT _ _  -> 1
   TyAll _ _   -> 1
-  TyMu _ _    -> 1
 
 expPrec :: Exp -> Precedence
 expPrec e = case e of
@@ -156,14 +152,12 @@ expPrec e = case e of
   App _ _   -> 3
   TApp _ _  -> 3
   RProj _ _ -> 3
-  Fold _ _  -> 3
-  Unfold _  -> 3
   Lit _     -> 5
   Var _     -> 5
   Rec {}    -> 5
   FEnv _    -> 5
   Mod _     -> 5
-  DataCon _ _ -> 5
+  DataCon _ _ _ -> 5
   Case {}   -> 1
   EList _   -> 5
   ETake _ _ -> 5
@@ -295,9 +289,6 @@ prettyTyp (TyArr t1 t2) =
 prettyTyp (TyAll x t) =
   let s = parensIf (typPrec t < typPrec (TyAll x t)) (prettyTyp t)
    in "forall " ++ x ++ ". " ++ s
-prettyTyp (TyMu x t) =
-  let s = parensIf (typPrec t < typPrec (TyMu x t)) (prettyTyp t)
-   in "mu " ++ x ++ ". " ++ s
 prettyTyp (TyBoxT ctx t) =
   let sCtx = prettyTyCtx ctx
       sTyp = parensIf (typPrec t < typPrec (TyBoxT ctx t)) (prettyTyp t)
@@ -312,7 +303,7 @@ prettyTyp (TyModule mt) = prettyModuleTyp mt
 prettyTyp (TyList t) = "[" ++ prettyTyp t ++ "]"
 
 prettyCtorSpec :: (Name, Typ) -> String
-prettyCtorSpec (ctor, ty) = ctor ++ " : " ++ prettyTyp ty
+prettyCtorSpec (ctor, ty) = ctor ++ " as " ++ prettyTyp ty
 
 prettyStructures :: Structures -> String
 prettyStructures = concatMap (\s -> prettyStructure s ++ "\n")
@@ -387,15 +378,10 @@ prettyExp (RProj e label) =
 prettyExp (FEnv env) = "[" ++ prettyEnv env ++ "]"
 prettyExp (Anno e t) = 
   parensIf (expPrec e < expPrec (Anno e t)) (prettyExp e) ++ " :: " ++ prettyTyp t
-prettyExp (Fold t e) =
-  "fold [" ++ prettyTyp t ++ "] " ++
-  parensIf (expPrec e < expPrec (Fold t e)) (prettyExp e)
-prettyExp (Unfold e) =
-  "unfold " ++ parensIf (expPrec e < expPrec (Unfold e)) (prettyExp e)
 prettyExp (Mod m) = prettyModule m
-prettyExp (DataCon ctor arg) = ctor ++ "(" ++ prettyExp arg ++ ")"
+prettyExp (DataCon ctor arg ty) = ctor ++ "(" ++ prettyExp arg ++ ") as " ++ prettyTyp ty
 prettyExp (Case e branches) =
-  "case " ++ prettyExp e ++ " of " ++ intercalateWith " | " (map prettyCaseBranch branches)
+  "case " ++ prettyExp e ++ " of " ++ intercalateWith " " (map (("| " ++) . prettyCaseBranch) branches)
 prettyExp (EList []) = "List[]"
 prettyExp (EList es) = "List[" ++ intercalateComma (map prettyExp es) ++ "]"
 prettyExp (ETake n ls) = "take(" ++ show n ++ ", " ++ prettyExp ls ++ ")"
@@ -410,5 +396,7 @@ prettyExp (BinOp (Gt e1 e2)) = prettyExp e1 ++ " > " ++ prettyExp e2
 prettyExp (BinOp (Ge e1 e2)) = prettyExp e1 ++ " >= " ++ prettyExp e2
 
 prettyCaseBranch :: CaseBranch -> String
+prettyCaseBranch (CaseBranch "_" "" body) =
+  "_ => " ++ prettyExp body
 prettyCaseBranch (CaseBranch ctor binder body) =
   "<" ++ ctor ++ "=" ++ binder ++ "> => " ++ prettyExp body

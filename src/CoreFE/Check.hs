@@ -145,6 +145,15 @@ rlk (Type (TyEnvt t2) : g1) l
 rlk (TypeEq _ : g1) l = rlk g1 l
 rlk _ _ = Nothing
 
+resolveProjEnv :: TyEnv -> Typ -> Maybe TyEnv
+resolveProjEnv _ (TyEnvt env) = Just env
+resolveProjEnv g (TyVar x) = lookt g x >>= resolveProjEnv g
+resolveProjEnv g (TySubstT s t) = do
+  env <- resolveProjEnv g t
+  pure (env ++ [TypeEq s])
+resolveProjEnv g (TyMu t) = resolveProjEnv g (TySubstT (TyMu t) t)
+resolveProjEnv _ _ = Nothing
+
 getVar :: TyEnv -> Int -> Maybe Typ
 getVar [] _ = Nothing
 getVar (Kind : g) x = tshift 0 <$> getVar g x
@@ -194,8 +203,8 @@ infer g (FEnv (TypE t : d)) = do
     return (TyEnvt (TypeEq t : g1))
 infer g (Rec l e) = TyRcd l <$> infer g e
 infer g (RProj e l) = do
-  TyEnvt g1 <- infer g e
-  traceM (show (rlk g1 l))
+  t <- infer g e
+  g1 <- resolveProjEnv g t
   rlk g1 l
 infer g (Fold t e) = do
   body <- resolveMuBody g t
@@ -303,23 +312,34 @@ check g e t =
   case infer g e of
     Just t' -> teq g t' t g
     _ -> 
-      trace ("FAILED to check: " ++ show e ++ " against type: " ++ show t) $
+      trace ("FAILED to check: " ++ show e ++ " against type: " ++ show t ++ ") in " ++ show g) $
       False
 
 inferCaseBranches :: TyEnv -> [(String, Typ)] -> [CaseBranch] -> Maybe Typ
 inferCaseBranches _ _ [] = Nothing
-inferCaseBranches g ctors (CaseBranch ctor body : rest) = do
-  payloadTy <- lookup ctor ctors
-  branchTy <- infer (Type payloadTy : g) body
+inferCaseBranches g ctors (b : rest) = do
+  branchTy <- inferCaseBranch g ctors b
   inferRemaining branchTy rest
   pure branchTy
   where
     inferRemaining _ [] = Just ()
-    inferRemaining expectedTy (CaseBranch ctor' body' : bs) = do
-      payloadTy' <- lookup ctor' ctors
-      branchTy' <- infer (Type payloadTy' : g) body'
+    inferRemaining expectedTy (b' : bs) = do
+      branchTy' <- inferCaseBranch g ctors b'
       guard (teq g expectedTy branchTy' g)
       inferRemaining expectedTy bs
+
+inferCaseBranch :: TyEnv -> [(String, Typ)] -> CaseBranch -> Maybe Typ
+inferCaseBranch g ctors (CaseBranch ctor body) = do
+  payloadTy <- payloadTyForBranch ctor ctors
+  infer (Type payloadTy : g) body
+
+payloadTyForBranch :: String -> [(String, Typ)] -> Maybe Typ
+payloadTyForBranch "_" ctors = firstPayloadTy ctors
+payloadTyForBranch ctor ctors = lookup ctor ctors
+
+firstPayloadTy :: [(String, Typ)] -> Maybe Typ
+firstPayloadTy [] = Nothing
+firstPayloadTy ((_, ty) : _) = Just ty
 
 resolveTySum :: TyEnv -> Typ -> Maybe [(String, Typ)]
 resolveTySum _ (TySum ctors) = Just ctors

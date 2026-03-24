@@ -1,10 +1,26 @@
-type NatList = mu x. (Nil : int | Cons : x);
+type Shape = Circle as int | Square as {w : int, h : int};
 
--- Explicit fold at introduction
-let a = fold [NatList] Nil(2);
+let a = Circle(2) as Shape;
+let b = Square({w = 3, h = 4}) as Shape;
 
--- Explicit unfold at elimination
-let res =
-	case unfold a of
-		<Nil = x> => x
-	| <Cons = x> => 0;
+let area : Shape -> int =
+  fun (s : Shape) ->
+    case s of 
+    | <Circle=r> => r * r 
+    | <Square=dim> => dim.w * dim.h;
+
+let n = area (b);
+
+type Addr = Physical as {firstlast : string} | Virtual as {name : string};
+
+let getName : Addr -> string =
+  fun (a : Addr) ->
+    case a of 
+    | <Virtual=y> => y.name
+    | _ => "Here";
+
+let v_addr = Virtual({name = "Hello"}) as Addr;
+let v_name = getName (v_addr);
+let p_addr = Physical({name = "Hey"}) as Addr;
+let p_name = getName (p_addr);
+

@@ -8,6 +8,7 @@ import EnvML.Elab
 import qualified CoreFE.Named as Named
 import qualified CoreFE.DeBruijn as DB
 import qualified CoreFE.Syntax as CoreFE
+import Control.Exception (evaluate)
 import Test.Hspec
 
 spec :: Spec
@@ -105,20 +106,34 @@ spec = do
       named `shouldBe`
         Named.Fix "f" (Named.Lam "x" (Named.App (Named.Var "f") (Named.Var "x")))
 
-    it "elaborates explicit source fold" $ do
-      let input = "fold [mu x. (Nil : int | Cons : x)] Nil(0)"
+    it "elaborates data constructor with source-level type annotation into core fold" $ do
+      let input = "Nil(0) as NatList"
       let parsed = parseExp (lexer input)
       let named = elabExp parsed
       named
         `shouldBe` Named.Fold
-          (Named.TyMu "x" (Named.TySum [("Nil", Named.TyLit CoreFE.TyInt), ("Cons", Named.TyVar "x")]))
+          (Named.TyVar "NatList")
           (Named.DataCon "Nil" (Named.Lit (CoreFE.LitInt 0)))
 
-    it "elaborates explicit source unfold" $ do
-      let input = "unfold x"
+    it "elaborates case by inserting core unfold on the scrutinee" $ do
+      let input = "case xs of | <Nil=h> => h | <Cons=t> => t"
       let parsed = parseExp (lexer input)
       let named = elabExp parsed
-      named `shouldBe` Named.Unfold (Named.Var "x")
+      named
+        `shouldBe` Named.Case
+          (Named.Unfold (Named.Var "xs"))
+          [ Named.CaseBranch "Nil" "h" (Named.Var "h")
+          , Named.CaseBranch "Cons" "t" (Named.Var "t")
+          ]
+
+    it "elaborates wildcard case branch" $ do
+      let input = "case xs of | _ => 0"
+      let parsed = parseExp (lexer input)
+      let named = elabExp parsed
+      named
+        `shouldBe` Named.Case
+          (Named.Unfold (Named.Var "xs"))
+          [Named.CaseBranch "_" "" (Named.Lit (CoreFE.LitInt 0))]
 
   describe "Elaborate Binary Operators" $ do
 
@@ -166,11 +181,13 @@ spec = do
                          (Named.TyAll "b" 
                            (Named.TyArr (Named.TyVar "a") (Named.TyVar "b")))
 
-    it "elaborates recursive mu types" $ do
-      let input = "mu a. (a -> a)"
-      let parsed = parseTyp (lexer input)
-      let named = elabTyp parsed
-      named `shouldBe` Named.TyMu "a" (Named.TyArr (Named.TyVar "a") (Named.TyVar "a"))
+    it "rejects inline sum annotations without a declared binder" $ do
+      let sumTy = Src.TySum [("Nil", Src.TyLit CoreFE.TyInt), ("Cons", Src.TyVar "NatList")]
+      evaluate
+        (case elabTyp sumTy of
+          Named.TyMu binder _ -> length binder
+          _ -> 0)
+        `shouldThrow` anyErrorCall
 
   describe "Elaborate Modules" $ do
     
@@ -184,6 +201,22 @@ spec = do
       let parsed = parseModule (lexer input)
       let named = elabModule parsed
       named `shouldBe` Named.FEnv [Named.ModE "x" (Named.Lit (CoreFE.LitInt 1))]
+
+    it "wraps type declarations of sum types with the declared binder in core" $ do
+      let input = "type NatList = Nil as int | Cons as NatList;"
+      let parsed = parseModule (lexer input)
+      let named = elabModule parsed
+      named
+        `shouldBe` Named.FEnv
+          [ Named.TypE
+              "NatList"
+              (Named.TyMu
+                "NatList"
+                (Named.TySum
+                  [ ("Nil", Named.TyLit CoreFE.TyInt)
+                  , ("Cons", Named.TyVar "NatList")
+                  ]))
+          ]
 
     it "elaborates functor with term argument" $ do
       let m = Src.Functor [("x", Src.TmArgType (Src.TyLit CoreFE.TyInt))]

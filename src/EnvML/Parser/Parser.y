@@ -33,6 +33,7 @@ import Data.Char (isUpper)
   if        { TokIf    }
   case      { TokCase  }
   of        { TokOf    }
+  as        { TokAs    }
   then      { TokThen  }
   else      { TokElse  }
   clos      { TokClos  }
@@ -40,7 +41,6 @@ import Data.Char (isUpper)
   box       { TokBox   }
   in        { TokIn    }
   forall    { TokForall }
-  mu        { TokMu }
   module    { TokModule }
   sig       { TokSig }
   end       { TokEnd }
@@ -62,6 +62,7 @@ import Data.Char (isUpper)
   '->m'     { TokArrowM }
   '@'       { TokAt }
   '|'       { TokPipe }
+  wildcard  { TokWildcard }
   ','       { TokComma }
   '.'       { TokDot }
   '('       { TokLParen }
@@ -122,7 +123,7 @@ TypeVars :: { [Name] }
   | id              { [$1] }
 
 Constructor :: { (Name, Typ) }
-  : id ':' Typ { ($1, $3) }
+  : id as Typ { ($1, $3) }
 
 InterfaceBody :: { ModuleTyp }
   : Intf                          { TySig $1 }
@@ -146,10 +147,11 @@ Exp :: { Exp }
   : fun FunArgs '->' Exp                  { Lam $2 $4 }
   | fix id '.' Exp                        { Fix $2 $4 }
   | if Exp then Exp else Exp              { If $2 $4 $6 }
-  | case Exp of CaseBranches              { Case $2 $4 }
+  | case Exp of '|' CaseBranches          { Case $2 $5 }
   | clos '[' Env ']' FunArgs '->' Exp     { Clos $3 $5 $7 }
   | tclos '[' Env ']' FunArgs '->' Exp    { TClos $3 $5 $7 }
   | box '[' Env ']' in Exp                { Box $3 $6 }
+  | Term as Typ                           { mkDataConAs $1 $3 }
   | Term '::' Typ                         { Anno $1 $3 }
   | Exp '==' Exp                          { BinOp (EqEq $1 $3) }
   | Exp '!=' Exp                          { BinOp (Neq $1 $3) }
@@ -171,7 +173,7 @@ ModuleExp :: { Module }
   | '(' ModuleExp ')'                     { $2 }
 
 Term :: { Exp }
-  : Term '(' Exp ')'     { mkAppOrCtor $1 $3 }
+  : Term '(' Exp ')'     { App $1 $3 }
   | Term '@' Typ         { TApp $1 $3 }
   | Term '.' id          { RProj $1 $3 }
   | Atom                 { $1 }
@@ -196,6 +198,7 @@ CaseBranches :: { [CaseBranch] }
 
 CaseBranch :: { CaseBranch }
   : '<' id '=' id '>' '=>' Exp  { CaseBranch $2 $4 $7 }
+  | wildcard '=>' Exp           { CaseBranch "_" "" $3 }
 
 ListElems :: { [Exp] }
   : Exp ',' ListElems    { $1 : $3 }
@@ -232,7 +235,6 @@ EnvElem :: { EnvE }
 Typ :: { Typ }
   : BaseTyp '->' Typ                   { TyArr $1 $3 }
   | forall id '.' Typ                  { TyAll $2 $4 }
-  | mu id '.' Typ                      { TyMu $2 $4 }
   | '[' TyCtx ']' '===>' Typ           { TyBoxT $2 $5 }
   | BaseTyp                            { $1 }
 
@@ -240,6 +242,7 @@ BaseTyp :: { Typ }
   : int                    { TyLit CoreFE.TyInt }
   | bool                   { TyLit CoreFE.TyBool }
   | stringt                { TyLit CoreFE.TyStr }
+  | Constructors           { TySum $1 }
   | id                     { TyVar $1 }
   | '{' TyRcdFields '}'    { TyRcd $2 }
   | '[' TyCtx ']'          { TyCtx $2 }
@@ -282,8 +285,8 @@ TyCtxElem :: { TyCtxE }
 parseError :: [Token] -> a
 parseError tokens = error $ "Parse error: " ++ show tokens
 
-mkAppOrCtor :: Exp -> Exp -> Exp
-mkAppOrCtor (Var n) e
-  | not (null n) && isUpper (head n) = DataCon n e
-mkAppOrCtor f e = App f e
+mkDataConAs :: Exp -> Typ -> Exp
+mkDataConAs (App (Var n) e) t
+  | not (null n) && isUpper (head n) = DataCon n e t
+mkDataConAs e _ = error $ "`as` is only valid on data constructor applications, got: " ++ show e
 }

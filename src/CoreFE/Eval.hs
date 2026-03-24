@@ -135,5 +135,5 @@ eval env = go
 lookupCaseBranch :: String -> [CaseBranch] -> Maybe Exp
 lookupCaseBranch _ [] = Nothing
 lookupCaseBranch ctor (CaseBranch ctor' body : rest)
-  | ctor == ctor' = Just body
+  | ctor == ctor' || ctor' == "_" = Just body
   | otherwise = lookupCaseBranch ctor rest

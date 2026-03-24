@@ -736,6 +736,18 @@ spec = do
               ]
       infer [] expr `shouldBe` Just (TyLit TyInt)
 
+    it "uses wildcard case branch as fallback" $ do
+      let natTy = TyMu (TySum [("Z", TyLit TyBool), ("S", TyVar 0)])
+      let scrutinee = Unfold (Fold natTy (DataCon "S" (Fold natTy (DataCon "Z" (Lit (LitBool True))))))
+      let expr =
+            Case
+              scrutinee
+              [ CaseBranch "Z" (Lit (LitInt 1))
+              , CaseBranch "_" (Lit (LitInt 0))
+              ]
+      infer [] expr `shouldBe` Just (TyLit TyInt)
+      eval [] expr `shouldBe` Just (Lit (LitInt 0))
+
     it "types explicit unfold of recursive function type at application" $ do
       let muArrow = TyMu (TyArr (TyLit TyInt) (TyLit TyInt))
       let funVal = Fold muArrow (Lam (Var 0))

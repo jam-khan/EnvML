@@ -49,7 +49,7 @@ elabStructure struct =
         Nothing -> CoreFE.ModE name (elabExp e)
         Just ty -> CoreFE.ModE name (CoreFE.Anno (elabExp e) (elabTyp ty))
     (EnvML.TypDecl name ty) ->
-      CoreFE.TypE name (elabTyp ty)
+      CoreFE.TypE name (elabTypWithBinder (Just name) ty)
     (EnvML.ModTypDecl name mty) ->
       CoreFE.TypE name (elabModTyp mty)
     (EnvML.ModStruct name maybeTyp mod1) ->
@@ -89,15 +89,14 @@ elabExp e =
       CoreFE.RProj (elabExp e1) n
     (EnvML.FEnv env) ->
       CoreFE.FEnv (elabEnv env)
-    (EnvML.Fold ty e1) ->
-      CoreFE.Fold (elabTyp ty) (elabExp e1)
-    (EnvML.Unfold e1) ->
-      CoreFE.Unfold (elabExp e1)
     (EnvML.Anno e1 ty) ->
       CoreFE.Anno (elabExp e1) (elabTyp ty)
     (EnvML.Mod m) -> elabModuleExp m
-    (EnvML.DataCon ctor arg) -> CoreFE.DataCon ctor (elabExp arg)
-    (EnvML.Case scrutinee branches) -> CoreFE.Case (elabExp scrutinee) (map elabCaseBranch branches)
+    (EnvML.DataCon ctor arg ty) ->
+      let ty' = elabTyp ty
+       in CoreFE.Fold ty' (CoreFE.DataCon ctor (elabExp arg))
+    (EnvML.Case scrutinee branches) ->
+      CoreFE.Case (CoreFE.Unfold (elabExp scrutinee)) (map elabCaseBranch branches)
     (EnvML.BinOp (EnvML.Add e1 e2)) ->
       CoreFE.BinOp (CoreFE.Add (elabExp e1) (elabExp e2))
     (EnvML.BinOp (EnvML.Sub e1 e2)) ->
@@ -149,19 +148,26 @@ elabEnvE envE =
     (EnvML.ModTypE name mty) -> CoreFE.TypE name (elabModTyp mty)
 
 elabTyp :: EnvML.Typ -> CoreFE.Typ
-elabTyp ty =
+elabTyp = elabTypWithBinder Nothing
+
+elabTypWithBinder :: Maybe EnvML.Name -> EnvML.Typ -> CoreFE.Typ
+elabTypWithBinder maybeBinder ty =
   case ty of
     (EnvML.TyLit lit) -> CoreFE.TyLit lit
     (EnvML.TyVar n) -> CoreFE.TyVar n
-    (EnvML.TyArr ta tb) -> CoreFE.TyArr (elabTyp ta) (elabTyp tb)
-    (EnvML.TyAll n ty1) -> CoreFE.TyAll n (elabTyp ty1)
-    (EnvML.TyMu n ty1) -> CoreFE.TyMu n (elabTyp ty1)
-    (EnvML.TyBoxT ctx ty1) -> CoreFE.TyBoxT (elabTyCtx ctx) (elabTyp ty1)
+    (EnvML.TyArr ta tb) -> CoreFE.TyArr (elabTypWithBinder maybeBinder ta) (elabTypWithBinder maybeBinder tb)
+    (EnvML.TyAll n ty1) -> CoreFE.TyAll n (elabTypWithBinder maybeBinder ty1)
+    (EnvML.TyBoxT ctx ty1) -> CoreFE.TyBoxT (elabTyCtx ctx) (elabTypWithBinder maybeBinder ty1)
     (EnvML.TyRcd fields) -> CoreFE.TyEnvt $ map (CoreFE.Type "_") $ elabRcdFieldsTy fields
-    (EnvML.TySum ctors) -> CoreFE.TySum [(name, elabTyp payloadTy) | (name, payloadTy) <- ctors]
+    (EnvML.TySum ctors) ->
+      let binder = case maybeBinder of
+            Just n -> n
+            Nothing -> error "Sum types must be declared with a binder"
+          ctors' = [(name, elabTypWithBinder maybeBinder payloadTy) | (name, payloadTy) <- ctors]
+       in CoreFE.TyMu binder (CoreFE.TySum ctors')
     (EnvML.TyCtx ctx) -> CoreFE.TyEnvt (elabTyCtx ctx)
     (EnvML.TyModule mty) -> elabModTyp mty
-    (EnvML.TyList ty1) -> CoreFE.TyList $ elabTyp ty1
+    (EnvML.TyList ty1) -> CoreFE.TyList $ elabTypWithBinder maybeBinder ty1
 
 elabTyCtx :: EnvML.TyCtx -> CoreFE.TyEnv
 elabTyCtx = reverse . map elabTyCtxE

@@ -1,11 +1,13 @@
+type NatList = Nil as int | Cons as NatList;
 
-type NatList = forall t. mu x. (Nil : t | Cons : x);
+let a = Nil(2) as NatList;
+let b = Cons(a) as NatList;
+let c = Cons(b) as NatList;
 
--- Explicit fold at introduction
-let a = fold [NatList] Nil(2);
+let getNum : NatList -> int = fix f. fun (l : NatList) -> (
+    case l of
+    | <Nil = x> => x
+    | <Cons = x> => f(x)
+);
 
--- Explicit unfold at elimination
-let res =
-	case unfold a of
-		<Nil = x> => x
-	| <Cons = x> => 0;
+let res = getNum(c);

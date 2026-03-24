@@ -27,16 +27,14 @@ tokens :-
   if          { \_ -> TokIf }
   case        { \_ -> TokCase }
   of          { \_ -> TokOf }
+  as          { \_ -> TokAs }
   then        { \_ -> TokThen }
   else        { \_ -> TokElse }
   clos        { \_ -> TokClos }
   tclos       { \_ -> TokTClos}
   box         { \_ -> TokBox  }
-  fold        { \_ -> TokFold }
-  unfold      { \_ -> TokUnfold }
   in          { \_ -> TokIn  }
   forall      { \_ -> TokForall }
-  mu          { \_ -> TokMu }
   module      { \_ -> TokModule }
   sig         { \_ -> TokSig  }
   end         { \_ -> TokEnd  }
@@ -78,6 +76,7 @@ tokens :-
   "*"         { \_ -> TokStar     }
   "@"         { \_ -> TokAt    }
   "|"         { \_ -> TokPipe   }
+  "_"         { \_ -> TokWildcard }
 
   -- Literals and Identifiers
   $digit+             { \s -> TokInt (read s) }
@@ -105,16 +104,14 @@ data Token
   | TokCase
   | TokOf
   | TokThen
+  | TokAs
   | TokElse
   | TokAt
   | TokClos
   | TokTClos
   | TokBox
-  | TokFold
-  | TokUnfold
   | TokIn
   | TokForall
-  | TokMu
   | TokModule
   | TokSig
   | TokEnd
@@ -154,6 +151,7 @@ data Token
   | TokDash
   | TokStar
   | TokPipe
+  | TokWildcard
   deriving (Eq, Show)
 
 lexer :: String -> [Token]
