@@ -58,4 +58,21 @@ inductive RLookup : Typ → String → Typ → Prop where
       → ¬Lin l A ∧ Lin l B
       → RLookup (.and A B) l C
 
+inductive LookupV : Exp → Nat → Exp → Prop where
+  | lvzero {v₁ v₂ : Exp}
+    : LookupV (.mrg v₁ v₂) 0 v₂
+  | lvsucc {v₁ v₂ v₃ : Exp} {n : Nat}
+    : LookupV v₁ n v₃
+    → LookupV (.mrg v₁ v₂) (n + 1) v₃
+
+inductive RLookupV : Exp → String → Exp → Prop where
+  | rvlzero {l : String} {e : Exp}
+    : RLookupV (.lrec l e) l e
+  | vlandl {e₁ e₂ e : Exp} {l : String}
+    : RLookupV e₁ l e
+    → RLookupV (.mrg e₁ e₂) l e
+  | vlandr {e₁ e₂ e : Exp} {l : String}
+    : RLookupV e₂ l e
+    → RLookupV (.mrg e₁ e₂) l e
+
 end Core

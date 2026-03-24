@@ -1,9 +1,75 @@
 
 import LeanSce.Core.Syntax
-import LeanSce.Core.Semantics
 import LeanSce.Core.Typing
 
-open Core C_Sem
+open Core
+
+inductive Step : Exp → Exp → Exp → Prop :=
+  | squery {v}
+    : Value v
+    -> Step v .query v
+  | sappl {v e1 e1' e2}
+    : Value v
+    → Step v e1 e1'
+    → Step v (.app e1 e2) (.app e1' e2)
+  | sboxl {v e1 e1' e2}
+    : Value v
+    → Step v e1 e1'
+    → Step v (.box e1 e2) (.box e1' e2)
+  | smrgl {v e1 e1' e2}
+    : Value v
+    → Step v e1 e1'
+    → Step v (.mrg e1 e2) (.mrg e1' e2)
+  | sappr {v v1 e2 e2'}
+    : Value v
+    → Value v1
+    → Step v e2 e2'
+    → Step v (.app v1 e2) (.app v1 e2')
+  | sboxr
+    : Value v
+    → Value v1
+    → Step v1 e2 e2'
+    → Step v (.box v1 e2) (.box v1 e2')
+  | smrgr {v v1 e2 e2'}
+    : Value v
+    → Value v1
+    → Step (.mrg v v1) e2 e2'
+    → Step v (.mrg v1 e2) (.mrg v1 e2')
+  | sclos {v A e}
+    : Value v
+    → Step v (.lam A e) (.clos v A e)
+  | sbeta {v v1 v2 A e}
+    : Value v
+    → Value v1
+    → Value v2
+    → Step v (.app (.clos v2 A e) v1) (.box (.mrg v2 v1) e)
+  | sboxv {v v1 v2}
+    : Value v
+    → Value v1
+    → Value v2
+    → Step v (.box v1 v2) v2
+  | sproj {v e1 e2 n}
+    : Value v
+    → Step v e1 e2
+    → Step v (.proj e1 n) (.proj e2 n)
+  | sprojv {v v1 n v2}
+    : Value v
+    → Value v1
+    → LookupV v1 n v2
+    → Step v (.proj v1 n) v2
+  | slrec {v e1 e2 l}
+    : Value v
+    → Step v e1 e2
+    → Step v (.lrec l e1) (.lrec l e2)
+  | srproj
+    : Value v
+    → Step v e1 e2
+    → Step v (.rproj e1 l) (.rproj e2 l)
+  | srprojv {v v1 l v2}
+    : Value v
+    → Value v1
+    → RLookupV v1 l v2
+    → Step v (.rproj v1 l) v2
 
 @[simp]
 theorem value_weaken
@@ -564,3 +630,4 @@ theorem progress {e A}
   apply gprogress <;> try assumption
   · exact Value.vunit
   · exact HasType.tunit
+

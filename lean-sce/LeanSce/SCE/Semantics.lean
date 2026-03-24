@@ -118,12 +118,10 @@ inductive BStep : Exp → Exp → Exp → Prop where
   | mfunctor_open {ρ : Exp} {A : Typ} {body : Exp}
     : Value ρ
     → BStep ρ (.mfunctor .open_ A body) (.mclos ρ A body)
-  -- Below is completely wrong!!!!
-  | mlink {ρ e₁ e₂ v₁ v₂ v : Exp} {A : Typ} {body : Exp}
+  | mlink {ρ e₁ e₂ v₁ v₂ vr : Exp} {A : Typ} {body : Exp}
     : Value ρ
-    → BStep ρ e₂ (.mclos v A body)
     → BStep ρ e₁ v₁
-    → BStep (.mrg v₁ v₂) body v
-    → BStep ρ (.mlink e₁ e₂) (.mrg v₁ (.app v₂ v₁))
-
+    → BStep ρ e₂ (.mclos v₂ A body)
+    → BStep (.mrg v₂ v₁) body vr
+    → BStep ρ (.mlink e₁ e₂) (.mrg v₁ vr)
 end S_Sem
