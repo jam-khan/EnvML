@@ -304,10 +304,6 @@ check g (App e1 e2) tyB =
 -- List checking
 check _ (EList []) (TyList _) = True -- Empty list checks against any list type
 check g (EList es) (TyList t) = all (\e -> check g e t) es
-check g (FEnv d) (TyEnvt g1) =
-  case infer g (FEnv d) of
-    Just (TyEnvt g2) -> g1 == g2 && lvalue d
-    _ -> False
 check g e t =
   case infer g e of
     Just t' -> teq g t' t g

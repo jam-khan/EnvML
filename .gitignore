@@ -91,3 +91,4 @@ src/WASM.o
 *.hi
 src/EnvML/Parser/Parser.info
 src/CoreFE/Parser/Parser.info
+app/DebugMain.hs
