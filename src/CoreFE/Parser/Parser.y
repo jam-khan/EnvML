@@ -27,6 +27,7 @@ import CoreFE.Syntax
   ident     { TokIdent $$ }
   num       { TokNum $$ }        -- Integer literal
   bool      { TokBool $$ }       -- Boolean literal
+  unit_kw   { TokUnitKw }        -- Unit keyword
   string    { TokString $$ }     -- String literal
   fix       { TokFix }
   if        { TokIf }
@@ -96,6 +97,7 @@ AtomExp :: { Exp }
   : num                                 { Lit (LitInt $1) }
   | bool                                { Lit (LitBool $1) }
   | string                              { Lit (LitStr $1) }
+  | '(' ')'                             { Lit LitUnit }
   | var                                 { Var $1 }
   | '[' RuntimeEnvList ']' '|>' AtomExp { Box $2 $5 }
   | '[' RuntimeEnvList ']'              { FEnv $2 }
@@ -130,8 +132,7 @@ AppTyp :: { Typ }
 AtomTyp :: { Typ }
   : int_kw                      { TyLit TyInt }
   | bool_kw                     { TyLit TyBool }
-  | str_kw                      { TyLit TyStr }
-  | num                         { TyVar $1 }
+  | str_kw                      { TyLit TyStr }  | unit_kw                    { TyLit TyUnit }  | num                         { TyVar $1 }
   | forall '.' Typ              { TyAll $3 }
   | EnvKw '[' TyEnvList ']'     { TyEnvt $3 }
   | '{' ident ':' Typ '}'       { TyRcd $2 $4 }

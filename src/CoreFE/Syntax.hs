@@ -28,6 +28,7 @@ data TyLit
   = TyInt
   | TyBool
   | TyStr
+  | TyUnit
   deriving (Eq, Show)
 
 type Env = [EnvE]
@@ -81,6 +82,7 @@ data Literal
   = LitInt Int
   | LitBool Bool
   | LitStr String
+  | LitUnit
   deriving (Eq, Show)
 
 class Pretty a where
@@ -96,6 +98,7 @@ instance Pretty TyLit where
   pretty TyInt = "Int"
   pretty TyBool = "Bool"
   pretty TyStr = "String"
+  pretty TyUnit = "Unit"
 
 instance Pretty TyEnvE where
   pretty :: TyEnvE -> String
@@ -350,6 +353,7 @@ stringOfLiteral :: Literal -> String
 stringOfLiteral (LitInt n) = show n
 stringOfLiteral (LitBool b) = if b then "true" else "false"
 stringOfLiteral (LitStr s) = "\"" ++ s ++ "\""
+stringOfLiteral LitUnit = "()"
 
 expPrec :: Exp -> Int
 expPrec (Lit _) = 10

@@ -337,8 +337,10 @@ prettyLiteral :: CoreFE.Literal -> String
 prettyLiteral (CoreFE.LitInt n) = show n
 prettyLiteral (CoreFE.LitBool b) = if b then "true" else "false"
 prettyLiteral (CoreFE.LitStr s) = "\"" ++ s ++ "\""
+prettyLiteral CoreFE.LitUnit = "()"
 
 prettyTyLit :: CoreFE.TyLit -> String
 prettyTyLit CoreFE.TyInt  = "int"
 prettyTyLit CoreFE.TyBool = "bool"
 prettyTyLit CoreFE.TyStr  = "string"
+prettyTyLit CoreFE.TyUnit = "unit"

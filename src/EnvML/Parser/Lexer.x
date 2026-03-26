@@ -46,6 +46,7 @@ tokens :-
   nil         { \_ -> TokNil  }
   list        { \_ -> TokList }
   List        { \_ -> TokListE }
+  unit        { \_ -> TokUnit }
 
   -- Symbols
   "=="        { \_ -> TokEqEq     }
@@ -122,6 +123,7 @@ data Token
   | TokNil
   | TokList
   | TokListE
+  | TokUnit
   -- Symbol Tokens
   | TokEq
   | TokColon    

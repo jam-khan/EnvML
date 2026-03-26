@@ -201,6 +201,7 @@ infer _ (Lit lit) = pure $ TyLit $ inferLit lit
     inferLit (LitInt _) = TyInt
     inferLit (LitBool _) = TyBool
     inferLit (LitStr _) = TyStr
+    inferLit LitUnit = TyUnit
 infer g (Var x) = getVar g x
 infer g (App e1 e2) = do
   TyArr a b <- infer g e1
@@ -305,7 +306,8 @@ infer _ _ = Nothing
 check :: TyEnv -> Exp -> Typ -> Bool
 check g e (TySubstT a b) = check (TypeEq a : g) e b
 check g (Lam e) (TyArr a b) = check (Type a : g) e b
-check g (TLam e) (TyAll a) = check (Kind : g) e a
+check g (TLam e) (TyAll a) = 
+  check (Kind : g) e a
 check g (Clos d e) (TyBoxT g1 (TyArr a b)) =
   case infer g (FEnv d) of
     Just (TyEnvt g2) -> g1 == g2 && lvalue d && check (Type a : g1) e b

@@ -28,6 +28,7 @@ tokens :-
   else                          { \_ -> TokElse }
   true                          { \_ -> TokBool True }
   false                         { \_ -> TokBool False }
+  Unit                          { \_ -> TokUnitKw }
 
   -- Literals
   x $digit+                     { \s -> TokVar (read (drop 1 s)) }
@@ -81,6 +82,7 @@ data Token
   | TokThen
   | TokElse
   | TokBool Bool
+  | TokUnitKw
   | TokString String
   | TokVar Int
   | TokIdent String

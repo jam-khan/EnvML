@@ -51,6 +51,7 @@ import Data.Char (isUpper)
   nil       { TokNil }
   list      { TokList }
   List      { TokListE }
+  unit      { TokUnit }
   '='       { TokEq }
   ':'       { TokColon }
   ';'       { TokSemi }
@@ -183,6 +184,7 @@ Atom :: { Exp }
   | str                       { Lit (CoreFE.LitStr $1) }
   | true                      { Lit (CoreFE.LitBool True) }
   | false                     { Lit (CoreFE.LitBool False) }
+  | '(' ')'                   { Lit CoreFE.LitUnit }
   | id                        { Var $1 }
   | '{' RecFields '}'         { Rec $2 }
   | '[' Env ']'               { FEnv $2 }
@@ -242,6 +244,7 @@ BaseTyp :: { Typ }
   : int                    { TyLit CoreFE.TyInt }
   | bool                   { TyLit CoreFE.TyBool }
   | stringt                { TyLit CoreFE.TyStr }
+  | unit                   { TyLit CoreFE.TyUnit }
   | Constructors           { TySum $1 }
   | id                     { TyVar $1 }
   | '{' TyRcdFields '}'    { TyRcd $2 }
@@ -280,6 +283,7 @@ TyCtxElem :: { TyCtxE }
   | int                                 { Type (TyLit CoreFE.TyInt) }
   | bool                                { Type (TyLit CoreFE.TyBool) }
   | stringt                             { Type (TyLit CoreFE.TyStr) }
+  | unit                                { Type (TyLit CoreFE.TyUnit) }
 
 {
 parseError :: [Token] -> a
