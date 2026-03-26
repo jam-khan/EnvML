@@ -1,277 +1,161 @@
 type ty =
-  TBool as bool
-| TNat as int
-| TArrow as {arg : ty, ret : ty}
+  TNat as int -- ADD UNIT TYPES
+| TArrow as {arg : ty, ret : ty};
 
 type exp =
   Var as string
-| Lam as {argE : exp, argT : ty, body : exp}
+| Lam as {name : string, argT : ty, body : exp}
 | App as {funcE : exp, argE : exp}
-| Let as {name : string, val : exp, body : exp};
+| Nat as int;
 
-type ctx =
-  CtxEmpty as int
-| CtxBind as {name : string, valueTy : ty, rest : ctx};
+type maybeExp =
+    Just as exp
+| Error as string;
 
-let emptyCtx : ctx = CtxEmpty(0) as ctx;
+type maybeTy =
+    TyOk as ty
+| TyError as string;
 
---let eqTy : ty -> ty -> bool =
---  fix eq.
---    fun (a : ty) (b : ty) ->
---      case a of
---      | <TBool = ignored> =>
---          (case b of
---          | <TBool = ignored> => true
---          | <TNat = ignored> => false
---          | <TArrow = ignored> => false
---          | <TErr = ignored> => false)
---      | <TNat = ignored> =>
---          (case b of
---          | <TBool = ignored> => false
---          | <TNat = ignored> => true
---          | <TArrow = ignored> => false
---          | <TErr = ignored> => false)
---      | <TArrow = ta> =>
---          (case b of
---          | <TArrow = tb> =>
---              if eq(ta.arg)(tb.arg)
---              then eq(ta.ret)(tb.ret)
---              else false
---          | <TBool = ignored> => false
---          | <TNat = ignored> => false
---          | <TErr = ignored> => false)
---      | <TErr = ignored> => false;
+type tyCtx =
+    CtxNil as int
+| CtxCons as {name : string, entryT : ty, rest : tyCtx};
+
+let subst : string -> exp -> exp -> exp =
+    fix go. fun (name : string) (value : exp) (e : exp) -> (
+        case e of
+        | <Var = v> =>
+            if (v == name) then
+                value
+            else
+                Var(v) as exp
+        
+        | <Lam = l> =>
+            if (l.name == name) then
+                Lam({name = l.name, argT = l.argT, body = l.body}) as exp
+            else
+                Lam({name = l.name, argT = l.argT, body = go(name)(value)(l.body)}) as exp
+        | <App = a> =>
+            App({
+                funcE = go(name)(value)(a.funcE),
+                argE = go(name)(value)(a.argE)
+            }) as exp
+        | <Nat = n> => Nat(n) as exp
+    );
+
+let eval : exp -> maybeExp =
+    fix go. fun (e : exp) -> (
+        case e of
+        | <Var = v> => Error("Runtime error: unbound variable") as maybeExp
+        | <Lam = l> => Just(e) as maybeExp
+        | <Nat = n> => Just(e) as maybeExp
+        | <App = a> => 
+        Just(Nat (2) as exp) as maybeExp
+--            case go(a.funcE) of
+--            | <Error = errF> => Error(errF) as maybeExp
+--            | <Just = funcVal> =>
+--                case go(a.argE) of
+--                | <Error = errA> => Error(errA) as maybeExp
+--                | <Just = argVal> => argVal
+--                Just (Var("y") as exp) as maybeExp
+
+--                    case funcVal of
+--                    | <Lam = f> =>                    -- go(subst (f.name) (argVal) (f.body))
+--                    | _ => Error("Runtime error: head of application is not a lambda") as maybeExp
+                     
+    );
+
+--let tyEq : ty -> ty -> bool =
+--    fix go. fun (a : ty) (b : ty) -> (
+--        case a of
+--        | <TNat = n1> =>
+--            (case b of
+--            | <TNat = n2> => true
+--            | _ => false)
+--        | <TArrow = a1> =>
+--            (case b of
+--            | <TArrow = b1> =>
+--                if go(a1.arg)(b1.arg) then
+--                    go(a1.ret)(b1.ret)
+--                else
+--                    false
+--            | _ => false)
+--    );
 --
---let lookupTy : ctx -> string -> ty =
---  fix go.
---    fun (gamma : ctx) (x : string) ->
---      case gamma of
---      | <CtxEmpty = ignored> => TErr("unbound variable") as ty
---      | <CtxBind = b> =>
---          if b.name == x
---          then b.valueTy
---          else go(b.rest)(x);
+--let lookupTy : string -> tyCtx -> maybeTy =
+--    fix go. fun (name : string) (ctx : tyCtx) -> (
+--        case ctx of
+--        | <CtxNil = n> => TyError("Type error: variable not found in context") as maybeTy
+--        | <CtxCons = c> =>
+--            if (c.name == name) then
+--                TyOk(c.entryT) as maybeTy
+--            else
+--                go(name)(c.rest)
+--    );
 --
---let infer : ctx -> expr -> ty =
---  fix go.
---    fun (gamma : ctx) (e : expr) ->
---      case e of
---      | <Var = x> => lookupTy(gamma)(x)
---      | <BoolLit = ignored> => TBool(true) as ty
---      | <NatLit = ignored> => TNat(0) as ty
---      | <Abs = a> =>
---          (case go(CtxBind({name = a.param, valueTy = a.paramTy, rest = gamma}) as ctx)(a.body) of
---          | <TErr = msg> => TErr(msg) as ty
---          | <TBool = t> => TArrow({arg = a.paramTy, ret = TBool(t) as ty}) as ty
---          | <TNat = n> => TArrow({arg = a.paramTy, ret = TNat(n) as ty}) as ty
---          | <TArrow = arr> => TArrow({arg = a.paramTy, ret = TArrow(arr) as ty}) as ty)
---      | <App = ap> =>
---          (case go(gamma)(ap.fn) of
---          | <TErr = msg> => TErr(msg) as ty
---          | <TArrow = arr> =>
---              (case go(gamma)(ap.arg) of
---              | <TErr = msg2> => TErr(msg2) as ty
---              | <TBool = ignored> =>
---                  if eqTy(arr.arg)(TBool(true) as ty)
---                  then arr.ret
---                  else TErr("argument type mismatch") as ty
---              | <TNat = ignored> =>
---                  if eqTy(arr.arg)(TNat(0) as ty)
---                  then arr.ret
---                  else TErr("argument type mismatch") as ty
---              | <TArrow = arrArg> =>
---                  if eqTy(arr.arg)(TArrow(arrArg) as ty)
---                  then arr.ret
---                  else TErr("argument type mismatch") as ty)
---          | <TBool = ignored> => TErr("attempted to apply a boolean") as ty
---          | <TNat = ignored> => TErr("attempted to apply a nat") as ty)
---      | <Let = l> =>
---          (case go(gamma)(l.value) of
---          | <TErr = msg> => TErr(msg) as ty
---          | <TBool = t> => go(CtxBind({name = l.name, valueTy = TBool(t) as ty, rest = gamma}) as ctx)(l.body)
---          | <TNat = n> => go(CtxBind({name = l.name, valueTy = TNat(n) as ty, rest = gamma}) as ctx)(l.body)
---          | <TArrow = arr> => go(CtxBind({name = l.name, valueTy = TArrow(arr) as ty, rest = gamma}) as ctx)(l.body))
---      | <If = i> =>
---          (case go(gamma)(i.cond) of
---          | <TErr = msg> => TErr(msg) as ty
---          | <TBool = ignored> =>
---              (case go(gamma)(i.thenE) of
---              | <TErr = msgThen> => TErr(msgThen) as ty
---              | <TBool = tThen> =>
---                  (case go(gamma)(i.elseE) of
---                  | <TBool = tElse> =>
---                      if eqTy(TBool(tThen) as ty)(TBool(tElse) as ty)
---                      then TBool(tThen) as ty
---                      else TErr("if branches must have the same type") as ty
---                  | <TNat = ignored> => TErr("if branches must have the same type") as ty
---                  | <TArrow = ignored> => TErr("if branches must have the same type") as ty
---                  | <TErr = msgElse> => TErr(msgElse) as ty)
---              | <TNat = nThen> =>
---                  (case go(gamma)(i.elseE) of
---                  | <TBool = ignored> => TErr("if branches must have the same type") as ty
---                  | <TNat = nElse> =>
---                      if eqTy(TNat(nThen) as ty)(TNat(nElse) as ty)
---                      then TNat(nThen) as ty
---                      else TErr("if branches must have the same type") as ty
---                  | <TArrow = ignored> => TErr("if branches must have the same type") as ty
---                  | <TErr = msgElse> => TErr(msgElse) as ty)
---              | <TArrow = arrThen> =>
---                  (case go(gamma)(i.elseE) of
---                  | <TBool = ignored> => TErr("if branches must have the same type") as ty
---                  | <TNat = ignored> => TErr("if branches must have the same type") as ty
---                  | <TArrow = arrElse> =>
---                      if eqTy(TArrow(arrThen) as ty)(TArrow(arrElse) as ty)
-----                      then TArrow(arrThen) as ty
---                      else TErr("if branches must have the same type") as ty
---                  | <TErr = msgElse> => TErr(msgElse) as ty))
---          | <TNat = ignored> => TErr("if condition must be bool") as ty
---          | <TArrow = ignored> => TErr("if condition must be bool") as ty)
---      | <Record = ignored> => TErr("record typing not implemented in this STLC demo") as ty
---      | <Proj = ignored> => TErr("record projection not implemented in this STLC demo") as ty
---      | <RuntimeErr = msg> => TErr(msg) as ty;
+--let extendCtx : string -> ty -> tyCtx -> tyCtx =
+--    fun (name : string) (entryT : ty) (rest : tyCtx) ->
+--        CtxCons({name = name, entryT = entryT, rest = rest}) as tyCtx;
 --
---let subst : string -> expr -> expr -> expr =
---  fix go.
---    fun (x : string) (replacement : expr) (target : expr) ->
---      case target of
---      | <Var = y> =>
---          if y == x then replacement else target
---      | <Abs = a> =>
---          if a.param == x
---          then target
---          else
---            Abs({
---              param = a.param,
---              paramTy = a.paramTy,
---              body = go(x)(replacement)(a.body)
---            }) as expr
---      | <App = ap> =>
---          App({
---            fn = go(x)(replacement)(ap.fn),
---            arg = go(x)(replacement)(ap.arg)
---          }) as expr
---      | <Let = l> =>
---          if l.name == x
---          then
---            Let({
---              name = l.name,
---              value = go(x)(replacement)(l.value),
---              body = l.body
---            }) as expr
---          else
---            Let({
---              name = l.name,
---              value = go(x)(replacement)(l.value),
---              body = go(x)(replacement)(l.body)
---            }) as expr
---      | <BoolLit = ignored> => target
---      | <NatLit = ignored> => target
---      | <If = i> =>
---          If({
---            cond = go(x)(replacement)(i.cond),
---            thenE = go(x)(replacement)(i.thenE),
---            elseE = go(x)(replacement)(i.elseE)
---          }) as expr
---      | <Record = ignored> => target
---      | <Proj = p> =>
---          Proj({
---            record = go(x)(replacement)(p.record),
---            label = p.label
---          }) as expr
---      | <RuntimeErr = ignored> => target;
+--let typeCheck : tyCtx -> exp -> maybeTy =
+--    fix go. fun (ctx : tyCtx) (e : exp) -> (
+--        case e of
+--        | <Var = v> => lookupTy(v)(ctx)
+--        | <Nat = n> => TyOk(TNat(0) as ty) as maybeTy
+--        | <Lam = l> => (
+--            case go(extendCtx(l.name)(l.argT)(ctx))(l.body) of
+--            | <TyOk = bodyT> =>
+--                TyOk(TArrow({arg = l.argT, ret = bodyT}) as ty) as maybeTy
+--            | <TyError = err> => TyError(err) as maybeTy
+--        )
+--        | <App = a> =>
+--            case go(ctx)(a.funcE) of
+--            | <TyError = errF> => TyError(errF) as maybeTy
+--            | <TyOk = funcT> =>
+--                case go(ctx)(a.argE) of
+--                | <TyError = errA> => TyError(errA) as maybeTy
+--                | <TyOk = argT> =>
+--                    case funcT of
+--                    | <TArrow = arr> =>
+--                        if tyEq(arr.arg)(argT) then
+--                            TyOk(arr.ret) as maybeTy
+--                        else
+--                            TyError("Type error: argument type mismatch") as maybeTy
+--                    | _ => TyError("Type error: attempted to apply a non-function") as maybeTy
+--    );
 --
-
-let eval : expr -> expr =
-fix go.
-  fun (e : expr) ->
-    case e of
-    | <Var = ignored> => RuntimeErr("free variable during evaluation") as expr
-    | <Abs = ignored> => e
-    | <BoolLit = ignored> => e
-    | <NatLit = ignored> => e
-    | <App = ap> =>
-        (case go(ap.fn) of
-        | <RuntimeErr = msgf> => RuntimeErr(msgf) as expr
-        | <Abs = a> =>
-            (case go(ap.arg) of
-            | <RuntimeErr = msga> => RuntimeErr(msga) as expr
-            | <Var = argValVar> => go(subst(a.param)(Var(argValVar) as expr)(a.body))
-            | <Abs = argValAbs> => go(subst(a.param)(Abs(argValAbs) as expr)(a.body))
-            | <App = argValApp> => go(subst(a.param)(App(argValApp) as expr)(a.body))
-            | <Let = argValLet> => go(subst(a.param)(Let(argValLet) as expr)(a.body))
-            | <BoolLit = argValBool> => go(subst(a.param)(BoolLit(argValBool) as expr)(a.body))
-              | <NatLit = argValNat> => go(subst(a.param)(NatLit(argValNat) as expr)(a.body))
-              | <If = argValIf> => go(subst(a.param)(If(argValIf) as expr)(a.body))
-              | <Record = argValRecord> => go(subst(a.param)(Record(argValRecord) as expr)(a.body))
-              | <Proj = argValProj> => go(subst(a.param)(Proj(argValProj) as expr)(a.body)))
-          | <Var = ignored> => RuntimeErr("cannot apply non-function") as expr
-          | <App = ignored> => RuntimeErr("cannot apply non-function") as expr
-          | <Let = ignored> => RuntimeErr("cannot apply non-function") as expr
-          | <BoolLit = ignored> => RuntimeErr("cannot apply non-function") as expr
-          | <NatLit = ignored> => RuntimeErr("cannot apply non-function") as expr
-          | <If = ignored> => RuntimeErr("cannot apply non-function") as expr
-          | <Record = ignored> => RuntimeErr("cannot apply non-function") as expr
-          | <Proj = ignored> => RuntimeErr("cannot apply non-function") as expr)
-      | <Let = l> =>
-          go(App({
-            fn = Abs({param = l.name, paramTy = TNat(0) as ty, body = l.body}) as expr,
-            arg = l.value
-          }) as expr)
-      | <If = i> =>
-          (case go(i.cond) of
-          | <RuntimeErr = msg> => RuntimeErr(msg) as expr
-          | <BoolLit = b> => if b then go(i.thenE) else go(i.elseE)
-          | <Var = ignored> => RuntimeErr("if condition must evaluate to bool") as expr
-          | <Abs = ignored> => RuntimeErr("if condition must evaluate to bool") as expr
-          | <App = ignored> => RuntimeErr("if condition must evaluate to bool") as expr
-          | <Let = ignored> => RuntimeErr("if condition must evaluate to bool") as expr
-          | <NatLit = ignored> => RuntimeErr("if condition must evaluate to bool") as expr
-          | <If = ignored> => RuntimeErr("if condition must evaluate to bool") as expr
-          | <Record = ignored> => RuntimeErr("if condition must evaluate to bool") as expr
-          | <Proj = ignored> => RuntimeErr("if condition must evaluate to bool") as expr)
-      | <Record = ignored> => RuntimeErr("record evaluation not implemented in this STLC demo") as expr
-      | <Proj = ignored> => RuntimeErr("record projection not implemented in this STLC demo") as expr
-      | <RuntimeErr = ignored> => e;
-
-let natTy : ty = TNat(0) as ty;
-
-let idNat : expr =
-  Abs({
-    param = "x",
-    paramTy = natTy,
-    body = Var("x") as expr
-  }) as expr;
-
-let constTrue : expr =
-  Abs({
-    param = "x",
-    paramTy = natTy,
-    body = BoolLit(true) as expr
-  }) as expr;
-
-let testGood : expr =
-  App({
-    fn = idNat,
-    arg = NatLit(42) as expr
-  }) as expr;
-
-let testBad : expr =
-  App({
-    fn = idNat,
-    arg = BoolLit(false) as expr
-  }) as expr;
-
-let testIf : expr =
-  If({
-    cond = BoolLit(true) as expr,
-    thenE = NatLit(1) as expr,
-    elseE = NatLit(2) as expr
-  }) as expr;
-
-let tyGood : ty = infer(emptyCtx)(testGood);
-let evGood : expr = eval(testGood);
-
-let tyBad : ty = infer(emptyCtx)(testBad);
-
-let tyIf : ty = infer(emptyCtx)(testIf);
-let evIf : expr = eval(testIf);
+-- ========== subst test ==========
+-- target == (fun(y : nat) -> x(y)) (y)
+-- value == 42
+--let substExample = box [
+--  body = App({funcE = Var("x") as exp, argE = Var("y") as exp}) as exp,
+--  lam = Lam({name = "y", argT = TNat(0) as ty, body = body}) as exp, 
+--  target = App({funcE = lam, argE = Var("y") as exp}) as exp, 
+--  value = Nat(42) as exp,
+--  subst = subst
+--] in subst ("y") (value) (target);
+--
+--
+---- ========== eval and check test ==========
+--let emptyTyCtx = CtxNil(0) as tyCtx;
+--
+---- example == (fun (x : nat -> nat) -> fun (y : nat) -> x(y)) (fun (x : nat) -> x) (2)
+--let checkExample = box [
+--  body = App({funcE = Var("x") as exp, argE = Var("y") as exp}) as exp,
+--  funY = Lam({name = "y", argT = TNat(0) as ty, body = body}) as exp, 
+--  funX = Lam({name = "x", argT = TArrow ({arg = TNat(0) as ty, ret = TNat(0) as ty}) as ty, body = funY}) as exp,
+--  id = Lam({name = "x", argT = TNat(0) as ty, body = Var("x") as exp}) as exp, 
+--  two = Nat(2) as exp,
+--  
+--  app1 = App ({funcE = funX, argE = id}) as exp,
+--  app2 = App ({funcE = app1, argE = two}) as exp,
+--
+--  typeCheck = typeCheck,
+--  eval = eval,
+--  emptyTyCtx = emptyTyCtx
+--] in 
+--[
+--    {typeCheckRes = typeCheck (emptyTyCtx) (app2)},
+--    {evalRes = eval (app2)}
+--];
+--
+----------------------------------------------------------------------------------------------

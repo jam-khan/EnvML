@@ -1,0 +1,22 @@
+--type m = int;
+--type n = forall t. m;
+--type c = string;
+--
+--let a : n = fun (type t) -> 3;
+
+
+type exp =
+ Nat as int;
+
+type maybeExp =
+    Just as exp;
+
+type random = int;
+
+let a = Just(Nat (2) as exp) as maybeExp; 
+
+
+--let eval : exp -> maybeExp =
+--    fun (e : exp) -> (
+--        Just(Nat (2) as exp) as maybeExp
+--    );

@@ -21,6 +21,6 @@ let getName : Addr -> string =
 
 let v_addr = Virtual({name = "Hello"}) as Addr;
 let v_name = getName (v_addr);
-let p_addr = Physical({name = "Hey"}) as Addr;
+let p_addr = Physical({firstlast = "Hey"}) as Addr;
 let p_name = getName (p_addr);
 

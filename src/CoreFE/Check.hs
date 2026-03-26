@@ -25,6 +25,31 @@ tshift x (TyList a) = TyList (tshift x a) -- ADD THIS
 tshift x (TySum ctors) = TySum [(l, tshift x t) | (l, t) <- ctors]
 tshift x (TyMu t) = TyMu (tshift (1 + x) t) -- TODO: Verify
 
+-- | Type substitution: replace TyVar i with s in t, shifting vars > i down by 1
+typeSubst :: Typ -> Int -> Typ -> Typ
+typeSubst _ _ (TyLit l) = TyLit l
+typeSubst s i (TyVar j)
+  | j == i    = s
+  | j > i     = TyVar (j - 1)
+  | otherwise = TyVar j
+typeSubst s i (TyArr a b) = TyArr (typeSubst s i a) (typeSubst s i b)
+typeSubst s i (TyAll a) = TyAll (typeSubst (tshift 0 s) (i + 1) a)
+typeSubst s i (TyMu a) = TyMu (typeSubst (tshift 0 s) (i + 1) a)
+typeSubst _ _ (TyBoxT g a) = TyBoxT g a
+typeSubst s i (TySubstT a b) = TySubstT (typeSubst s i a) (typeSubst (tshift 0 s) (i + 1) b)
+typeSubst s i (TyRcd l a) = TyRcd l (typeSubst s i a)
+typeSubst s i (TyEnvt bs) = TyEnvt (tyEnvSubst s i bs)
+typeSubst s i (TyList a) = TyList (typeSubst s i a)
+typeSubst s i (TySum ctors) = TySum [(l, typeSubst s i t) | (l, t) <- ctors]
+
+tyEnvSubst :: Typ -> Int -> TyEnv -> TyEnv
+tyEnvSubst _ _ [] = []
+tyEnvSubst s i (Kind : rest) = Kind : tyEnvSubst (tshift 0 s) (i + 1) rest
+tyEnvSubst s i (TypeEq a : rest) =
+  TypeEq (typeSubst s (i + keyLen rest) a) : tyEnvSubst (tshift 0 s) (i + 1) rest
+tyEnvSubst s i (Type a : rest) =
+  Type (typeSubst s (i + keyLen rest) a) : tyEnvSubst s i rest
+
 tshiftBinds :: Int -> TyEnv -> TyEnv
 tshiftBinds _ [] = []
 tshiftBinds x (Kind : bs) = Kind : tshiftBinds x bs
@@ -208,12 +233,13 @@ infer g (RProj e l) = do
   rlk g1 l
 infer g (Fold t e) = do
   body <- resolveMuBody g t
-  guard (check g e (TySubstT t body))
+  let unfoldedBody = typeSubst t 0 body
+  guard (check g e unfoldedBody)
   pure t
 infer g (Unfold e) = do
   t <- infer g e
   body <- resolveMuBody g t
-  pure (TySubstT t body)
+  pure (typeSubst t 0 body)
 infer g (Anno e t) =
   if check g e t then Just t else Nothing
 infer g (BinOp (Add e1 e2)) = do
@@ -306,10 +332,13 @@ check _ (EList []) (TyList _) = True -- Empty list checks against any list type
 check g (EList es) (TyList t) = all (\e -> check g e t) es
 check g e t =
   case infer g e of
-    Just t' -> teq g t' t g
+    Just t' -> trace (show t' ++ " == " ++ show t ++ "? " ++ show (teq g t' t g) ++ "in " ++ show g) $
+      teq g t' t g
     _ -> 
-      trace ("FAILED to check: " ++ show e ++ " against type: " ++ show t ++ ") in " ++ show g) $
-      False
+      case t of
+        TyVar n -> trace ("FAILED to check: " ++ show e ++ " against type: " ++ show t ++ " lookup: " ++ show (lookt g n) ++ ") in " ++ show g) $
+          False
+        _ -> False
 
 inferCaseBranches :: TyEnv -> [(String, Typ)] -> [CaseBranch] -> Maybe Typ
 inferCaseBranches _ _ [] = Nothing
