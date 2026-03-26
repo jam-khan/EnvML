@@ -13,7 +13,7 @@ inductive HasType : Typ → Exp → Typ → Prop where
     : HasType Γ e₁ (.arr A B)
     → HasType Γ e₂ A
     → HasType Γ (.app e₁ e₂) B
-  | tbox {Γ Γ₁ A B : Typ} {e₁ e₂ : Exp}
+  | tbox {Γ Γ₁ A : Typ} {e₁ e₂ : Exp}
     : HasType Γ e₁ Γ₁
     → HasType Γ₁ e₂ A
     → HasType Γ (.box e₁ e₂) A

@@ -4,6 +4,7 @@ import LeanSce.Core.Syntax
 open SCE
 
 mutual
+@[simp]
 def elabTyp : Typ → Core.Typ
   | Typ.int        => Core.Typ.int
   | Typ.top        => Core.Typ.top
@@ -12,6 +13,7 @@ def elabTyp : Typ → Core.Typ
   | Typ.rcd str t  => Core.Typ.rcd str (elabTyp t)
   | Typ.sig mty    => elabModTyp mty
 
+@[simp]
 def elabModTyp : ModTyp → Core.Typ
   | ModTyp.TyIntf t1      => elabTyp t1
   | ModTyp.TyArrM t1 mty  => Core.Typ.arr (elabTyp t1) (elabModTyp mty)

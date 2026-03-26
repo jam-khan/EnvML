@@ -361,7 +361,7 @@ theorem gpreservation
     intro E A htype henv
     cases htype with
     | tbox ih2 ih3 =>
-      rename_i Γ Γ₁
+      rename_i Γ₁
       apply HasType.tbox <;> try assumption
       apply ih1
       repeat assumption
@@ -386,7 +386,7 @@ theorem gpreservation
     intro E A htype henv
     cases htype with
     | tbox ih3 ih4 =>
-      rename_i Γ₁ B
+      rename_i Γ₁
       apply HasType.tbox <;> try assumption
       apply ih2
       repeat assumption
@@ -429,7 +429,7 @@ theorem gpreservation
     rename_i v1 v2 v3
     cases htype with
     | tbox ih1 ih2 =>
-      rename_i Γ₁ B
+      rename_i Γ₁
       apply value_weaken ih2 hv3
   | sproj hv hstep ih =>
     rename_i v1 e1 e2 n
@@ -520,7 +520,7 @@ theorem gprogress
           | _ =>
             cases htype1
   | tbox htyp1 htyp2 ih1 ih2 =>
-    rename_i Γ Γ₁ A B e1 e2
+    rename_i Γ Γ₁ A e1 e2
     intro v hv henv
     have h1 := ih1 hv henv
     cases h1 with
@@ -630,4 +630,3 @@ theorem progress {e A}
   apply gprogress <;> try assumption
   · exact Value.vunit
   · exact HasType.tunit
-

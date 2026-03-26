@@ -64,7 +64,50 @@ theorem elaboration_uniqueness
 theorem type_preservation
     {Γ A : SCE.Typ} {es : SCE.Exp} {ec : Core.Exp}
     (h : elabExp Γ es A ec)
-    : HasType (elabTyp Γ) ec (elabTyp A) := by sorry
+    : HasType (elabTyp Γ) ec (elabTyp A) := by
+    induction h with
+    | equery =>
+      rename_i ctx
+      exact HasType.tquery
+    | elit ctx n =>
+      simp [elabTyp]
+      exact HasType.tint
+    | eunit ctx =>
+      simp [elabTyp]
+      exact HasType.tunit
+    | eapp ctx A B se1 se2 ce1 ce2 el1 el2 ih1 ih2 =>
+      exact HasType.tapp ih1 ih2
+    | eproj ctx A B se ce i el1 hlook ih =>
+      apply HasType.tproj
+      · apply ih
+      · apply type_safe_index_lookup
+        assumption
+    | ebox ctx ctx' A se1 se2 ce1 ce2 el1 el2 ih1 ih2 =>
+      apply HasType.tbox ih1 ih2
+    | edmrg ctx A B se1 se2 ce1 ce2 el1 el2 ih1 ih2 =>
+      simp [elabTyp]
+      apply HasType.tmrg ih1 ih2
+    | enmrg ctx A B se1 se2 ce1 ce2 el1 el2 ih1 ih2 =>
+      simp [elabTyp]
+      apply HasType.tapp
+      · rename_i A1
+        apply HasType.tlam
+        apply HasType.tmrg
+        · apply HasType.tbox
+          · apply HasType.tproj
+            · exact HasType.tquery
+            . exact Lookup.zero
+          · assumption
+        · apply HasType.tbox
+          · apply HasType.tproj
+            · apply HasType.tquery
+            · 
+              sorry
+            · sorry
+          · sorry
+          · sorry
+      · exact HasType.tquery
+    | _ => sorry
 
 -- ============================================
 -- Values elaborate to values

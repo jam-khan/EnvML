@@ -1,0 +1,27 @@
+name = "RequestProject"
+defaultTargets = ["Core", "SCE", "Elaboration", "Examples", "Theories"]
+
+[[require]]
+name = "mathlib"
+git = "https://github.com/leanprover-community/mathlib4.git"
+rev = "v4.28.0"
+
+[[lean_lib]]
+name = "Core"
+globs = ["Core.+"]
+
+[[lean_lib]]
+name = "SCE"
+globs = ["SCE.+"]
+
+[[lean_lib]]
+name = "Elaboration"
+globs = ["Elaboration"]
+
+[[lean_lib]]
+name = "Examples"
+globs = ["Examples"]
+
+[[lean_lib]]
+name = "Theories"
+globs = ["Theories"]

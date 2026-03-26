@@ -1,0 +1,9 @@
+{"plugins": [],
+ "package": "RequestProject",
+ "options": {},
+ "name": "Core.Semantics",
+ "isModule": false,
+ "importArts":
+ {"Core.Syntax":
+  ["/Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/build/lib/lean/Core/Syntax.olean"]},
+ "dynlibs": []}
