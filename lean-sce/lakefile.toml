@@ -1,0 +1,10 @@
+name = "lean-sce"
+version = "0.1.0"
+defaultTargets = ["lean-sce"]
+
+[[lean_lib]]
+name = "LeanSce"
+
+[[lean_exe]]
+name = "lean-sce"
+root = "Main"
