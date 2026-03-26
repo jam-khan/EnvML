@@ -99,6 +99,8 @@ prettyNamedBindingExp name e =
 prettyNamedExpShort :: Named.Exp -> String
 prettyNamedExpShort (Named.Lit l) = prettyLiteral l
 prettyNamedExpShort (Named.Var n) = n
+prettyNamedExpShort (Named.Fix n _) = "fix " ++ n ++ ". ..."
+prettyNamedExpShort (Named.If _ _ _) = "if ... then ... else ..."
 prettyNamedExpShort (Named.Lam n _) = "λ" ++ n ++ ". ..."
 prettyNamedExpShort (Named.TLam n _) = "Λ" ++ n ++ ". ..."
 prettyNamedExpShort (Named.Clos _ _) = "<closure>"
@@ -110,6 +112,11 @@ prettyNamedExpShort (Named.Rec l e) = "{" ++ l ++ " = " ++ prettyNamedExpShort e
 prettyNamedExpShort (Named.RProj e l) = prettyNamedExpShort e ++ "." ++ l
 prettyNamedExpShort (Named.FEnv env) = prettyNamedEnvShort env
 prettyNamedExpShort (Named.Anno e _) = prettyNamedExpShort e
+prettyNamedExpShort (Named.Fold _ e) = "fold(...) " ++ prettyNamedExpShort e
+prettyNamedExpShort (Named.Unfold e) = "unfold " ++ prettyNamedExpShort e
+prettyNamedExpShort (Named.DataCon ctor arg) = ctor ++ "(" ++ prettyNamedExpShort arg ++ ")"
+prettyNamedExpShort (Named.Case _ _) = "case ... of ..."
+prettyNamedExpShort (Named.BinOp _) = "..."
 prettyNamedExpShort (Named.EList es) = foldr (\e acc -> acc ++ prettyNamedExpShort e ++ ",") "" es
 prettyNamedExpShort (Named.ETake i e) = "take(" ++ show i ++ "," ++ prettyNamedExpShort e ++ ")"
 
@@ -137,6 +144,7 @@ prettyDeBruijnBinding :: CoreFE.EnvE -> String
 prettyDeBruijnBinding (CoreFE.TypE t) = 
     "type " ++ prettyDeBruijnTyp t
 prettyDeBruijnBinding (CoreFE.ExpE e) = prettyDeBruijnBindingExp e
+prettyDeBruijnBinding (CoreFE.RecE _) = "<recursive-binding>"
 
 prettyDeBruijnBindingExp :: CoreFE.Exp -> String
 prettyDeBruijnBindingExp (CoreFE.Rec label (CoreFE.Anno e t)) =
@@ -161,6 +169,10 @@ prettyDeBruijnExpShort (CoreFE.Rec l e) = "{" ++ l ++ " = " ++ prettyDeBruijnExp
 prettyDeBruijnExpShort (CoreFE.RProj e l) = prettyDeBruijnExpShort e ++ "." ++ l
 prettyDeBruijnExpShort (CoreFE.FEnv env) = prettyDeBruijnEnvShort env
 prettyDeBruijnExpShort (CoreFE.Anno e _) = prettyDeBruijnExpShort e
+prettyDeBruijnExpShort (CoreFE.Fold _ e) = "fold(...) " ++ prettyDeBruijnExpShort e
+prettyDeBruijnExpShort (CoreFE.Unfold e) = "unfold " ++ prettyDeBruijnExpShort e
+prettyDeBruijnExpShort (CoreFE.DataCon ctor arg) = ctor ++ "(" ++ prettyDeBruijnExpShort arg ++ ")"
+prettyDeBruijnExpShort (CoreFE.Case _ _) = "case ... of ..."
 prettyDeBruijnExpShort (CoreFE.Fix _) = "fix ..."
 prettyDeBruijnExpShort (CoreFE.If {}) = "if ... then ... else ..."
 prettyDeBruijnExpShort (CoreFE.BinOp op) = prettyDeBruijnBinOpShort op
@@ -173,6 +185,11 @@ prettyDeBruijnBinOpShort (CoreFE.Add e1 e2) = prettyDeBruijnExpShort e1 ++ " + "
 prettyDeBruijnBinOpShort (CoreFE.Sub e1 e2) = prettyDeBruijnExpShort e1 ++ " - " ++ prettyDeBruijnExpShort e2
 prettyDeBruijnBinOpShort (CoreFE.Mul e1 e2) = prettyDeBruijnExpShort e1 ++ " * " ++ prettyDeBruijnExpShort e2
 prettyDeBruijnBinOpShort (CoreFE.EqEq e1 e2) = prettyDeBruijnExpShort e1 ++ " == " ++ prettyDeBruijnExpShort e2
+prettyDeBruijnBinOpShort (CoreFE.Neq e1 e2) = prettyDeBruijnExpShort e1 ++ " != " ++ prettyDeBruijnExpShort e2
+prettyDeBruijnBinOpShort (CoreFE.Lt e1 e2) = prettyDeBruijnExpShort e1 ++ " < " ++ prettyDeBruijnExpShort e2
+prettyDeBruijnBinOpShort (CoreFE.Le e1 e2) = prettyDeBruijnExpShort e1 ++ " <= " ++ prettyDeBruijnExpShort e2
+prettyDeBruijnBinOpShort (CoreFE.Gt e1 e2) = prettyDeBruijnExpShort e1 ++ " > " ++ prettyDeBruijnExpShort e2
+prettyDeBruijnBinOpShort (CoreFE.Ge e1 e2) = prettyDeBruijnExpShort e1 ++ " >= " ++ prettyDeBruijnExpShort e2
 
 prettyDeBruijnEnvShort :: CoreFE.Env -> String
 prettyDeBruijnEnvShort [] = "[]"
@@ -182,6 +199,7 @@ prettyDeBruijnEnvShort env
   where
     shortEntry (CoreFE.ExpE (CoreFE.Rec l _)) = l
     shortEntry (CoreFE.ExpE _) = "_"
+    shortEntry (CoreFE.RecE _) = "rec"
     shortEntry (CoreFE.TypE _) = "type"
 
 needsParenCore :: CoreFE.Exp -> Bool
@@ -189,6 +207,8 @@ needsParenCore (CoreFE.App _ _) = True
 needsParenCore (CoreFE.TApp _ _) = True
 needsParenCore (CoreFE.Lam _) = True
 needsParenCore (CoreFE.TLam _) = True
+needsParenCore (CoreFE.Fold _ _) = True
+needsParenCore (CoreFE.Unfold _) = True
 needsParenCore _ = False
 
 prettyDeBruijnExp :: CoreFE.Exp -> String
@@ -205,6 +225,10 @@ prettyDeBruijnExp (CoreFE.Rec l e) = "{" ++ l ++ " = " ++ prettyDeBruijnExp e ++
 prettyDeBruijnExp (CoreFE.RProj e l) = parenIf (needsParenCore e) (prettyDeBruijnExp e) ++ "." ++ l
 prettyDeBruijnExp (CoreFE.FEnv env) = "[" ++ prettyDeBruijnEnv env ++ "]"
 prettyDeBruijnExp (CoreFE.Anno e t) = parenIf (needsParenCore e) (prettyDeBruijnExp e) ++ " : " ++ prettyDeBruijnTyp t
+prettyDeBruijnExp (CoreFE.Fold t e) = "fold [" ++ prettyDeBruijnTyp t ++ "] " ++ prettyDeBruijnExp e
+prettyDeBruijnExp (CoreFE.Unfold e) = "unfold " ++ prettyDeBruijnExp e
+prettyDeBruijnExp (CoreFE.DataCon ctor arg) = ctor ++ "(" ++ prettyDeBruijnExp arg ++ ")"
+prettyDeBruijnExp (CoreFE.Case e _) = "case " ++ prettyDeBruijnExp e ++ " of ..."
 prettyDeBruijnExp (CoreFE.Fix e) = "fix " ++ prettyDeBruijnExp e
 prettyDeBruijnExp (CoreFE.If e1 e2 e3) = "if " ++ prettyDeBruijnExp e1 ++ " then " ++ prettyDeBruijnExp e2 ++ " else " ++ prettyDeBruijnExp e3
 prettyDeBruijnExp (CoreFE.BinOp op) = prettyDeBruijnBinOp op
@@ -217,6 +241,11 @@ prettyDeBruijnBinOp (CoreFE.Add e1 e2) = prettyDeBruijnExp e1 ++ " + " ++ pretty
 prettyDeBruijnBinOp (CoreFE.Sub e1 e2) = prettyDeBruijnExp e1 ++ " - " ++ prettyDeBruijnExp e2
 prettyDeBruijnBinOp (CoreFE.Mul e1 e2) = prettyDeBruijnExp e1 ++ " * " ++ prettyDeBruijnExp e2
 prettyDeBruijnBinOp (CoreFE.EqEq e1 e2) = prettyDeBruijnExp e1 ++ " == " ++ prettyDeBruijnExp e2
+prettyDeBruijnBinOp (CoreFE.Neq e1 e2) = prettyDeBruijnExp e1 ++ " != " ++ prettyDeBruijnExp e2
+prettyDeBruijnBinOp (CoreFE.Lt e1 e2) = prettyDeBruijnExp e1 ++ " < " ++ prettyDeBruijnExp e2
+prettyDeBruijnBinOp (CoreFE.Le e1 e2) = prettyDeBruijnExp e1 ++ " <= " ++ prettyDeBruijnExp e2
+prettyDeBruijnBinOp (CoreFE.Gt e1 e2) = prettyDeBruijnExp e1 ++ " > " ++ prettyDeBruijnExp e2
+prettyDeBruijnBinOp (CoreFE.Ge e1 e2) = prettyDeBruijnExp e1 ++ " >= " ++ prettyDeBruijnExp e2
 
 prettyDeBruijnEnv :: CoreFE.Env -> String
 prettyDeBruijnEnv [] = ""
@@ -225,6 +254,7 @@ prettyDeBruijnEnv es = intercalate ", " $ map prettyDeBruijnEnvE (reverse es)
 prettyDeBruijnEnvE :: CoreFE.EnvE -> String
 prettyDeBruijnEnvE (CoreFE.ExpE (CoreFE.Rec l e)) = l ++ " = " ++ prettyDeBruijnExp e
 prettyDeBruijnEnvE (CoreFE.ExpE e) = prettyDeBruijnExp e
+prettyDeBruijnEnvE (CoreFE.RecE _) = "<rec>"
 prettyDeBruijnEnvE (CoreFE.TypE t) = "type " ++ prettyDeBruijnTyp t
 
 prettyDeBruijnTyp :: CoreFE.Typ -> String
@@ -235,9 +265,14 @@ prettyDeBruijnTyp (CoreFE.TyArr t1 t2) =
         s2 = prettyDeBruijnTyp t2
     in s1 ++ " -> " ++ s2
 prettyDeBruijnTyp (CoreFE.TyAll t) = "forall. " ++ prettyDeBruijnTyp t
+prettyDeBruijnTyp (CoreFE.TyMu t) = "mu. " ++ prettyDeBruijnTyp t
 prettyDeBruijnTyp (CoreFE.TyBoxT env t) = "[" ++ prettyDeBruijnTyEnv env ++ "] => " ++ prettyDeBruijnTyp t
 prettyDeBruijnTyp (CoreFE.TySubstT t1 t2) = "#[" ++ prettyDeBruijnTyp t1 ++ "] " ++ prettyDeBruijnTyp t2
 prettyDeBruijnTyp (CoreFE.TyRcd l t) = "{" ++ l ++ " : " ++ prettyDeBruijnTyp t ++ "}"
+prettyDeBruijnTyp (CoreFE.TySum ctors) =
+        intercalate " | " (map prettyCtor ctors)
+    where
+    prettyCtor (ctor, ty) = ctor ++ " : " ++ prettyDeBruijnTyp ty
 prettyDeBruijnTyp (CoreFE.TyEnvt env) = "Env[" ++ prettyDeBruijnTyEnv env ++ "]"
 prettyDeBruijnTyp (CoreFE.TyList es) = "list " ++ prettyDeBruijnTyp es
 
@@ -275,6 +310,7 @@ prettyEvalResult (CoreFE.FEnv env) =
     formatBinding :: CoreFE.EnvE -> String
     formatBinding (CoreFE.TypE t) = "  type " ++ prettyDeBruijnTyp t
     formatBinding (CoreFE.ExpE e) = formatExpBinding e
+    formatBinding (CoreFE.RecE _) = "  <recursive-binding>"
     
     formatExpBinding :: CoreFE.Exp -> String
     formatExpBinding (CoreFE.Rec label val) = 
@@ -301,8 +337,10 @@ prettyLiteral :: CoreFE.Literal -> String
 prettyLiteral (CoreFE.LitInt n) = show n
 prettyLiteral (CoreFE.LitBool b) = if b then "true" else "false"
 prettyLiteral (CoreFE.LitStr s) = "\"" ++ s ++ "\""
+prettyLiteral CoreFE.LitUnit = "()"
 
 prettyTyLit :: CoreFE.TyLit -> String
 prettyTyLit CoreFE.TyInt  = "int"
 prettyTyLit CoreFE.TyBool = "bool"
 prettyTyLit CoreFE.TyStr  = "string"
+prettyTyLit CoreFE.TyUnit = "unit"

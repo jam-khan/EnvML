@@ -11,7 +11,7 @@ import CoreFE.Syntax
 %tokentype { Token }
 %error { parseError }
 
-%expect 1
+%expect 2
 
 %token
   int_kw    { TokInt }
@@ -27,6 +27,7 @@ import CoreFE.Syntax
   ident     { TokIdent $$ }
   num       { TokNum $$ }        -- Integer literal
   bool      { TokBool $$ }       -- Boolean literal
+  unit_kw   { TokUnitKw }        -- Unit keyword
   string    { TokString $$ }     -- String literal
   fix       { TokFix }
   if        { TokIf }
@@ -50,12 +51,15 @@ import CoreFE.Syntax
   '@'       { TokAt }
   '='       { TokEquals }       -- record assignment
   '=='      { TokEqOp }         -- equality check
+  '!='      { TokNeqOp }
+  '<='      { TokLeOp }
+  '>='      { TokGeOp }
   '|'       { TokBar }
   '-'       { TokSub }
   '**'      { TokMul }          -- using ** to avoid confusion with * (Kind)
 
 %right '->'
-%nonassoc '=='
+%nonassoc '==' '!=' '<' '<=' '>' '>='
 %left '-'
 %left '**'
 %left '.'
@@ -70,6 +74,11 @@ Exp :: { Exp }
   | fix Exp                             { Fix $2 }
   | AppExp ':' Typ                      { Anno $1 $3 }
   | AppExp '==' AppExp                  { BinOp (EqEq $1 $3) }
+  | AppExp '!=' AppExp                  { BinOp (Neq $1 $3) }
+  | AppExp '<' AppExp                   { BinOp (Lt $1 $3) }
+  | AppExp '<=' AppExp                  { BinOp (Le $1 $3) }
+  | AppExp '>' AppExp                   { BinOp (Gt $1 $3) }
+  | AppExp '>=' AppExp                  { BinOp (Ge $1 $3) }
   | AppExp '-' AppExp                   { BinOp (Sub $1 $3) }
   | AppExp '**' AppExp                  { BinOp (Mul $1 $3) }
   | AppExp                              { $1 }
@@ -88,6 +97,7 @@ AtomExp :: { Exp }
   : num                                 { Lit (LitInt $1) }
   | bool                                { Lit (LitBool $1) }
   | string                              { Lit (LitStr $1) }
+  | '(' ')'                             { Lit LitUnit }
   | var                                 { Var $1 }
   | '[' RuntimeEnvList ']' '|>' AtomExp { Box $2 $5 }
   | '[' RuntimeEnvList ']'              { FEnv $2 }
@@ -122,8 +132,7 @@ AppTyp :: { Typ }
 AtomTyp :: { Typ }
   : int_kw                      { TyLit TyInt }
   | bool_kw                     { TyLit TyBool }
-  | str_kw                      { TyLit TyStr }
-  | num                         { TyVar $1 }
+  | str_kw                      { TyLit TyStr }  | unit_kw                    { TyLit TyUnit }  | num                         { TyVar $1 }
   | forall '.' Typ              { TyAll $3 }
   | EnvKw '[' TyEnvList ']'     { TyEnvt $3 }
   | '{' ident ':' Typ '}'       { TyRcd $2 $4 }

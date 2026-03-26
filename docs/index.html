@@ -703,7 +703,191 @@ let final = (result::(sig val id : a -> a; end)).id(1);`
           type t = int;
           let y : t = 10;
         end;`
-  }
+  },
+  { id: "e12", label: "Fix Factorial",
+    code: ` let fact : int -> int -> int =
+	fun (p : int) -> fix f. fun (x : int) -> 
+    (if x == 1 then 1 else (x * f(x - 1)) + p);
+
+let placeholder : int = 0; -- test interaction with bindings outside fix
+let result : int = fact(placeholder)(4);
+    `
+  },
+  { id: "e12", label: "Fix Factorial",
+    code: ` let fact : int -> int -> int =
+	fun (p : int) -> fix f. fun (x : int) -> 
+    (if x == 1 then 1 else (x * f(x - 1)) + p);
+
+let placeholder : int = 0; -- test interaction with bindings outside fix
+let result : int = fact(placeholder)(4);
+    `
+  },
+  { id: "e13", label: "Sum types and case statements",
+    code: ` 
+type Shape = Square as int | Rect as {w : int, h : int};
+
+let a = Square(2) as Shape;
+let b = Rect({w = 3, h = 4}) as Shape;
+
+let area : Shape -> int =
+  fun (s : Shape) ->
+    case s of 
+    | <Square=r> => r * r 
+    | <Rect=dim> => dim.w * dim.h;
+
+let resultA : int = area(a);
+let resultB : int = area(b);
+`
+  },
+  { id: "e14", label: "STLC implementation",
+    code: ` 
+type ty =
+  TNat as unit
+| TBool as unit
+| TArrow as {arg : ty, ret : ty};
+
+type exp =
+  Var as string
+| Lam as {name : string, argT : ty, body : exp}
+| App as {funcE : exp, argE : exp}
+| Nat as int;
+
+type maybeExp =
+    Just as exp
+| Error as string;
+
+type maybeTy =
+    TyOk as ty
+| TyError as string;
+
+type tyCtx =
+    CtxNil as int
+| CtxCons as {name : string, entryT : ty, rest : tyCtx};
+
+let subst : string -> exp -> exp -> exp =
+    fix go. fun (name : string) (value : exp) (e : exp) -> (
+        case e of
+        | <Var = v> =>
+            if (v == name) then
+                value
+            else
+                Var(v) as exp
+        
+        | <Lam = l> =>
+            if (l.name == name) then
+                Lam({name = l.name, argT = l.argT, body = l.body}) as exp
+            else
+                Lam({name = l.name, argT = l.argT, body = go(name)(value)(l.body)}) as exp
+        | <App = a> =>
+            App({
+                funcE = go(name)(value)(a.funcE),
+                argE = go(name)(value)(a.argE)
+            }) as exp
+        | <Nat = n> => Nat(n) as exp
+    );
+
+let eval : exp -> maybeExp =
+    fix go. fun (e : exp) -> (
+        case e of
+        | <Var = v> => Error("Runtime error: unbound variable") as maybeExp
+        | <Lam = l> => Just(e) as maybeExp
+        | <Nat = n> => Just(e) as maybeExp
+        | <App = a> => 
+            case go(a.funcE) of
+            | <Error = errF> => Error(errF) as maybeExp
+            | <Just = funcVal> =>
+                case go(a.argE) of
+                | <Error = errA> => Error(errA) as maybeExp
+                | <Just = argVal> => 
+                    case funcVal of
+                    | <Lam = f> => go(subst (f.name) (argVal) (f.body))
+                    | _ => Error("Runtime error: head of application is not a lambda") as maybeExp
+                     
+    );
+
+let lookupTy : string -> tyCtx -> maybeTy =
+    fix go. fun (name : string) (ctx : tyCtx) -> (
+        case ctx of
+        | <CtxNil = n> => TyError("Type error: variable not found in context") as maybeTy
+        | <CtxCons = c> =>
+            if (c.name == name) then
+                TyOk(c.entryT) as maybeTy
+            else
+                go(name)(c.rest)
+    );
+
+let extendCtx : string -> ty -> tyCtx -> tyCtx =
+    fun (name : string) (entryT : ty) (rest : tyCtx) ->
+        CtxCons({name = name, entryT = entryT, rest = rest}) as tyCtx;
+
+let typeCheck : tyCtx -> exp -> maybeTy =
+    fix go. fun (ctx : tyCtx) (e : exp) -> (
+        case e of
+        | <Var = v> => lookupTy(v)(ctx)
+        | <Nat = n> => TyOk(TNat(()) as ty) as maybeTy
+        | <Lam = l> => (
+            case go(extendCtx(l.name)(l.argT)(ctx))(l.body) of
+            | <TyOk = bodyT> =>
+                TyOk(TArrow({arg = l.argT, ret = bodyT}) as ty) as maybeTy
+            | <TyError = err> => TyError(err) as maybeTy
+        )
+        | <App = a> =>
+            case go(ctx)(a.funcE) of
+            | <TyError = errF> => TyError(errF) as maybeTy
+            | <TyOk = funcT> =>
+                case go(ctx)(a.argE) of
+                | <TyError = errA> => TyError(errA) as maybeTy
+                | <TyOk = argT> =>
+                    case funcT of
+                    | <TArrow = arr> =>
+                        if arr.arg == argT then
+                            TyOk(arr.ret) as maybeTy
+                        else
+                            TyError("Type error: argument type mismatch") as maybeTy
+                    | _ => TyError("Type error: attempted to apply a non-function") as maybeTy
+    );
+
+-- ========== subst test ==========
+
+let substExample = box [
+  body = App({funcE = Var("x") as exp, argE = Var("y") as exp}) as exp,
+  lam = Lam({name = "y", argT = TNat(()) as ty, body = body}) as exp, 
+  target = App({funcE = lam, argE = Var("y") as exp}) as exp, 
+  value = Nat(42) as exp,
+  subst = subst
+] in
+-- ***** human readable version *****
+-- target == (fun(y : nat) -> x(y)) (y)
+-- value == 42
+ subst ("y") (value) (target);
+
+
+---- ========== eval and check test ==========
+let emptyTyCtx = CtxNil(0) as tyCtx;
+
+let checkExample = box [
+  body = App({funcE = Var("x") as exp, argE = Var("y") as exp}) as exp,
+  funY = Lam({name = "y", argT = TNat(()) as ty, body = body}) as exp, 
+  funX = Lam({name = "x", argT = TArrow ({arg = TNat(()) as ty, ret = TNat(()) as ty}) as ty, body = funY}) as exp,
+  id = Lam({name = "x", argT = TNat(()) as ty, body = Var("x") as exp}) as exp, 
+  two = Nat(2) as exp,
+  
+  app1 = App ({funcE = funX, argE = id}) as exp,
+  app2 = App ({funcE = app1, argE = two}) as exp,
+
+  typeCheck = typeCheck,
+  eval = eval,
+  emptyTyCtx = emptyTyCtx
+] in 
+-- ***** human readable version ******
+-- app2 == (fun (x : nat -> nat) -> fun (y : nat) -> x(y)) (fun (x : nat) -> x) (2)
+[
+    {typeCheckRes = typeCheck (emptyTyCtx) (app2)},
+    {evalRes = eval (app2)}
+];
+
+`
+  },
 ];
 
 const coreExamples = [

@@ -23,6 +23,13 @@ tokens :-
   type        { \_ -> TokType }
   Type        { \_ -> TokBType }
   fun         { \_ -> TokFun  }
+  fix         { \_ -> TokFix  }
+  if          { \_ -> TokIf }
+  case        { \_ -> TokCase }
+  of          { \_ -> TokOf }
+  as          { \_ -> TokAs }
+  then        { \_ -> TokThen }
+  else        { \_ -> TokElse }
   clos        { \_ -> TokClos }
   tclos       { \_ -> TokTClos}
   box         { \_ -> TokBox  }
@@ -39,11 +46,17 @@ tokens :-
   nil         { \_ -> TokNil  }
   list        { \_ -> TokList }
   List        { \_ -> TokListE }
+  unit        { \_ -> TokUnit }
 
   -- Symbols
+  "=="        { \_ -> TokEqEq     }
+  "!="        { \_ -> TokNeq      }
+  "<="        { \_ -> TokLe       }
+  ">="        { \_ -> TokGe       }
   "="         { \_ -> TokEq       }
   ":"         { \_ -> TokColon    }
   ":="        { \_ -> TokColonEqual    }
+  "=>"        { \_ -> TokFatArrow    }
   "("         { \_ -> TokLParen   }
   ")"         { \_ -> TokRParen   }
   "["         { \_ -> TokLBracket }
@@ -63,6 +76,8 @@ tokens :-
   "-"         { \_ -> TokDash     }
   "*"         { \_ -> TokStar     }
   "@"         { \_ -> TokAt    }
+  "|"         { \_ -> TokPipe   }
+  "_"         { \_ -> TokWildcard }
 
   -- Literals and Identifiers
   $digit+             { \s -> TokInt (read s) }
@@ -85,6 +100,13 @@ data Token
   | TokLet
   | TokVal
   | TokFun
+  | TokFix
+  | TokIf
+  | TokCase
+  | TokOf
+  | TokThen
+  | TokAs
+  | TokElse
   | TokAt
   | TokClos
   | TokTClos
@@ -101,6 +123,7 @@ data Token
   | TokNil
   | TokList
   | TokListE
+  | TokUnit
   -- Symbol Tokens
   | TokEq
   | TokColon    
@@ -112,6 +135,10 @@ data Token
   | TokRBrace   
   | TokLAngle
   | TokRAngle
+  | TokEqEq
+  | TokNeq
+  | TokLe
+  | TokGe
   | TokComma    
   | TokDot
   | TokSemi
@@ -120,10 +147,13 @@ data Token
   | TokTripleArrow
   | TokDoubleColon
   | TokColonEqual
+  | TokFatArrow
   | TokLink
   | TokPlus
   | TokDash
   | TokStar
+  | TokPipe
+  | TokWildcard
   deriving (Eq, Show)
 
 lexer :: String -> [Token]

@@ -36,6 +36,58 @@ toNamelessExp eNames tNames e =
       in  case b of
             TermBinding -> Nameless.Var i
             ModBinding  -> Nameless.RProj (Nameless.FEnv [Nameless.ExpE (Nameless.Var i)]) n
+    (Named.Fix n e1) ->
+      Nameless.Fix (toNamelessExp ((n, TermBinding):eNames) tNames e1)
+    (Named.If e1 e2 e3) ->
+      Nameless.If
+        (toNamelessExp eNames tNames e1)
+        (toNamelessExp eNames tNames e2)
+        (toNamelessExp eNames tNames e3)
+    (Named.BinOp (Named.Add e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.Add
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
+    (Named.BinOp (Named.Sub e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.Sub
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
+    (Named.BinOp (Named.Mul e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.Mul
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
+    (Named.BinOp (Named.EqEq e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.EqEq
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
+    (Named.BinOp (Named.Neq e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.Neq
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
+    (Named.BinOp (Named.Lt e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.Lt
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
+    (Named.BinOp (Named.Le e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.Le
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
+    (Named.BinOp (Named.Gt e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.Gt
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
+    (Named.BinOp (Named.Ge e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.Ge
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
     (Named.Lam x e1) ->
       Nameless.Lam (toNamelessExp ((x, TermBinding):eNames) tNames e1)
     (Named.Clos env e1)  ->
@@ -70,6 +122,18 @@ toNamelessExp eNames tNames e =
       Nameless.Anno
         (toNamelessExp eNames tNames e1)
         (toNamelessTyp eNames tNames ty)
+    (Named.Fold ty e1)   ->
+      Nameless.Fold
+        (toNamelessTyp eNames tNames ty)
+        (toNamelessExp eNames tNames e1)
+    (Named.Unfold e1)    ->
+      Nameless.Unfold (toNamelessExp eNames tNames e1)
+    (Named.DataCon ctor arg) ->
+      Nameless.DataCon ctor (toNamelessExp eNames tNames arg)
+    (Named.Case e1 branches) ->
+      Nameless.Case
+        (toNamelessExp eNames tNames e1)
+        (map (toNamelessCaseBranch eNames tNames) branches)
     (Named.EList es)     ->
       Nameless.EList (map (toNamelessExp eNames tNames) es)
     (Named.ETake i e1)    ->
@@ -138,6 +202,8 @@ toNamelessTyp eNames tNames ty =
       Nameless.TyArr (toNamelessTyp eNames tNames a) (toNamelessTyp eNames tNames b)
     Named.TyAll n a     ->
       Nameless.TyAll (toNamelessTyp eNames (n:tNames) a)
+    Named.TyMu n a      ->
+      Nameless.TyMu (toNamelessTyp eNames (n:tNames) a)
     Named.TyBoxT tyEnv a ->
       Nameless.TyBoxT
         (toNamelessTyEnv eNames tNames tyEnv)
@@ -148,6 +214,11 @@ toNamelessTyp eNames tNames ty =
         (toNamelessTyp eNames (n:tNames) b)
     Named.TyRcd l a     ->
       Nameless.TyRcd l (toNamelessTyp eNames tNames a)
+    Named.TySum ctors   ->
+      Nameless.TySum
+        [ (ctorName, toNamelessTyp eNames tNames ctorTy)
+        | (ctorName, ctorTy) <- ctors
+        ]
     Named.TyEnvt env    ->
       Nameless.TyEnvt (toNamelessTyEnv eNames tNames env)
     Named.TyList a      ->
@@ -198,3 +269,7 @@ toDeBruijn = toNamelessExp [] []
 
 toDeBruijnTyp :: Named.Typ -> Nameless.Typ
 toDeBruijnTyp = toNamelessTyp [] []
+
+toNamelessCaseBranch :: ExpNames -> TypNames -> Named.CaseBranch -> Nameless.CaseBranch
+toNamelessCaseBranch eNames tNames (Named.CaseBranch ctor binder body) =
+  Nameless.CaseBranch ctor (toNamelessExp ((binder, TermBinding) : eNames) tNames body)

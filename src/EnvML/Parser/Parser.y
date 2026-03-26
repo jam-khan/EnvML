@@ -4,6 +4,7 @@ module EnvML.Parser.Parser where
 import EnvML.Parser.Lexer
 import EnvML.Syntax
 import qualified CoreFE.Syntax as CoreFE
+import Data.Char (isUpper)
 }
 
 %name parseModule ModuleBody
@@ -28,6 +29,13 @@ import qualified CoreFE.Syntax as CoreFE
   id        { TokVar $$ }
   num       { TokInt $$ }
   fun       { TokFun   }
+  fix       { TokFix   }
+  if        { TokIf    }
+  case      { TokCase  }
+  of        { TokOf    }
+  as        { TokAs    }
+  then      { TokThen  }
+  else      { TokElse  }
   clos      { TokClos  }
   tclos     { TokTClos }
   box       { TokBox   }
@@ -43,15 +51,19 @@ import qualified CoreFE.Syntax as CoreFE
   nil       { TokNil }
   list      { TokList }
   List      { TokListE }
+  unit      { TokUnit }
   '='       { TokEq }
   ':'       { TokColon }
   ';'       { TokSemi }
   '::'      { TokDoubleColon }
   ':='      { TokColonEqual }
+  '=>'      { TokFatArrow }
   '->'      { TokArrow }
   '===>'    { TokTripleArrow }
   '->m'     { TokArrowM }
   '@'       { TokAt }
+  '|'       { TokPipe }
+  wildcard  { TokWildcard }
   ','       { TokComma }
   '.'       { TokDot }
   '('       { TokLParen }
@@ -62,12 +74,19 @@ import qualified CoreFE.Syntax as CoreFE
   '}'       { TokRBrace }
   '<'       { TokLAngle }
   '>'       { TokRAngle }
+  '=='      { TokEqEq }
+  '!='      { TokNeq }
+  '<='      { TokLe }
+  '>='      { TokGe }
   '+'       { TokPlus   }
   '-'       { TokDash   }
   '*'       { TokStar   }
 
 %right '->'
 %right '->m'
+%nonassoc '==' '!=' '<' '<=' '>' '>='
+%left '+' '-'
+%left '*'
 
 %%
 
@@ -85,6 +104,8 @@ ModuleStructs :: { Structures }
 ModuleStruct :: { Structure }
   : let    id          '=' Exp       ';' { Let $2 Nothing $4              }
   | let    id ':' Typ  '=' Exp       ';' { Let $2 (Just $4) $6            }
+  | type   id '<' TypeVars '>' '=' Constructors ';' { TypDecl $2 (foldr TyAll (TySum $7) $4) }
+  | type   id          '=' Constructors ';' { TypDecl $2 (TySum $4)       }
   | type   id          '=' Typ       ';' { TypDecl $2 $4                  }
   | module id          '=' ModuleExp ';' { ModStruct $2 Nothing $4        }
   | module id ':' ModuleTyp 
@@ -93,6 +114,17 @@ ModuleStruct :: { Structure }
   | functor id FunArgs '=' ModuleExp ';' { FunctStruct $2 $3 Nothing $5   }
   | functor id FunArgs ':' ModuleTyp 
                        '=' ModuleExp ';' { FunctStruct $2 $3 (Just $5) $7 }
+
+Constructors :: { [(Name, Typ)] }
+  : Constructor '|' Constructors { $1 : $3 }
+  | Constructor                  { [$1] }
+
+TypeVars :: { [Name] }
+  : id ',' TypeVars { $1 : $3 }
+  | id              { [$1] }
+
+Constructor :: { (Name, Typ) }
+  : id as Typ { ($1, $3) }
 
 InterfaceBody :: { ModuleTyp }
   : Intf                          { TySig $1 }
@@ -114,10 +146,20 @@ IntfE :: { IntfE }
 
 Exp :: { Exp }
   : fun FunArgs '->' Exp                  { Lam $2 $4 }
+  | fix id '.' Exp                        { Fix $2 $4 }
+  | if Exp then Exp else Exp              { If $2 $4 $6 }
+  | case Exp of '|' CaseBranches          { Case $2 $5 }
   | clos '[' Env ']' FunArgs '->' Exp     { Clos $3 $5 $7 }
   | tclos '[' Env ']' FunArgs '->' Exp    { TClos $3 $5 $7 }
   | box '[' Env ']' in Exp                { Box $3 $6 }
+  | Term as Typ                           { mkDataConAs $1 $3 }
   | Term '::' Typ                         { Anno $1 $3 }
+  | Exp '==' Exp                          { BinOp (EqEq $1 $3) }
+  | Exp '!=' Exp                          { BinOp (Neq $1 $3) }
+  | Exp '<' Exp                           { BinOp (Lt $1 $3) }
+  | Exp '<=' Exp                          { BinOp (Le $1 $3) }
+  | Exp '>' Exp                           { BinOp (Gt $1 $3) }
+  | Exp '>=' Exp                          { BinOp (Ge $1 $3) }
   | Exp '+' Exp                           { BinOp (Add $1 $3) }
   | Exp '-' Exp                           { BinOp (Sub $1 $3) }
   | Exp '*' Exp                           { BinOp (Mul $1 $3) }
@@ -142,6 +184,7 @@ Atom :: { Exp }
   | str                       { Lit (CoreFE.LitStr $1) }
   | true                      { Lit (CoreFE.LitBool True) }
   | false                     { Lit (CoreFE.LitBool False) }
+  | '(' ')'                   { Lit CoreFE.LitUnit }
   | id                        { Var $1 }
   | '{' RecFields '}'         { Rec $2 }
   | '[' Env ']'               { FEnv $2 }
@@ -150,6 +193,14 @@ Atom :: { Exp }
   | take '(' num ',' Exp ')'  { ETake $3 $5 }
   | '(' Exp ')'               { $2 }
   | ModuleExp                 { Mod $1 }
+
+CaseBranches :: { [CaseBranch] }
+  : CaseBranch '|' CaseBranches { $1 : $3 }
+  | CaseBranch                  { [$1] }
+
+CaseBranch :: { CaseBranch }
+  : '<' id '=' id '>' '=>' Exp  { CaseBranch $2 $4 $7 }
+  | wildcard '=>' Exp           { CaseBranch "_" "" $3 }
 
 ListElems :: { [Exp] }
   : Exp ',' ListElems    { $1 : $3 }
@@ -193,6 +244,8 @@ BaseTyp :: { Typ }
   : int                    { TyLit CoreFE.TyInt }
   | bool                   { TyLit CoreFE.TyBool }
   | stringt                { TyLit CoreFE.TyStr }
+  | unit                   { TyLit CoreFE.TyUnit }
+  | Constructors           { TySum $1 }
   | id                     { TyVar $1 }
   | '{' TyRcdFields '}'    { TyRcd $2 }
   | '[' TyCtx ']'          { TyCtx $2 }
@@ -230,8 +283,14 @@ TyCtxElem :: { TyCtxE }
   | int                                 { Type (TyLit CoreFE.TyInt) }
   | bool                                { Type (TyLit CoreFE.TyBool) }
   | stringt                             { Type (TyLit CoreFE.TyStr) }
+  | unit                                { Type (TyLit CoreFE.TyUnit) }
 
 {
 parseError :: [Token] -> a
 parseError tokens = error $ "Parse error: " ++ show tokens
+
+mkDataConAs :: Exp -> Typ -> Exp
+mkDataConAs (App (Var n) e) t
+  | not (null n) && isUpper (head n) = DataCon n e t
+mkDataConAs e _ = error $ "`as` is only valid on data constructor applications, got: " ++ show e
 }

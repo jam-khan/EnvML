@@ -2,6 +2,7 @@ module CoreFE.Check where
 
 import Control.Monad (guard)
 import CoreFE.Syntax
+import Debug.Trace (trace, traceM)
 
 -- | Count type variable bindings (Etvar and Eteq) in an environment
 keyLen :: TyEnv -> Int
@@ -20,7 +21,34 @@ tshift _ (TyBoxT t a) = TyBoxT t a
 tshift x (TySubstT a1 a2) = TySubstT (tshift x a1) (tshift (1 + x) a2)
 tshift x (TyRcd l a) = TyRcd l (tshift x a)
 tshift x (TyEnvt bs) = TyEnvt (tshiftBinds x bs)
-tshift x (TyList a) = TyList (tshift x a)  -- ADD THIS
+tshift x (TyList a) = TyList (tshift x a) -- ADD THIS
+tshift x (TySum ctors) = TySum [(l, tshift x t) | (l, t) <- ctors]
+tshift x (TyMu t) = TyMu (tshift (1 + x) t) -- TODO: Verify
+
+-- | Type substitution: replace TyVar i with s in t, shifting vars > i down by 1
+typeSubst :: Typ -> Int -> Typ -> Typ
+typeSubst _ _ (TyLit l) = TyLit l
+typeSubst s i (TyVar j)
+  | j == i = s
+  | j > i = TyVar (j - 1)
+  | otherwise = TyVar j
+typeSubst s i (TyArr a b) = TyArr (typeSubst s i a) (typeSubst s i b)
+typeSubst s i (TyAll a) = TyAll (typeSubst (tshift 0 s) (i + 1) a)
+typeSubst s i (TyMu a) = TyMu (typeSubst (tshift 0 s) (i + 1) a)
+typeSubst _ _ (TyBoxT g a) = TyBoxT g a
+typeSubst s i (TySubstT a b) = TySubstT (typeSubst s i a) (typeSubst (tshift 0 s) (i + 1) b)
+typeSubst s i (TyRcd l a) = TyRcd l (typeSubst s i a)
+typeSubst s i (TyEnvt bs) = TyEnvt (tyEnvSubst s i bs)
+typeSubst s i (TyList a) = TyList (typeSubst s i a)
+typeSubst s i (TySum ctors) = TySum [(l, typeSubst s i t) | (l, t) <- ctors]
+
+tyEnvSubst :: Typ -> Int -> TyEnv -> TyEnv
+tyEnvSubst _ _ [] = []
+tyEnvSubst s i (Kind : rest) = Kind : tyEnvSubst (tshift 0 s) (i + 1) rest
+tyEnvSubst s i (TypeEq a : rest) =
+  TypeEq (typeSubst s (i + keyLen rest) a) : tyEnvSubst (tshift 0 s) (i + 1) rest
+tyEnvSubst s i (Type a : rest) =
+  Type (typeSubst s (i + keyLen rest) a) : tyEnvSubst s i rest
 
 tshiftBinds :: Int -> TyEnv -> TyEnv
 tshiftBinds _ [] = []
@@ -69,6 +97,8 @@ teq g1 (TyArr a b) (TyArr c d) g2 =
   teq g1 a c g2 && teq g1 b d g2
 teq g1 (TyAll a) (TyAll b) g2 =
   teq (Kind : g1) a b (Kind : g2)
+teq g1 (TyMu a) (TyMu b) g2 =
+  teq (Kind : g1) a b (Kind : g2)
 teq g1 (TySubstT a b) c g2 =
   teq (TypeEq a : g1) b c g2
 teq g1 b (TySubstT a c) g2 =
@@ -77,7 +107,14 @@ teq g1 (TyEnvt e1) (TyEnvt e2) g2 =
   teqEnv g1 e1 e2 g2
 teq g1 (TyRcd l1 a) (TyRcd l2 b) g2 =
   l1 == l2 && teq g1 a b g2
-teq g1 (TyList a) (TyList b) g2 =  -- ADD THIS
+teq g1 (TySum c1) (TySum c2) g2 =
+  length c1 == length c2
+    && and
+      [ n1 == n2 && teq g1 t1 t2 g2
+        | ((n1, t1), (n2, t2)) <- zip c1 c2
+      ]
+teq g1 (TyList a) (TyList b) g2 =
+  -- ADD THIS
   teq g1 a b g2
 teq _ _ _ _ = False
 
@@ -97,12 +134,15 @@ value (Clos e _) = lvalue e
 value (TClos e _) = lvalue e
 value (FEnv e) = lvalue e
 value (Rec _ v) = value v
-value (EList es) = all value es  -- ADD THIS
+value (Fold _ v) = value v
+value (DataCon _ v) = value v
+value (EList es) = all value es -- ADD THIS
 value _ = False
 
 lvalue :: Env -> Bool
 lvalue [] = True
 lvalue (ExpE v : e) = lvalue e && value v
+lvalue (RecE _ : e) = lvalue e
 lvalue (TypE (TyBoxT _ _) : e) = lvalue e
 lvalue (TypE _ : _) = False
 
@@ -130,12 +170,29 @@ rlk (Type (TyEnvt t2) : g1) l
 rlk (TypeEq _ : g1) l = rlk g1 l
 rlk _ _ = Nothing
 
+resolveProjEnv :: TyEnv -> Typ -> Maybe TyEnv
+resolveProjEnv _ (TyEnvt env) = Just env
+resolveProjEnv g (TyVar x) = lookt g x >>= resolveProjEnv g
+resolveProjEnv g (TySubstT s t) = do
+  env <- resolveProjEnv g t
+  pure (env ++ [TypeEq s])
+resolveProjEnv g (TyMu t) = resolveProjEnv g (TySubstT (TyMu t) t)
+resolveProjEnv _ _ = Nothing
+
 getVar :: TyEnv -> Int -> Maybe Typ
 getVar [] _ = Nothing
 getVar (Kind : g) x = tshift 0 <$> getVar g x
 getVar (TypeEq _ : g) x = tshift 0 <$> getVar g x
 getVar (Type a : _) 0 = Just a
 getVar (Type _ : g) x = getVar g (x - 1)
+
+resolveMuBody :: TyEnv -> Typ -> Maybe Typ
+resolveMuBody _ (TyMu body) = Just body
+resolveMuBody g (TyVar x) = lookt g x >>= resolveMuBody g
+resolveMuBody g (TySubstT s t) = do
+  body <- resolveMuBody (TypeEq s : g) t
+  pure (TySubstT s body)
+resolveMuBody _ _ = Nothing
 
 -- | Infer the type of an expression
 infer :: TyEnv -> Exp -> Maybe Typ
@@ -144,12 +201,14 @@ infer _ (Lit lit) = pure $ TyLit $ inferLit lit
     inferLit (LitInt _) = TyInt
     inferLit (LitBool _) = TyBool
     inferLit (LitStr _) = TyStr
+    inferLit LitUnit = TyUnit
 infer g (Var x) = getVar g x
 infer g (App e1 e2) = do
   TyArr a b <- infer g e1
   guard (check g e2 a)
   return b
-infer g (TLam e) = TyAll <$> infer (Kind : g) e
+infer g (TLam e) =
+  TyAll <$> infer (Kind : g) e
 infer g (TApp e t) = do
   TyAll b <- infer g e
   return (TySubstT t b)
@@ -161,13 +220,27 @@ infer g (FEnv (ExpE e : d)) = do
   TyEnvt g1 <- infer g (FEnv d)
   a <- infer (g1 ++ g) e
   return (TyEnvt (Type a : g1))
+infer g (FEnv (RecE e : d)) = do
+  TyEnvt g1 <- infer g (FEnv d)
+  a <- infer (g1 ++ g) e
+  return (TyEnvt (Type a : g1))
 infer g (FEnv (TypE t : d)) = do
   TyEnvt g1 <- infer g (FEnv d)
   return (TyEnvt (TypeEq t : g1))
 infer g (Rec l e) = TyRcd l <$> infer g e
 infer g (RProj e l) = do
-  TyEnvt g1 <- infer g e
+  t <- infer g e
+  g1 <- resolveProjEnv g t
   rlk g1 l
+infer g (Fold t e) = do
+  body <- resolveMuBody g t
+  let unfoldedBody = typeSubst t 0 body
+  guard (check g e unfoldedBody)
+  pure t
+infer g (Unfold e) = do
+  t <- infer g e
+  body <- resolveMuBody g t
+  pure (typeSubst t 0 body)
 infer g (Anno e t) =
   if check g e t then Just t else Nothing
 infer g (BinOp (Add e1 e2)) = do
@@ -192,25 +265,49 @@ infer g (BinOp (EqEq e1 e2)) = do
   t1 <- infer g e1
   guard (check g e2 t1)
   return (TyLit TyBool)
-
+infer g (BinOp (Neq e1 e2)) = do
+  t1 <- infer g e1
+  guard (check g e2 t1)
+  return (TyLit TyBool)
+infer g (BinOp (Lt e1 e2)) = do
+  guard (check g e1 (TyLit TyInt))
+  guard (check g e2 (TyLit TyInt))
+  return (TyLit TyBool)
+infer g (BinOp (Le e1 e2)) = do
+  guard (check g e1 (TyLit TyInt))
+  guard (check g e2 (TyLit TyInt))
+  return (TyLit TyBool)
+infer g (BinOp (Gt e1 e2)) = do
+  guard (check g e1 (TyLit TyInt))
+  guard (check g e2 (TyLit TyInt))
+  return (TyLit TyBool)
+infer g (BinOp (Ge e1 e2)) = do
+  guard (check g e1 (TyLit TyInt))
+  guard (check g e2 (TyLit TyInt))
+  return (TyLit TyBool)
+infer _ (DataCon _ _) = Nothing
+infer g (Case e branches) = do
+  t <- infer g e
+  ctors <- resolveTySum g t
+  inferCaseBranches g ctors branches
 -- List inference
 infer _ (EList []) = Nothing -- Cannot infer empty list type
-infer g (EList (e:es)) = do
+infer g (EList (e : es)) = do
   t <- infer g e
   -- Check all remaining elements have the same type
   guard (all (\ei -> check g ei t) es)
   return (TyList t)
-
 infer g (ETake _ e) = do
   TyList t <- infer g e
   return (TyList t)
-
 infer _ _ = Nothing
 
 -- | Check an expression against a type
 check :: TyEnv -> Exp -> Typ -> Bool
+check g e (TySubstT a b) = check (TypeEq a : g) e b
 check g (Lam e) (TyArr a b) = check (Type a : g) e b
-check g (TLam e) (TyAll a) = check (Kind : g) e a
+check g (TLam e) (TyAll a) =
+  check (Kind : g) e a
 check g (Clos d e) (TyBoxT g1 (TyArr a b)) =
   case infer g (FEnv d) of
     Just (TyEnvt g2) -> g1 == g2 && lvalue d && check (Type a : g1) e b
@@ -221,15 +318,56 @@ check g (TClos d e) (TyBoxT g1 (TyAll a)) =
     _ -> False
 check g (Fix e) (TyArr a b) =
   check (Type (TyArr a b) : g) e (TyArr a b)
-check g (App e1 e2) tyB   =
+check g (DataCon ctor args) ty =
+  case resolveTySum g ty of
+    Just ctors ->
+      case lookup ctor ctors of
+        Just payloadTy -> check g args payloadTy
+        Nothing -> False
+    Nothing -> False
+check g (App e1 e2) tyB =
   case infer g e2 of
-    Just tyA  -> check g e1 (TyArr tyA tyB)
-    Nothing   -> False
+    Just tyA -> check g e1 (TyArr tyA tyB)
+    Nothing -> False
 -- List checking
-check _ (EList []) (TyList _) = True  -- Empty list checks against any list type
+check _ (EList []) (TyList _) = True -- Empty list checks against any list type
 check g (EList es) (TyList t) = all (\e -> check g e t) es
-
 check g e t =
   case infer g e of
     Just t' -> teq g t' t g
     _ -> False
+
+inferCaseBranches :: TyEnv -> [(String, Typ)] -> [CaseBranch] -> Maybe Typ
+inferCaseBranches _ _ [] = Nothing
+inferCaseBranches g ctors (b : rest) = do
+  branchTy <- inferCaseBranch g ctors b
+  inferRemaining branchTy rest
+  pure branchTy
+  where
+    inferRemaining _ [] = Just ()
+    inferRemaining expectedTy (b' : bs) = do
+      branchTy' <- inferCaseBranch g ctors b'
+      guard (teq g expectedTy branchTy' g)
+      inferRemaining expectedTy bs
+
+inferCaseBranch :: TyEnv -> [(String, Typ)] -> CaseBranch -> Maybe Typ
+inferCaseBranch g ctors (CaseBranch ctor body) = do
+  payloadTy <- payloadTyForBranch ctor ctors
+  infer (Type payloadTy : g) body
+
+payloadTyForBranch :: String -> [(String, Typ)] -> Maybe Typ
+payloadTyForBranch "_" ctors = firstPayloadTy ctors
+payloadTyForBranch ctor ctors = lookup ctor ctors
+
+firstPayloadTy :: [(String, Typ)] -> Maybe Typ
+firstPayloadTy [] = Nothing
+firstPayloadTy ((_, ty) : _) = Just ty
+
+resolveTySum :: TyEnv -> Typ -> Maybe [(String, Typ)]
+resolveTySum _ (TySum ctors) = Just ctors
+resolveTySum g (TyVar x) = lookt g x >>= resolveTySum g
+resolveTySum g (TySubstT a b) = do
+  ctors <- resolveTySum g b
+  pure [(name, TySubstT a payloadTy) | (name, payloadTy) <- ctors]
+resolveTySum g (TyMu a) = resolveTySum g (TySubstT (TyMu a) a)
+resolveTySum _ _ = Nothing

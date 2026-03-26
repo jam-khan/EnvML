@@ -147,6 +147,7 @@ cmdDeBruijn path = runPipeline path $ \ast -> do
   let coreNamed = elaborate ast
   let coreNameless = toDeBruijn coreNamed
   putStrLn "=== De Bruijn Core (Nameless) ==="
+  putStrLn $ show coreNameless
   putStrLn $ CoreFE.pretty coreNameless
 
 cmdCheck :: FilePath -> IO ()
@@ -158,7 +159,6 @@ cmdCheck path = runPipeline path $ \ast -> do
     Nothing -> putStrLn "✗ Type check failed: Could not infer type"
     Just typ -> do
       putStrLn "✓ Type check succeeded!"
-      putStrLn $ "  Type: " ++ CoreFE.pretty typ
 
 cmdEval :: FilePath -> IO ()
 cmdEval path = runPipeline path $ \ast -> do

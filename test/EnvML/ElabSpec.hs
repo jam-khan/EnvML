@@ -8,6 +8,7 @@ import EnvML.Elab
 import qualified CoreFE.Named as Named
 import qualified CoreFE.DeBruijn as DB
 import qualified CoreFE.Syntax as CoreFE
+import Control.Exception (evaluate)
 import Test.Hspec
 
 spec :: Spec
@@ -32,6 +33,16 @@ spec = do
       let parsed = parseExp (lexer input)
       let named = elabExp parsed
       named `shouldBe` Named.Lit (CoreFE.LitBool True)
+
+    it "elaborates if expression" $ do
+      let input = "if true then 1 else 0"
+      let parsed = parseExp (lexer input)
+      let named = elabExp parsed
+      named `shouldBe`
+        Named.If
+          (Named.Lit (CoreFE.LitBool True))
+          (Named.Lit (CoreFE.LitInt 1))
+          (Named.Lit (CoreFE.LitInt 0))
 
   describe "Elaborate Lambda Expressions" $ do
     
@@ -88,6 +99,60 @@ spec = do
       let named = elabExp parsed
       named `shouldBe` Named.TApp (Named.Var "f") (Named.TyLit CoreFE.TyInt)
 
+    it "elaborates named fixpoint" $ do
+      let input = "fix f. fun (x : int) -> f(x)"
+      let parsed = parseExp (lexer input)
+      let named = elabExp parsed
+      named `shouldBe`
+        Named.Fix "f" (Named.Lam "x" (Named.App (Named.Var "f") (Named.Var "x")))
+
+    it "elaborates data constructor with source-level type annotation into core fold" $ do
+      let input = "Nil(0) as NatList"
+      let parsed = parseExp (lexer input)
+      let named = elabExp parsed
+      named
+        `shouldBe` Named.Fold
+          (Named.TyVar "NatList")
+          (Named.DataCon "Nil" (Named.Lit (CoreFE.LitInt 0)))
+
+    it "elaborates case by inserting core unfold on the scrutinee" $ do
+      let input = "case xs of | <Nil=h> => h | <Cons=t> => t"
+      let parsed = parseExp (lexer input)
+      let named = elabExp parsed
+      named
+        `shouldBe` Named.Case
+          (Named.Unfold (Named.Var "xs"))
+          [ Named.CaseBranch "Nil" "h" (Named.Var "h")
+          , Named.CaseBranch "Cons" "t" (Named.Var "t")
+          ]
+
+    it "elaborates wildcard case branch" $ do
+      let input = "case xs of | _ => 0"
+      let parsed = parseExp (lexer input)
+      let named = elabExp parsed
+      named
+        `shouldBe` Named.Case
+          (Named.Unfold (Named.Var "xs"))
+          [Named.CaseBranch "_" "" (Named.Lit (CoreFE.LitInt 0))]
+
+  describe "Elaborate Binary Operators" $ do
+
+    it "elaborates comparison operators" $ do
+      let input = "1 <= 2"
+      let parsed = parseExp (lexer input)
+      let named = elabExp parsed
+      named `shouldBe`
+        Named.BinOp
+          (Named.Le
+            (Named.Lit (CoreFE.LitInt 1))
+            (Named.Lit (CoreFE.LitInt 2)))
+
+    it "elaborates inequality operator" $ do
+      let input = "x != y"
+      let parsed = parseExp (lexer input)
+      let named = elabExp parsed
+      named `shouldBe` Named.BinOp (Named.Neq (Named.Var "x") (Named.Var "y"))
+
   describe "Elaborate Types" $ do
     
     it "elaborates type literals" $ do
@@ -116,6 +181,14 @@ spec = do
                          (Named.TyAll "b" 
                            (Named.TyArr (Named.TyVar "a") (Named.TyVar "b")))
 
+    it "rejects inline sum annotations without a declared binder" $ do
+      let sumTy = Src.TySum [("Nil", Src.TyLit CoreFE.TyInt), ("Cons", Src.TyVar "NatList")]
+      evaluate
+        (case elabTyp sumTy of
+          Named.TyMu binder _ -> length binder
+          _ -> 0)
+        `shouldThrow` anyErrorCall
+
   describe "Elaborate Modules" $ do
     
     it "elaborates module variable" $ do
@@ -128,6 +201,22 @@ spec = do
       let parsed = parseModule (lexer input)
       let named = elabModule parsed
       named `shouldBe` Named.FEnv [Named.ModE "x" (Named.Lit (CoreFE.LitInt 1))]
+
+    it "wraps type declarations of sum types with the declared binder in core" $ do
+      let input = "type NatList = Nil as int | Cons as NatList;"
+      let parsed = parseModule (lexer input)
+      let named = elabModule parsed
+      named
+        `shouldBe` Named.FEnv
+          [ Named.TypE
+              "NatList"
+              (Named.TyMu
+                "NatList"
+                (Named.TySum
+                  [ ("Nil", Named.TyLit CoreFE.TyInt)
+                  , ("Cons", Named.TyVar "NatList")
+                  ]))
+          ]
 
     it "elaborates functor with term argument" $ do
       let m = Src.Functor [("x", Src.TmArgType (Src.TyLit CoreFE.TyInt))]
@@ -165,3 +254,26 @@ spec = do
       case nameless of
         CoreFE.TLam body -> return ()
         _ -> expectationFailure "Expected TLam"
+
+    it "converts if expression" $ do
+      let named =
+            Named.If
+              (Named.Lit (CoreFE.LitBool True))
+              (Named.Lit (CoreFE.LitInt 1))
+              (Named.Lit (CoreFE.LitInt 0))
+      let nameless = DB.toDeBruijn named
+      nameless `shouldBe`
+        CoreFE.If
+          (CoreFE.Lit (CoreFE.LitBool True))
+          (CoreFE.Lit (CoreFE.LitInt 1))
+          (CoreFE.Lit (CoreFE.LitInt 0))
+
+    it "converts named fixpoint with recursive reference" $ do
+      let named =
+            Named.Fix "f"
+              (Named.Lam "x" (Named.App (Named.Var "f") (Named.Var "x")))
+      let nameless = DB.toDeBruijn named
+      nameless `shouldBe`
+        CoreFE.Fix
+          (CoreFE.Lam
+            (CoreFE.App (CoreFE.Var 1) (CoreFE.Var 0)))

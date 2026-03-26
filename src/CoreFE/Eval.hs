@@ -5,7 +5,9 @@ import CoreFE.Syntax
 lookupv :: Env -> Int -> Maybe Exp
 lookupv [] _ = Nothing
 lookupv (ExpE v : _) 0 = pure v
+lookupv (RecE v : _) 0 = pure v
 lookupv (ExpE _ : xs) n = lookupv xs (n - 1)
+lookupv (RecE _ : xs) n = lookupv xs (n - 1)
 lookupv (TypE _ : xs) n = lookupv xs n
 
 c2g :: Env -> TyEnv
@@ -50,6 +52,10 @@ eval env = go
       FEnv ve1 <- eval env (FEnv ve)
       ee <- eval (ve1 ++ env) e'
       pure $ FEnv (ExpE ee : ve1)
+    go (FEnv (RecE e' : ve)) = do
+      FEnv ve1 <- eval env (FEnv ve)
+      ee <- eval (ve1 ++ env) e'
+      pure $ FEnv (RecE ee : ve1)
     go (FEnv (TypE a : e1)) = do
       -- b_tdef
       FEnv ve1 <- eval env (FEnv e1)
@@ -59,12 +65,20 @@ eval env = go
     go (RProj e l) = do
       v <- eval env e
       rlookupv v l
+    go (Fold t e) = do
+      v <- eval env e
+      pure (Fold t v)
+    go (Unfold e) = do
+      v <- eval env e
+      case v of
+        Fold _ inner -> pure inner
+        _ -> Nothing
     go (Anno e _) =
       eval env e
     go (Fix e) = do
-        Clos env' e1 <- eval env e
-        let v_fix = Clos (ExpE v_fix : env') e1
-        pure v_fix
+      Clos env' e1 <- eval env e
+      let v_fix = Clos (RecE v_fix : env') e1
+      pure v_fix
     go (If cond e1 e2) = do
         Lit (LitBool b) <- eval env cond
         eval env (if b then e1 else e2)
@@ -84,9 +98,42 @@ eval env = go
         v1 <- eval env e1
         v2 <- eval env e2
         pure $ Lit (LitBool (v1 == v2))
+    go (BinOp (Neq e1 e2)) = do
+      v1 <- eval env e1
+      v2 <- eval env e2
+      pure $ Lit (LitBool (v1 /= v2))
+    go (BinOp (Lt e1 e2)) = do
+      Lit (LitInt v1) <- eval env e1
+      Lit (LitInt v2) <- eval env e2
+      pure $ Lit (LitBool (v1 < v2))
+    go (BinOp (Le e1 e2)) = do
+      Lit (LitInt v1) <- eval env e1
+      Lit (LitInt v2) <- eval env e2
+      pure $ Lit (LitBool (v1 <= v2))
+    go (BinOp (Gt e1 e2)) = do
+      Lit (LitInt v1) <- eval env e1
+      Lit (LitInt v2) <- eval env e2
+      pure $ Lit (LitBool (v1 > v2))
+    go (BinOp (Ge e1 e2)) = do
+      Lit (LitInt v1) <- eval env e1
+      Lit (LitInt v2) <- eval env e2
+      pure $ Lit (LitBool (v1 >= v2))
+    go (DataCon ctor arg) = do
+      val <- eval env arg
+      pure $ DataCon ctor val
+    go (Case e branches) = do
+      DataCon ctor payload <- eval env e
+      branchBody <- lookupCaseBranch ctor branches
+      eval (ExpE payload : env) branchBody
     go (EList es) = do
         vs <- mapM (eval env) es
         pure $ EList vs
     go (ETake n e) = do
         EList vs <- eval env e
         pure $ EList (take n vs)
+
+lookupCaseBranch :: String -> [CaseBranch] -> Maybe Exp
+lookupCaseBranch _ [] = Nothing
+lookupCaseBranch ctor (CaseBranch ctor' body : rest)
+  | ctor == ctor' || ctor' == "_" = Just body
+  | otherwise = lookupCaseBranch ctor rest

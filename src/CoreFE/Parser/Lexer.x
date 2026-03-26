@@ -28,6 +28,7 @@ tokens :-
   else                          { \_ -> TokElse }
   true                          { \_ -> TokBool True }
   false                         { \_ -> TokBool False }
+  Unit                          { \_ -> TokUnitKw }
 
   -- Literals
   x $digit+                     { \s -> TokVar (read (drop 1 s)) }
@@ -54,6 +55,9 @@ tokens :-
   "@"                           { \_ -> TokAt }
   "="                           { \_ -> TokEquals }
   "=="                          { \_ -> TokEqOp }
+  "!="                          { \_ -> TokNeqOp }
+  "<="                          { \_ -> TokLeOp }
+  ">="                          { \_ -> TokGeOp }
   "|"                           { \_ -> TokBar }
   "-"                           { \_ -> TokSub }
   "**"                          { \_ -> TokMul }
@@ -78,6 +82,7 @@ data Token
   | TokThen
   | TokElse
   | TokBool Bool
+  | TokUnitKw
   | TokString String
   | TokVar Int
   | TokIdent String
@@ -100,6 +105,9 @@ data Token
   | TokAt
   | TokEquals
   | TokEqOp
+  | TokNeqOp
+  | TokLeOp
+  | TokGeOp
   | TokBar
   | TokSub
   | TokMul
