@@ -44,7 +44,46 @@ theorem type_safe_index_lookup
 
 theorem type_safe_label_existence
     {l : String} {ST : SCE.Typ}
-    : SCE.LabelIn l ST ↔ Core.Lin l (elabTyp ST) := by sorry
+    : SCE.LabelIn l ST ↔ Core.Lin l (elabTyp ST) := by
+  constructor
+  · intro h
+    induction h with
+    | rcd l T =>
+      simp [elabTyp]
+      exact Core.Lin.rcd
+    | andl A B l _ ih =>
+      simp [elabTyp]
+      exact Core.Lin.andl ih
+    | andr A B l _ ih =>
+      simp [elabTyp]
+      exact Core.Lin.andr ih
+    | sig l T _ ih =>
+      simp [elabTyp, elabModTyp]
+      exact ih
+  · intro h
+    cases ST with
+    | rcd lA T =>
+      simp [elabTyp] at h
+      cases h
+      exact SCE.LabelIn.rcd l T
+    | and A B =>
+      simp [elabTyp] at h
+      cases h with
+      | andl h =>
+        exact SCE.LabelIn.andl A B l (type_safe_label_existence.mpr h)
+      | andr h =>
+        exact SCE.LabelIn.andr A B l (type_safe_label_existence.mpr h)
+    | int => simp [elabTyp] at h; cases h
+    | top => simp [elabTyp] at h; cases h
+    | arr _ _ => simp [elabTyp] at h; cases h
+    | sig mt =>
+      cases mt with
+      | TyIntf T =>
+        simp [elabTyp, elabModTyp] at h
+        exact SCE.LabelIn.sig l T (type_safe_label_existence.mpr h)
+      | TyArrM T mt' =>
+        simp [elabTyp, elabModTyp] at h; cases h
+
 
 theorem type_safe_label_nonexistence
     {l : String} {ST : SCE.Typ}
@@ -56,7 +95,20 @@ theorem type_safe_label_nonexistence
 theorem type_safe_record_lookup
     {ST₁ ST₂ : SCE.Typ} {l : String}
     (h : SCE.SRLookup ST₁ l ST₂)
-    : Core.RLookup (elabTyp ST₁) l (elabTyp ST₂) := by sorry
+    : Core.RLookup (elabTyp ST₁) l (elabTyp ST₂) := by
+  induction h with
+  | zero l T =>
+    simp [elabTyp]
+    exact Core.RLookup.zero
+  | andl A B l T _ h_cond ih =>
+    simp [elabTyp]
+    exact Core.RLookup.landl ih
+      (type_safe_label_nonexistence.mp h_cond.2)
+  | andr A B l T _ h_cond ih =>
+    simp [elabTyp]
+    exact Core.RLookup.landr ih
+      ⟨type_safe_label_nonexistence.mp h_cond.2,
+       type_safe_label_existence.mp h_cond.1⟩
 
 /-- Same source expression in same context yields same type -/
 theorem inference_uniqueness
