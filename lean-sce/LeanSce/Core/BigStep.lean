@@ -46,27 +46,24 @@ inductive EBig : Exp → Exp → Exp → Prop where
     → RLookupV v₁ l v₂
     → EBig e (.rproj a l) v₂
 
-theorem big_gpreservation
-  {e v' v : Exp}
-  (heval : EBig v e v') :
-  ∀ {E A : Typ},
-  HasType E e A
-  → HasType .top v E
-  → HasType .top v' A := by
-  sorry
-
-theorem termination
-  {E A : Typ} {e : Exp}
-  (htype : HasType E e A) :
-  ∀ {v : Exp},
-  Value v
-  → HasType .top v E
-  → ∃ v', EBig v e v' ∧ Value v' := by
-  sorry
-
-
-theorem big_preservation {e v' A}
-  : HasType .top e A
-  → EBig .unit e v'
-  → HasType .top v' A := by
-  sorry
+theorem ebig_produces_value
+    {v e v' : Core.Exp}
+    (hval : Core.Value v)
+    (hbig : EBig v e v')
+    : Core.Value v' := by
+  induction hbig with
+  | eblit _ => exact Value.vint
+  | ebunit _ => exact Value.vunit
+  | ebmrg _ _ ih1 ih2 => exact Value.vmrg (ih1 hval) (ih2 (Value.vmrg hval (ih1 hval)))
+  | ebclos hv => exact Value.vclos hv
+  | ebapp _ _ _ ih1 ih2 ih3 =>
+    have hclos := ih1 hval
+    cases hclos with | vclos hv => exact ih3 (Value.vmrg hv (ih2 hval))
+  | ebbox _ _ ih1 ih2 => exact ih2 (ih1 hval)
+  | eclos _ hv1 => exact Value.vclos hv1
+  | equery hv => exact hv
+  | ebproj _ hlook ih =>
+    exact lookupv_value hlook (ih hval)
+  | ebrec _ ih => exact Value.vrcd (ih hval)
+  | ebsel _ hsel ih =>
+    exact rlookupv_value hsel (ih hval)

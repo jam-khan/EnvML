@@ -507,7 +507,7 @@ theorem type_preservation
       simp [elabTyp]
       exact HasType.tapp ih1 ih2
     | mlink ctx Γ₁ A mt l se1 se2 ce1 ce2 _ _ hlookup ih1 ih2 =>
-      simp [elabTyp, elabModTyp, linkedCore]
+      simp [elabTyp, linkedCore]
       apply HasType.tapp
       · apply HasType.tlam
         apply HasType.tmrg
@@ -520,6 +520,148 @@ theorem type_preservation
               (HasType.trcd (HasType.trproj ih1 (type_safe_record_lookup hlookup)))
       · exact HasType.tquery
 
+theorem value_typing_weakening
+    {v : SCE.Exp} {cv : Core.Exp} {A Γ₁ Γ₂ : SCE.Typ}
+    (hval : SCE.Value v)
+    (helab : elabExp Γ₁ v A cv)
+    : elabExp Γ₂ v A cv := by
+  induction hval generalizing Γ₁ Γ₂ A cv with
+  | vint =>
+    cases helab
+    exact elabExp.elit Γ₂ _
+  | vunit =>
+    cases helab
+    exact elabExp.eunit Γ₂
+  | vclos hv ih =>
+    cases helab with
+    | eclos _ _ _ _ _ _ _ _ hval' h1 h2 =>
+      exact elabExp.eclos Γ₂ _ _ _ _ _ _ _ hval' h1 h2
+  | vmclos hv ih =>
+    cases helab with
+    | mclos _ _ _ _ _ _ _ _ hval' h1 h2 =>
+      exact elabExp.mclos Γ₂ _ _ _ _ _ _ _ hval' h1 h2
+  | vmrg hv1 hv2 ih1 ih2 =>
+    cases helab with
+    | edmrg _ _ _ _ _ _ _ h1 h2 =>
+      exact elabExp.edmrg Γ₂ _ _ _ _ _ _ (ih1 h1) (ih2 h2)
+  | vlrec hv ih =>
+    cases helab with
+    | elrec _ _ _ _ _ h =>
+      exact elabExp.elrec Γ₂ _ _ _ _ (ih h)
+
+theorem source_lookupv_value
+    {v v' : SCE.Exp} {n : Nat}
+    (hval : SCE.Value v)
+    (hlook : S_Sem.LookupV v n v')
+    : SCE.Value v' := by
+  induction hlook with
+  | dmrg_zero => cases hval with | vmrg h1 h2 => exact h2
+  | dmrg_succ _ ih => cases hval with | vmrg h1 h2 => exact ih h1
+  | nmrg_zero => cases hval
+  | nmrg_succ => cases hval
+
+theorem source_sel_value
+    {v v' : SCE.Exp} {l : String}
+    (hval : SCE.Value v)
+    (hsel : S_Sem.Sel v l v')
+    : SCE.Value v' := by
+  induction hsel with
+  | rcd => cases hval with | vlrec h => exact h
+  | dmrg_left _ ih => cases hval with | vmrg h1 h2 => exact ih h1
+  | dmrg_right _ ih => cases hval with | vmrg h1 h2 => exact ih h2
+  | nmrg_left _ ih => cases hval
+  | nmrg_right _ ih => cases hval
+
+theorem eval_produces_value
+    {ρ e v : SCE.Exp}
+    (hval : SCE.Value ρ)
+    (heval : S_Sem.BStep ρ e v)
+    : SCE.Value v := by
+  induction heval with
+  | query _ => exact hval
+  | lit _ => exact SCE.Value.vint
+  | unit _ => exact SCE.Value.vunit
+  | clos_val _ hv => exact SCE.Value.vclos hv
+  | mclos_val _ hv => exact SCE.Value.vmclos hv
+  | proj _ _ hlook ih1 =>
+    exact source_lookupv_value (ih1 hval) hlook
+  | lam _ => exact SCE.Value.vclos hval
+  | box _ _ _ ih1 ih2 => exact ih2 (ih1 hval)
+  | app_clos _ _ _ _ ih1 ih2 ih3 =>
+    have hvclos := ih1 hval
+    cases hvclos with | vclos hv => exact ih3 (SCE.Value.vmrg hv (ih2 hval))
+  | app_mclos _ _ _ _ ih1 ih2 ih3 =>
+    have hvclos := ih1 hval
+    cases hvclos with | vmclos hv => exact ih3 (SCE.Value.vmrg hv (ih2 hval))
+  | dmrg _ _ _ ih1 ih2 =>
+    exact SCE.Value.vmrg (ih1 hval) (ih2 (SCE.Value.vmrg hval (ih1 hval)))
+  | nmrg _ _ _ ih1 ih2 =>
+    exact SCE.Value.vmrg (ih1 hval) (ih2 hval)
+  | lrec _ _ ih => exact SCE.Value.vlrec (ih hval)
+  | rproj _ _ hsel ih =>
+    exact source_sel_value (ih hval) hsel
+  | letb _ _ _ ih1 ih2 =>
+    exact ih2 (SCE.Value.vmrg hval (ih1 hval))
+  | openm _ _ _ ih1 ih2 =>
+    have := ih1 hval
+    cases this with | vlrec hv => exact ih2 (SCE.Value.vmrg hval hv)
+  | mstruct_sandboxed _ _ ih => exact ih SCE.Value.vunit
+  | mstruct_open _ _ ih => exact ih hval
+  | mfunctor_sandboxed _ => exact SCE.Value.vmclos SCE.Value.vunit
+  | mfunctor_open hv => exact SCE.Value.vmclos hv
+  | mlink hv hstep1 hstep2 hsel hstep3 ih1 ih2 ih3 =>
+    have hv1 := ih1 hv
+    have hv2 := ih2 hv
+    cases hv2 with
+    | vmclos hvv2 =>
+      have hvl := source_sel_value hv1 hsel
+      exact SCE.Value.vmrg hv1 (ih3 (SCE.Value.vmrg hvv2 (SCE.Value.vlrec hvl)))
+
+theorem lookup_preservation
+    {v_e v' : SCE.Exp} {vc_e : Core.Exp} {A B : SCE.Typ} {i : Nat}
+    (hval : SCE.Value v_e)
+    (helab : elabExp SCE.Typ.top v_e A vc_e)
+    (hlook : S_Sem.LookupV v_e i v')
+    (htyp_look : SCE.SLookup A i B)
+    : ∃ vc', Core.LookupV vc_e i vc' ∧ elabExp SCE.Typ.top v' B vc' := by
+  sorry
+
+theorem sel_preservation
+    {v_e v' : SCE.Exp} {vc_e : Core.Exp} {A B : SCE.Typ} {l : String}
+    (hval : SCE.Value v_e)
+    (helab : elabExp SCE.Typ.top v_e A vc_e)
+    (hlook : S_Sem.Sel v_e l v')
+    (htyp_look : SCE.SRLookup A l B)
+    : ∃ vc', Core.RLookupV vc_e l vc' ∧ elabExp SCE.Typ.top v' B vc' := by
+  sorry
+
+theorem linkedCore_eval
+    {ρc vc1 vc2 vc_l vc3 : Core.Exp} {ctx : Core.Typ} {l : String}
+    {ce1 ce2 body : Core.Exp} {A : Core.Typ}
+    (hval_ρ : Core.Value ρc)
+    (hbig1 : EBig ρc ce1 vc1)
+    (hbig2 : EBig ρc ce2 (Core.Exp.clos vc2 (.rcd l A) body))
+    (hsel : Core.RLookupV vc1 l vc_l)
+    (hbig3 : EBig (.mrg vc2 (.lrec l vc_l)) body vc3)
+    : EBig ρc (linkedCore ctx l ce1 ce2) (.mrg vc1 vc3) := by
+  have hval_vc1 := ebig_produces_value hval_ρ hbig1
+  simp [linkedCore]
+  apply EBig.ebapp
+  · exact EBig.ebclos hval_ρ
+  · exact EBig.equery hval_ρ
+  · apply EBig.ebmrg
+    · apply EBig.ebbox
+      · exact EBig.ebproj (EBig.equery (Value.vmrg hval_ρ hval_ρ)) LookupV.lvzero
+      · exact hbig1
+    · apply EBig.ebbox
+      · exact EBig.ebproj
+          (EBig.equery (Value.vmrg (Value.vmrg hval_ρ hval_ρ) hval_vc1))
+          (LookupV.lvsucc LookupV.lvzero)
+      · exact EBig.ebapp
+          hbig2
+          (EBig.ebrec (EBig.ebsel hbig1 hsel))
+          hbig3
+
 theorem semantic_preservation
     {Γ A : SCE.Typ} {es : SCE.Exp} {ec : Core.Exp}
     {ρs vs : SCE.Exp} {ρc : Core.Exp}
@@ -527,7 +669,80 @@ theorem semantic_preservation
     (heval : S_Sem.BStep ρs es vs)
     (henv : elabExp SCE.Typ.top ρs Γ ρc)
     (henv_val : SCE.Value ρs)
-    : ∃ vc, EBig ρc ec vc ∧ elabExp SCE.Typ.top vs A vc := by sorry
+    : ∃ vc, EBig ρc ec vc ∧ elabExp SCE.Typ.top vs A vc := by
+  induction heval generalizing Γ A ec ρc with
+  | query hval=>
+    rename_i v
+    exists ρc
+    constructor
+    · cases helab
+      refine EBig.equery ?_
+      exact elab_value henv hval
+    · cases helab
+      assumption
+  | lit hval =>
+    cases helab
+    exact ⟨Core.Exp.lit _, EBig.eblit (elab_value henv henv_val), elabExp.elit .top _⟩
+  | unit =>
+    cases helab
+    exists Core.Exp.unit
+    constructor
+    · apply EBig.ebunit
+      (expose_names; exact elab_value henv h)
+    · exact elabExp.eunit SCE.Typ.top
+  | clos_val henv_src hval =>
+    cases helab with
+    | eclos _ _ _ _ _ _ _ _ hval' h1 h2 =>
+      exact ⟨_, EBig.eclos (elab_value henv henv_val) (elab_value h1 hval),
+               elabExp.eclos .top _ _ _ _ _ _ _ hval h1 h2⟩
+  | mclos_val henv_src hval =>
+    cases helab with
+    | mclos _ _ _ _ _ _ _ _ hval' h1 h2 =>
+      exact ⟨_, EBig.eclos (elab_value henv henv_val) (elab_value h1 hval),
+               elabExp.mclos .top _ _ _ _ _ _ _ hval h1 h2⟩
+  | proj ρ1 hstep hlookv ih1 =>
+    cases helab with
+    | eproj _ A' _ _ ce _ h_elab h_slook =>
+      obtain ⟨vc, hbig, helab_v⟩ := ih1 h_elab henv henv_val
+      obtain ⟨vc', hlookvc, helab_v'⟩ := lookup_preservation
+        (eval_produces_value henv_val hstep)
+        helab_v hlookv h_slook
+      exact ⟨vc', EBig.ebproj hbig hlookvc, helab_v'⟩
+  | lam hval =>
+    cases helab with
+    | elam _ _ _ _ ce h_body =>
+      exact ⟨Core.Exp.clos ρc _ ce,
+             EBig.ebclos (elab_value henv henv_val),
+             elabExp.eclos .top _ _ _ _ _ _ _ henv_val henv h_body⟩
+  | mlink h1 bstep1 bstep2 sel1 step2 step3 ih1 ih2 =>
+    rename_i _ e1 e2 v1 v2 vl v3 A_src body_src l_name
+    cases helab with
+    | mlink _ Γ₁ A_inner mt l_inner _ _ ce1 ce2 h_elab1 h_elab2 h_lookup =>
+      obtain ⟨vc1, hbig1, helab_v1⟩ := step3 h_elab1 henv henv_val
+      obtain ⟨vc2, hbig2, helab_v2⟩ := ih1 h_elab2 henv henv_val
+      cases helab_v2 with
+      | mclos _ _ _ _ _ _ _ _ hval_v2 h_env2 h_body =>
+        rename_i ctx_inner ce1_inner ce2_inner
+        have hv1_val := eval_produces_value henv_val bstep1
+        obtain ⟨vc_l, hrlookup_v, helab_vl⟩ :=
+          sel_preservation hv1_val helab_v1 sel1 h_lookup
+        have hvl_val := source_sel_value hv1_val sel1
+        have hval_lrec := SCE.Value.vlrec (l := l_name) hvl_val
+        have hval_env := SCE.Value.vmrg hval_v2 hval_lrec
+        have helab_lrec := elabExp.elrec .top _ _ _ l_name helab_vl
+        have helab_lrec_weak :=
+          value_typing_weakening (Γ₂ := SCE.Typ.and .top ctx_inner) hval_lrec helab_lrec
+        have helab_env := elabExp.edmrg .top _ _ _ _ _ _ h_env2 helab_lrec_weak
+        obtain ⟨vc3, hbig3, helab_v3⟩ := ih2 h_body helab_env hval_env
+        have hv3_val := eval_produces_value hval_env step2
+        have helab_v3_weak :=
+          value_typing_weakening (Γ₂ := SCE.Typ.and .top Γ₁) hv3_val helab_v3
+        have helab_result := elabExp.edmrg .top _ _ _ _ _ _
+          helab_v1 helab_v3_weak
+        exact ⟨.mrg vc1 vc3,
+               linkedCore_eval (elab_value henv henv_val) hbig1 hbig2 hrlookup_v hbig3,
+               helab_result⟩
+  | _ => sorry
 
 theorem whole_program_correctness
     {A : SCE.Typ} {es : SCE.Exp} {ec : Core.Exp} {vs : SCE.Exp}
@@ -546,27 +761,38 @@ theorem core_link_typed
     (hlink : CoreLink Γ l A₁ A B ec₁ ec₂ ec)
     (h₁ : HasType Γ ec₁ A₁)
     (h₂ : HasType Γ ec₂ (.arr (.rcd l A) B))
-    : HasType Γ ec (.and A₁ B) :=
-    by sorry
-/--
-  Separate compilation: compiling components separately
-  then linking in core preserves the behavior of
-  linking in source then evaluating.
--/
+    : HasType Γ ec (.and A₁ B) := by
+  cases hlink with
+  | link _ _ _ _ _ _ hrlookup =>
+    simp [linkedCore]
+    apply HasType.tapp
+    · apply HasType.tlam
+      apply HasType.tmrg
+      · apply HasType.tbox
+        · exact HasType.tproj HasType.tquery Lookup.zero
+        · exact h₁
+      · apply HasType.tbox
+        · exact HasType.tproj HasType.tquery (Lookup.succ Lookup.zero)
+        · exact HasType.tapp h₂ (HasType.trcd (HasType.trproj h₁ hrlookup))
+    · exact HasType.tquery
+
 theorem separate_compilation
-    {Γ Γ₁ A : SCE.Typ} {mt : SCE.ModTyp} {l : String}
+    {Γ Γ₁ A B : SCE.Typ} {l : String}
     {es₁ es₂ : SCE.Exp} {ec₁ ec₂ ec : Core.Exp}
     {ρs vs : SCE.Exp} {ρc : Core.Exp}
     (helab₁ : elabExp Γ es₁ Γ₁ ec₁)
-    (helab₂ : elabExp Γ es₂ (.sig (.TyArrM (.rcd l A) mt)) ec₂)
+    (helab₂ : elabExp Γ es₂ (.sig (.TyArrM (.rcd l A) (.TyIntf B))) ec₂)
     (hlookup : SRLookup Γ₁ l A)
-    (hlink : CoreLink (elabTyp Γ) l (elabTyp Γ₁) (elabTyp A) (elabModTyp mt) ec₁ ec₂ ec)
+    (hlink : CoreLink (elabTyp Γ) l (elabTyp Γ₁) (elabTyp A) (elabTyp B) ec₁ ec₂ ec)
     (heval : S_Sem.BStep ρs (.mlink es₁ es₂) vs)
     (henv : elabExp SCE.Typ.top ρs Γ ρc)
     (henv_val : SCE.Value ρs)
     : ∃ vc, EBig ρc ec vc
-           ∧ elabExp SCE.Typ.top vs (.and Γ₁ (.sig mt)) vc := by sorry
-
+           ∧ elabExp SCE.Typ.top vs (.and Γ₁ B) vc := by
+  cases hlink with
+  | link _ _ _ _ _ _ _ =>
+    have hmlink := elabExp.mlink Γ Γ₁ A B l es₁ es₂ ec₁ ec₂ helab₁ helab₂ hlookup
+    exact semantic_preservation hmlink heval henv henv_val
 /-
 Dynamic and Static linking at Source with first-class modules
 

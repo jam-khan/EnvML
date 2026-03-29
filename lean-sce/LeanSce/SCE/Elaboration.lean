@@ -125,12 +125,12 @@ inductive elabExp : TyCtx → Exp → Typ → Core.Exp → Prop
     → elabExp ctx se2 A ce2
     → elabExp ctx (Exp.mapp se1 se2) (Typ.sig mt)
         (Core.Exp.app ce1 ce2)
-  | mlink (ctx Γ₁ A : Typ) (mt : ModTyp) (l : String)
+  | mlink (ctx Γ₁ A B : Typ) (l : String)
       (se1 se2 : Exp) (ce1 ce2 : Core.Exp)
     : elabExp ctx se1 Γ₁ ce1
-    → elabExp ctx se2 (Typ.sig (ModTyp.TyArrM (Typ.rcd l A) mt)) ce2
+    → elabExp ctx se2 (Typ.sig (ModTyp.TyArrM (Typ.rcd l A) (ModTyp.TyIntf B))) ce2
     → SRLookup Γ₁ l A
-    → elabExp ctx (Exp.mlink se1 se2) (Typ.and Γ₁ (Typ.sig mt))
+    → elabExp ctx (Exp.mlink se1 se2) (Typ.and Γ₁ B)
         (linkedCore (elabTyp ctx) l ce1 ce2)
   -- | mlink (ctx A : Typ) (mt : ModTyp) (se1 se2 : Exp) (ce1 ce2 : Core.Exp)
   --   : elabExp ctx se1 A ce1

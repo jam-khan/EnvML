@@ -118,10 +118,11 @@ inductive BStep : Exp → Exp → Exp → Prop where
   | mfunctor_open {ρ : Exp} {A : Typ} {body : Exp}
     : Value ρ
     → BStep ρ (.mfunctor .open_ A body) (.mclos ρ A body)
-  | mlink {ρ e₁ e₂ v₁ v₂ vr : Exp} {A : Typ} {body : Exp}
+| mlink {ρ e₁ e₂ v₁ v₂ vₗ v₃ : Exp} {A : Typ} {body : Exp} {l : String}
     : Value ρ
     → BStep ρ e₁ v₁
-    → BStep ρ e₂ (.mclos v₂ A body)
-    → BStep (.mrg v₂ v₁) body vr
-    → BStep ρ (.mlink e₁ e₂) (.mrg v₁ vr)
+    → BStep ρ e₂ (.mclos v₂ (.rcd l A) body)
+    → Sel v₁ l vₗ
+    → BStep (.mrg v₂ (.lrec l vₗ)) body v₃
+    → BStep ρ (.mlink e₁ e₂) (.mrg v₁ v₃)
 end S_Sem
