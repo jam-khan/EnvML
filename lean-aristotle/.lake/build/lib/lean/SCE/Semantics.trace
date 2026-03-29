@@ -1,0 +1,30 @@
+{"synthetic": false,
+ "schemaVersion": "2025-09-10",
+ "outputs":
+ {"o": ["7a7e62ddd65ec4a5.olean"],
+  "i": "70ba87d06cd32b04.ilean",
+  "c": "a721d21e60bb3d5f.c"},
+ "log":
+ [{"message":
+   ".> LEAN_PATH=/Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/packages/Cli/.lake/build/lib/lean:/Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/packages/batteries/.lake/build/lib/lean:/Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/packages/Qq/.lake/build/lib/lean:/Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/packages/aesop/.lake/build/lib/lean:/Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/packages/proofwidgets/.lake/build/lib/lean:/Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/packages/importGraph/.lake/build/lib/lean:/Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/packages/LeanSearchClient/.lake/build/lib/lean:/Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/packages/plausible/.lake/build/lib/lean:/Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/packages/mathlib/.lake/build/lib/lean:/Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/build/lib/lean /Users/jamkabeeralikhan/.elan/toolchains/leanprover--lean4---v4.28.0/bin/lean /Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/SCE/Semantics.lean -o /Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/build/lib/lean/SCE/Semantics.olean -i /Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/build/lib/lean/SCE/Semantics.ilean -c /Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/build/ir/SCE/Semantics.c --setup /Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/build/ir/SCE/Semantics.setup.json --json",
+   "level": "trace"}],
+ "inputs":
+ [["SCE.Semantics:deps",
+   [["deps",
+     [["RequestProject/SCE:extraDep",
+       [["@RequestProject:extraDep", "00000000000006bb"]]],
+      ["imports",
+       [["SCE.Syntax transitive imports (legacy)", "00000000000006bb"],
+        ["SCE.Syntax:importAllArts", "6dceb84e58f1dc46"]]]]],
+    ["libs",
+     [["import dynlibs", "00000000000006bb"],
+      ["package external libraries", "00000000000006bb"],
+      ["module dynlibs", "00000000000006bb"],
+      ["module plugins", "00000000000006bb"]]]]],
+  ["Lean 4.28.0, commit 7e01a1bf5c70fc6167d49c345d3bf80596e9a79b",
+   "a96bc04a2e5e9630"],
+  ["/Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/SCE/Semantics.lean",
+   "b872f607a64c5144"],
+  ["options", "00000000000006bb"],
+  ["Module.leanArgs: #[]", "00000000000006bb"]],
+ "depHash": "554d700a78b84f92"}

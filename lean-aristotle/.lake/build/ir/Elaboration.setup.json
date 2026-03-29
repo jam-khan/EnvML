@@ -1,0 +1,11 @@
+{"plugins": [],
+ "package": "RequestProject",
+ "options": {},
+ "name": "Elaboration",
+ "isModule": false,
+ "importArts":
+ {"SCE.Syntax":
+  ["/Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/build/lib/lean/SCE/Syntax.olean"],
+  "Core.Syntax":
+  ["/Users/jamkabeeralikhan/Documents/Programming/EnvML/lean-sce/.lake/build/lib/lean/Core/Syntax.olean"]},
+ "dynlibs": []}
