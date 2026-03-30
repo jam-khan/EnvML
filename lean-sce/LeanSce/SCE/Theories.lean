@@ -615,6 +615,28 @@ theorem eval_produces_value
       have hvl := source_sel_value hv1 hsel
       exact SCE.Value.vmrg hv1 (ih3 (SCE.Value.vmrg hvv2 (SCE.Value.vlrec hvl)))
 
+theorem sel_implies_label_in
+    {v v' : SCE.Exp} {vc : Core.Exp} {A : SCE.Typ} {l : String}
+    (hval : SCE.Value v)
+    (helab : elabExp SCE.Typ.top v A vc)
+    (hsel : S_Sem.Sel v l v')
+    : SCE.LabelIn l A := by
+  induction hsel generalizing A vc with
+  | rcd =>
+    cases hval with | vlrec hv =>
+    cases helab with | elrec _ _ _ _ _ h =>
+    exact SCE.LabelIn.rcd _ _
+  | dmrg_left _ ih =>
+    cases hval with | vmrg hv1 hv2 =>
+    cases helab with | edmrg _ A' B' _ _ ce1 ce2 h1 h2 =>
+    exact SCE.LabelIn.andl _ _ _ (ih hv1 h1)
+  | dmrg_right _ ih =>
+    cases hval with | vmrg hv1 hv2 =>
+    cases helab with | edmrg _ A' B' _ _ ce1 ce2 h1 h2 =>
+    exact SCE.LabelIn.andr _ _ _ (ih hv2 (value_typing_weakening hv2 h2))
+  | nmrg_left => cases hval
+  | nmrg_right => cases hval
+
 theorem lookup_preservation
     {v_e v' : SCE.Exp} {vc_e : Core.Exp} {A B : SCE.Typ} {i : Nat}
     (hval : SCE.Value v_e)
@@ -622,7 +644,20 @@ theorem lookup_preservation
     (hlook : S_Sem.LookupV v_e i v')
     (htyp_look : SCE.SLookup A i B)
     : ∃ vc', Core.LookupV vc_e i vc' ∧ elabExp SCE.Typ.top v' B vc' := by
-  sorry
+  induction hlook generalizing A B vc_e with
+  | dmrg_zero =>
+    cases hval with | vmrg hv1 hv2 =>
+    cases helab with | edmrg _ _ _ _ _ ce1 ce2 h1 h2 =>
+    cases htyp_look with | zero =>
+    exact ⟨ce2, Core.LookupV.lvzero, value_typing_weakening hv2 h2⟩
+  | dmrg_succ _ ih =>
+    cases hval with | vmrg hv1 hv2 =>
+    cases helab with | edmrg _ _ _ _ _ ce1 ce2 h1 h2 =>
+    cases htyp_look with | succ _ _ _ _ htyp_inner =>
+    obtain ⟨vc', hlookvc, helab_v'⟩ := ih hv1 h1 htyp_inner
+    exact ⟨vc', Core.LookupV.lvsucc hlookvc, helab_v'⟩
+  | nmrg_zero => cases hval
+  | nmrg_succ => cases hval
 
 theorem sel_preservation
     {v_e v' : SCE.Exp} {vc_e : Core.Exp} {A B : SCE.Typ} {l : String}
@@ -631,7 +666,37 @@ theorem sel_preservation
     (hlook : S_Sem.Sel v_e l v')
     (htyp_look : SCE.SRLookup A l B)
     : ∃ vc', Core.RLookupV vc_e l vc' ∧ elabExp SCE.Typ.top v' B vc' := by
-  sorry
+  induction hlook generalizing A B vc_e with
+  | rcd =>
+    cases hval with | vlrec hv =>
+    cases helab with | elrec _ _ _ vc_inner _ h_inner =>
+    cases htyp_look with | zero =>
+    exact ⟨vc_inner, Core.RLookupV.rvlzero, h_inner⟩
+  | dmrg_left hsel_inner ih =>
+    cases hval with | vmrg hv1 hv2 =>
+    cases helab with | edmrg _ A' B' _ _ ce1 ce2 h1 h2 =>
+    cases htyp_look with
+    | andl _ _ _ _ hrl hcond =>
+      obtain ⟨vc', hlookvc, helab_v'⟩ := ih hv1 h1 hrl
+      exact ⟨vc', Core.RLookupV.vlandl hlookvc, helab_v'⟩
+    | andr _ _ _ _ hrl hcond =>
+      have hlin := sel_implies_label_in hv1 h1 hsel_inner
+      exact absurd hlin hcond.2
+  | dmrg_right hsel_inner ih =>
+    cases hval with | vmrg hv1 hv2 =>
+    cases helab with | edmrg _ A' B' _ _ ce1 ce2 h1 h2 =>
+    rename_i v1 v2 v3 l'
+    have h2_weak : elabExp SCE.Typ.top v2 B' ce2 :=
+      value_typing_weakening (Γ₂ := SCE.Typ.top) hv2 h2
+    cases htyp_look with
+    | andr _ _ _ _ hrl hcond =>
+      obtain ⟨vc', hlookvc, helab_v'⟩ := ih hv2 h2_weak hrl
+      exact ⟨vc', Core.RLookupV.vlandr hlookvc, helab_v'⟩
+    | andl _ _ _ _ hrl hcond =>
+      have hlin := sel_implies_label_in hv2 h2_weak hsel_inner
+      exact absurd hlin hcond.2
+  | nmrg_left => cases hval
+  | nmrg_right => cases hval
 
 theorem linkedCore_eval
     {ρc vc1 vc2 vc_l vc3 : Core.Exp} {ctx : Core.Typ} {l : String}
@@ -969,21 +1034,3 @@ theorem separate_compilation
   | link _ _ _ _ _ _ _ =>
     have hmlink := elabExp.mlink Γ Γ₁ A B l es₁ es₂ ec₁ ec₂ helab₁ helab₂ hlookup
     exact semantic_preservation hmlink heval henv henv_val
-/-
-Dynamic and Static linking at Source with first-class modules
-
-Elaboration rules
-  Γ ⊢ e1 : Γ₁ ⤳ e1'
-  Γ ⊢ e2 : {l : A} →m B ⤳ e2'
-  {l : A} ∈ Γ₁
-  ----------------------------------------------
-  Γ ⊢ linkₛ(e1, e2) : Γ₁ & B → linkc(e1, e2)
-
-Semantics
-  v ⊢ e1              => v1
-  v ⊢ e2              => ⟨v', functor {l : A}, e3⟩m
-  v1 ⊢ ?.l            => vₗ
-  v' ,, {l = vₗ} ⊢ e3 => v3
-  ----------------------------------------------
-  v ⊢ linkₛ(e1, e2) => v1 ,, v3
--/
