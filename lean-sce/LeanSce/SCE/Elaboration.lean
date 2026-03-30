@@ -100,7 +100,7 @@ inductive elabExp : TyCtx → Exp → Typ → Core.Exp → Prop
     : (sb = Sandbox.sandboxed → ctxInner = Typ.top)
     → (sb = Sandbox.open_     → ctxInner = ctx)
     → elabExp ctxInner se B ce
-    → elabExp ctx (Exp.mstruct sb se) (Typ.sig (ModTyp.TyIntf B))
+    → elabExp ctx (Exp.mstruct sb se) B
         (Core.Exp.box
           (match sb with
             | Sandbox.sandboxed => Core.Exp.unit
@@ -120,11 +120,10 @@ inductive elabExp : TyCtx → Exp → Typ → Core.Exp → Prop
     → elabExp (Typ.and ctx' A) se2 B ce2
     → elabExp ctx (Exp.mclos se1 A se2) (Typ.sig (ModTyp.TyArrM A (ModTyp.TyIntf B)))
         (Core.Exp.clos ce1 (elabTyp A) ce2)
-  | mapp (ctx A : Typ) (mt : ModTyp) (se1 se2 : Exp) (ce1 ce2 : Core.Exp)
-    : elabExp ctx se1 (Typ.sig (ModTyp.TyArrM A mt)) ce1
+  | mapp (ctx A B : Typ) (se1 se2 : Exp) (ce1 ce2 : Core.Exp)
+    : elabExp ctx se1 (Typ.sig (ModTyp.TyArrM A (ModTyp.TyIntf B))) ce1
     → elabExp ctx se2 A ce2
-    → elabExp ctx (Exp.mapp se1 se2) (Typ.sig mt)
-        (Core.Exp.app ce1 ce2)
+    → elabExp ctx (Exp.mapp se1 se2) B (Core.Exp.app ce1 ce2)
   | mlink (ctx Γ₁ A B : Typ) (l : String)
       (se1 se2 : Exp) (ce1 ce2 : Core.Exp)
     : elabExp ctx se1 Γ₁ ce1

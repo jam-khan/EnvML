@@ -476,7 +476,6 @@ theorem type_preservation
     | openm ctx A B se1 se2 ce1 ce2 l _ _ ih1 ih2 =>
       exact HasType.tapp (HasType.tlam ih2) (HasType.trproj ih1 Core.RLookup.zero)
     | mstruct ctx ctxInner B sb se ce envCore hs1 hs2 _ ih =>
-      simp [elabTyp, elabModTyp]
       cases sb with
       | sandboxed =>
         have := hs1 rfl
@@ -503,8 +502,7 @@ theorem type_preservation
     | mclos ctx ctx' A B se1 se2 ce1 ce2 hval h1 h2 ih1 ih2 =>
       simp [elabTyp, elabModTyp]
       exact HasType.tclos (elab_value h1 hval) ih1 ih2
-    | mapp ctx A mt se1 se2 ce1 ce2 _ _ ih1 ih2 =>
-      simp [elabTyp]
+    | mapp ctx A B se1 se2 ce1 ce2 _ _ ih1 ih2 =>
       exact HasType.tapp ih1 ih2
     | mlink ctx Γ₁ A mt l se1 se2 ce1 ce2 _ _ hlookup ih1 ih2 =>
       simp [elabTyp, linkedCore]
@@ -662,6 +660,34 @@ theorem linkedCore_eval
           (EBig.ebrec (EBig.ebsel hbig1 hsel))
           hbig3
 
+theorem nmrg_core_eval
+    {ρc vc1 vc2 : Core.Exp} {ctx : Core.Typ}
+    {ce1 ce2 : Core.Exp}
+    (hval_ρ : Core.Value ρc)
+    (hbig1 : EBig ρc ce1 vc1)
+    (hbig2 : EBig ρc ce2 vc2)
+    : EBig ρc
+        (Core.Exp.app
+          (Core.Exp.lam ctx
+            (Core.Exp.mrg
+              (Core.Exp.box (Core.Exp.proj Core.Exp.query 0) ce1)
+              (Core.Exp.box (Core.Exp.proj Core.Exp.query 1) ce2)))
+          Core.Exp.query)
+        (.mrg vc1 vc2) := by
+  have hval_vc1 := ebig_produces_value hval_ρ hbig1
+  apply EBig.ebapp
+  · exact EBig.ebclos hval_ρ
+  · exact EBig.equery hval_ρ
+  · apply EBig.ebmrg
+    · apply EBig.ebbox
+      · exact EBig.ebproj (EBig.equery (Value.vmrg hval_ρ hval_ρ)) LookupV.lvzero
+      · exact hbig1
+    · apply EBig.ebbox
+      · exact EBig.ebproj
+          (EBig.equery (Value.vmrg (Value.vmrg hval_ρ hval_ρ) hval_vc1))
+          (LookupV.lvsucc LookupV.lvzero)
+      · exact hbig2
+
 theorem semantic_preservation
     {Γ A : SCE.Typ} {es : SCE.Exp} {ec : Core.Exp}
     {ρs vs : SCE.Exp} {ρc : Core.Exp}
@@ -714,6 +740,157 @@ theorem semantic_preservation
       exact ⟨Core.Exp.clos ρc _ ce,
              EBig.ebclos (elab_value henv henv_val),
              elabExp.eclos .top _ _ _ _ _ _ _ henv_val henv h_body⟩
+  | box hval_ρ hstep1 hstep2 ih1 ih2 =>
+    cases helab with
+    | ebox _ ctx' _ _ _ ce1 ce2 h_elab1 h_elab2 =>
+      obtain ⟨vc1, hbig1, helab_v1⟩ := ih1 h_elab1 henv henv_val
+      have hv1_val := eval_produces_value henv_val hstep1
+      obtain ⟨vc, hbig2, helab_v⟩ := ih2 h_elab2 helab_v1 hv1_val
+      exact ⟨vc, EBig.ebbox hbig1 hbig2, helab_v⟩
+  | app_clos hval_ρ hstep1 hstep2 hstep_body ih1 ih2 ih3 =>
+    cases helab with
+    | eapp _ A_param B _ _ ce1 ce2 h_elab1 h_elab2 =>
+      obtain ⟨vc_clos, hbig1, helab_clos⟩ := ih1 h_elab1 henv henv_val
+      obtain ⟨vc2, hbig2, helab_v2⟩ := ih2 h_elab2 henv henv_val
+      cases helab_clos with
+      | eclos _ _ _ _ _ _ _ _ hval_v1 h_env_v1 h_body_elab =>
+        rename_i ctx_clos ce_env ce_body
+        have hv1_val := eval_produces_value henv_val hstep1
+        cases hv1_val with
+        | vclos hval_inner =>
+          have hv2_val := eval_produces_value henv_val hstep2
+          have hval_body_env := SCE.Value.vmrg hval_inner hv2_val
+          have helab_body_env := elabExp.edmrg .top _ _ _ _ _ _
+            h_env_v1 (value_typing_weakening (Γ₂ := SCE.Typ.and .top ctx_clos) hv2_val helab_v2)
+          obtain ⟨vc_result, hbig3, helab_result⟩ := ih3 h_body_elab helab_body_env hval_body_env
+          exact ⟨vc_result,
+                 EBig.ebapp hbig1 hbig2 hbig3,
+                 helab_result⟩
+  | app_mclos hval_ρ hstep1 hstep2 hstep_body ih1 ih2 ih3 =>
+    cases helab with
+    | mapp _ A_param mt _ _ ce1 ce2 h_elab1 h_elab2 =>
+      obtain ⟨vc_clos, hbig1, helab_clos⟩ := ih1 h_elab1 henv henv_val
+      obtain ⟨vc2, hbig2, helab_v2⟩ := ih2 h_elab2 henv henv_val
+      cases helab_clos with
+      | mclos _ _ _ _ _ _ _ _ hval_v1 h_env_v1 h_body_elab =>
+        have hv1_val := eval_produces_value henv_val hstep1
+        cases hv1_val with
+        | vmclos hval_inner =>
+          have hv2_val := eval_produces_value henv_val hstep2
+          have hval_body_env := SCE.Value.vmrg hval_inner hv2_val
+          have helab_body_env := elabExp.edmrg .top _ _ _ _ _ _
+            h_env_v1 (value_typing_weakening hv2_val helab_v2)
+          obtain ⟨vc_result, hbig3, helab_result⟩ := ih3 h_body_elab helab_body_env hval_body_env
+          exact ⟨vc_result,
+                 EBig.ebapp hbig1 hbig2 hbig3,
+                 helab_result⟩
+  | dmrg hval_ρ hstep1 hstep2 ih1 ih2 =>
+    cases helab with
+    | edmrg _ A_inner B_inner _ _ ce1 ce2 h_elab1 h_elab2 =>
+      obtain ⟨vc1, hbig1, helab_v1⟩ := ih1 h_elab1 henv henv_val
+      have hv1_val := eval_produces_value henv_val hstep1
+      have hval_mrg := SCE.Value.vmrg henv_val hv1_val
+      have helab_mrg_env := elabExp.edmrg .top _ _ _ _ _ _
+        henv (value_typing_weakening hv1_val helab_v1)
+      obtain ⟨vc2, hbig2, helab_v2⟩ := ih2 h_elab2 helab_mrg_env hval_mrg
+      have hv2_val := eval_produces_value hval_mrg hstep2
+      have helab_result := elabExp.edmrg .top _ _ _ _ _ _
+        helab_v1 (value_typing_weakening hv2_val helab_v2)
+      exact ⟨.mrg vc1 vc2, EBig.ebmrg hbig1 hbig2, helab_result⟩
+  | nmrg hval_ρ hstep1 hstep2 ih1 ih2 =>
+    cases helab with
+    | enmrg _ A_inner B_inner _ _ ce1 ce2 h_elab1 h_elab2 =>
+      obtain ⟨vc1, hbig1, helab_v1⟩ := ih1 h_elab1 henv henv_val
+      obtain ⟨vc2, hbig2, helab_v2⟩ := ih2 h_elab2 henv henv_val
+      have hv1_val := eval_produces_value henv_val hstep1
+      have hv2_val := eval_produces_value henv_val hstep2
+      have helab_result := elabExp.edmrg .top _ _ _ _ _ _
+        helab_v1 (value_typing_weakening hv2_val helab_v2)
+      exact ⟨.mrg vc1 vc2,
+             nmrg_core_eval (elab_value henv henv_val) hbig1 hbig2,
+             helab_result⟩
+  | openm hval_ρ hstep1 hstep2 ih1 ih2 =>
+    cases helab with
+    | openm _ A_inner B_inner _ _ ce1 ce2 l_inner h_elab1 h_elab2 =>
+      -- IH on e₁: produces lrec l v'
+      obtain ⟨vc_rcd, hbig1, helab_rcd⟩ := ih1 h_elab1 henv henv_val
+      -- extract inner value from lrec elaboration
+      cases helab_rcd with
+      | elrec _ _ _ vc_inner _ helab_inner =>
+        -- build env for body: ρ ,, v'
+        have hv'_val := eval_produces_value henv_val hstep1
+        cases hv'_val with
+        | vlrec hval_inner =>
+          have hval_mrg := SCE.Value.vmrg henv_val hval_inner
+          have helab_mrg_env := elabExp.edmrg .top _ _ _ _ _ _
+            henv (value_typing_weakening hval_inner helab_inner)
+          -- IH on e₂
+          obtain ⟨vc_result, hbig2, helab_result⟩ := ih2 h_elab2 helab_mrg_env hval_mrg
+          -- core big-step: app (lam ce2) (rproj ce1 l)
+          exact ⟨vc_result,
+                 EBig.ebapp
+                   (EBig.ebclos (elab_value henv henv_val))
+                   (EBig.ebsel hbig1 Core.RLookupV.rvlzero)
+                   hbig2,
+                 helab_result⟩
+  | letb hval_ρ hstep1 hstep2 ih1 ih2 =>
+    cases helab with
+    | letb _ A_inner B_inner _ _ ce1 ce2 h_elab1 h_elab2 =>
+      obtain ⟨vc1, hbig1, helab_v1⟩ := ih1 h_elab1 henv henv_val
+      have hv1_val := eval_produces_value henv_val hstep1
+      have hval_mrg := SCE.Value.vmrg henv_val hv1_val
+      have helab_mrg_env := elabExp.edmrg .top _ _ _ _ _ _
+        henv (value_typing_weakening hv1_val helab_v1)
+      obtain ⟨vc_result, hbig2, helab_result⟩ := ih2 h_elab2 helab_mrg_env hval_mrg
+      exact ⟨vc_result,
+             EBig.ebapp (EBig.ebclos (elab_value henv henv_val)) hbig1 hbig2,
+             helab_result⟩
+  | mstruct_sandboxed hval_ρ hstep_body ih =>
+    cases helab with
+    | mstruct _ _ _ _ _ ce _ hs1 hs2 h_elab_body =>
+      have hctx := hs1 rfl
+      rw [hctx] at h_elab_body
+      obtain ⟨vc, hbig, helab_v⟩ := ih h_elab_body (elabExp.eunit .top) SCE.Value.vunit
+      exact ⟨vc, EBig.ebbox (EBig.ebunit (elab_value henv henv_val)) hbig, helab_v⟩
+  | mstruct_open hval_ρ hstep_body ih =>
+    cases helab with
+    | mstruct _ _ _ _ _ ce _ hs1 hs2 h_elab_body =>
+      have hctx := hs2 rfl
+      rw [hctx] at h_elab_body
+      obtain ⟨vc, hbig, helab_v⟩ := ih h_elab_body henv henv_val
+      exact ⟨vc, EBig.ebbox (EBig.equery (elab_value henv henv_val)) hbig, helab_v⟩
+  | mfunctor_sandboxed hval_ρ =>
+    cases helab with
+    | mfunctor _ ctxInner _ _ sb _ ce hs1 hs2 h_body =>
+      have hctx := hs1 rfl
+      rw [hctx] at h_body
+      exact ⟨Core.Exp.clos .unit _ ce,
+             EBig.ebbox (EBig.ebunit (elab_value henv henv_val))
+                        (EBig.ebclos Value.vunit),
+             elabExp.mclos .top _ _ _ _ _ _ _ Value.vunit (elabExp.eunit .top) h_body⟩
+  | mfunctor_open hval_ρ =>
+    cases helab with
+    | mfunctor _ ctxInner _ _ sb _ ce hs1 hs2 h_body =>
+      have hctx := hs2 rfl
+      rw [hctx] at h_body
+      exact ⟨Core.Exp.clos ρc _ ce,
+             EBig.ebclos (elab_value henv henv_val),
+             elabExp.mclos .top _ _ _ _ _ _ _ henv_val henv h_body⟩
+  | lrec hval_ρ hstep ih =>
+    cases helab with
+    | elrec _ A_inner _ ce l h_elab =>
+      obtain ⟨vc, hbig, helab_v⟩ := ih h_elab henv henv_val
+      exact ⟨Core.Exp.lrec _ vc,
+             EBig.ebrec hbig,
+             elabExp.elrec .top _ _ _ _ helab_v⟩
+  | rproj hval_ρ hstep hsel ih =>
+    cases helab with
+    | erproj _ A_inner B_inner _ ce l_inner h_elab h_slook =>
+      obtain ⟨vc, hbig, helab_v⟩ := ih h_elab henv henv_val
+      have hv_val := eval_produces_value henv_val hstep
+      obtain ⟨vc', hrlookup_v, helab_v'⟩ :=
+        sel_preservation hv_val helab_v hsel h_slook
+      exact ⟨vc', EBig.ebsel hbig hrlookup_v, helab_v'⟩
   | mlink h1 bstep1 bstep2 sel1 step2 step3 ih1 ih2 =>
     rename_i _ e1 e2 v1 v2 vl v3 A_src body_src l_name
     cases helab with
@@ -742,7 +919,6 @@ theorem semantic_preservation
         exact ⟨.mrg vc1 vc3,
                linkedCore_eval (elab_value henv henv_val) hbig1 hbig2 hrlookup_v hbig3,
                helab_result⟩
-  | _ => sorry
 
 theorem whole_program_correctness
     {A : SCE.Typ} {es : SCE.Exp} {ec : Core.Exp} {vs : SCE.Exp}
