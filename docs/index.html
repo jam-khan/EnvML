@@ -1,525 +1,639 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EnvML | CoreFE — First-Class Environments Playground</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg-primary: #0e1117;
-            --bg-secondary: #161b22;
-            --bg-tertiary: #1c2129;
-            --bg-editor: #0d1117;
-            --bg-surface: #21262d;
-            --text-primary: #e6edf3;
-            --text-secondary: #8b949e;
-            --text-muted: #484f58;
-            --accent: #d2775b;
-            --accent-glow: rgba(210, 119, 91, 0.15);
-            --accent-hover: #e08b6d;
-            --border: #30363d;
-            --border-subtle: #21262d;
-            --success: #3fb950;
-            --error: #f85149;
-            --warning: #d29922;
-            /* Syntax — warm palette */
-            --syn-keyword: #ff7b72;
-            --syn-type: #ffa657;
-            --syn-string: #a5d6ff;
-            --syn-number: #79c0ff;
-            --syn-comment: #484f58;
-            --syn-operator: #ff7b72;
-            --syn-variable: #ffa657;
-            --syn-function: #d2a8ff;
-            --syn-bracket: #8b949e;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EnvML | CoreFE — First-Class Environments Playground</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0e1117;
+      --bg-secondary: #161b22;
+      --bg-tertiary: #1c2129;
+      --bg-editor: #0d1117;
+      --bg-surface: #21262d;
+      --text-primary: #e6edf3;
+      --text-secondary: #8b949e;
+      --text-muted: #484f58;
+      --accent: #d2775b;
+      --accent-glow: rgba(210, 119, 91, 0.15);
+      --accent-hover: #e08b6d;
+      --border: #30363d;
+      --border-subtle: #21262d;
+      --success: #3fb950;
+      --error: #f85149;
+      --warning: #d29922;
+      /* Syntax — warm palette */
+      --syn-keyword: #ff7b72;
+      --syn-type: #ffa657;
+      --syn-string: #a5d6ff;
+      --syn-number: #79c0ff;
+      --syn-comment: #484f58;
+      --syn-operator: #ff7b72;
+      --syn-variable: #ffa657;
+      --syn-function: #d2a8ff;
+      --syn-bracket: #8b949e;
+    }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-        body {
-            font-family: 'DM Sans', -apple-system, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            height: 100vh;
-            overflow: hidden;
-            line-height: 1.5;
-        }
+    body {
+      font-family: 'DM Sans', -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      line-height: 1.5;
+    }
 
-        /* ── Header ────────────────────────────────────────── */
-        header {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border);
-            padding: 0 24px;
-            height: 52px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-shrink: 0;
-        }
+    /* ── Header ────────────────────────────────────────── */
+    header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
 
-        .logo {
-            display: flex;
-            align-items: baseline;
-            gap: 10px;
-        }
+    .logo {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
 
-        .logo h1 {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--accent);
-            letter-spacing: -0.03em;
-        }
+    .logo h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.03em;
+    }
 
-        .logo span {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            font-weight: 400;
-        }
+    .logo span {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
 
-        .header-controls {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
 
-        /* ── Mode Switcher ─────────────────────────────────── */
-        .mode-switcher {
-            display: flex;
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            overflow: hidden;
-        }
+    /* ── Mode Switcher ─────────────────────────────────── */
+    .mode-switcher {
+      display: flex;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
 
-        .mode-btn {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
-            font-weight: 500;
-            padding: 6px 14px;
-            border: none;
-            background: transparent;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.2s;
-            letter-spacing: 0.01em;
-        }
+    .mode-btn {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 6px 14px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.01em;
+    }
 
-        .mode-btn:hover {
-            color: var(--text-primary);
-            background: var(--bg-surface);
-        }
+    .mode-btn:hover {
+      color: var(--text-primary);
+      background: var(--bg-surface);
+    }
 
-        .mode-btn.active {
-            background: var(--accent);
-            color: #fff;
-        }
+    .mode-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
 
-        /* ── Display Mode Switcher ────────────────────────── */
-        .display-mode-switcher {
-            display: flex;
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            overflow: hidden;
-        }
+    /* ── Display Mode Switcher ────────────────────────── */
+    .display-mode-switcher {
+      display: flex;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
 
-        .display-mode-btn {
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.7rem;
-            font-weight: 500;
-            padding: 5px 12px;
-            border: none;
-            background: transparent;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
+    .display-mode-btn {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 5px 12px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
 
-        .display-mode-btn:hover {
-            color: var(--text-primary);
-            background: var(--bg-surface);
-        }
+    .display-mode-btn:hover {
+      color: var(--text-primary);
+      background: var(--bg-surface);
+    }
 
-        .display-mode-btn.active {
-            background: var(--accent);
-            color: #fff;
-        }
+    .display-mode-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
 
-        /* ── Selects ───────────────────────────────────────── */
-        .styled-select {
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.8125rem;
-            padding: 6px 28px 6px 10px;
-            border-radius: 6px;
-            border: 1px solid var(--border);
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-            cursor: pointer;
-            outline: none;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b949e' viewBox='0 0 16 16'%3E%3Cpath d='M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 8px center;
-            transition: border-color 0.15s;
-        }
+    /* ── Selects ───────────────────────────────────────── */
+    .styled-select {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.8125rem;
+      padding: 6px 28px 6px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      cursor: pointer;
+      outline: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b949e' viewBox='0 0 16 16'%3E%3Cpath d='M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      transition: border-color 0.15s;
+    }
 
-        .styled-select:hover { border-color: var(--text-muted); }
-        .styled-select:focus { border-color: var(--accent); }
+    .styled-select:hover {
+      border-color: var(--text-muted);
+    }
 
-        /* ── Main Layout ───────────────────────────────────── */
-        main {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            height: calc(100vh - 52px);
-            overflow: hidden;
-        }
+    .styled-select:focus {
+      border-color: var(--accent);
+    }
 
-        /* ── Editor Panel ──────────────────────────────────── */
-        .editor-panel {
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid var(--border);
-            overflow: hidden;
-        }
+    /* ── Main Layout ───────────────────────────────────── */
+    main {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      height: calc(100vh - 52px);
+      overflow: hidden;
+    }
 
-        .panel-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px 16px;
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border);
-            flex-shrink: 0;
-            min-height: 42px;
-        }
+    /* ── Editor Panel ──────────────────────────────────── */
+    .editor-panel {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      overflow: hidden;
+    }
 
-        .panel-bar-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+    .panel-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      min-height: 42px;
+    }
 
-        .panel-bar-right {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+    .panel-bar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
 
-        .panel-label {
-            font-size: 0.6875rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--text-muted);
-        }
+    .panel-bar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
 
-        .btn {
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.8125rem;
-            font-weight: 500;
-            padding: 5px 12px;
-            border-radius: 6px;
-            border: 1px solid var(--border);
-            background: var(--bg-secondary);
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-        .btn:hover { background: var(--bg-surface); color: var(--text-primary); border-color: var(--text-muted); }
+    .panel-label {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
 
-        /* ── Editor ────────────────────────────────────────── */
-        .editor-wrapper {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-            overflow: hidden;
-            position: relative;
-        }
+    .btn {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
 
-        .editor-container {
-            flex: 1;
-            position: relative;
-            overflow: hidden;
-        }
+    .btn:hover {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      border-color: var(--text-muted);
+    }
 
-        #highlight-layer {
-            position: absolute;
-            inset: 0;
-            background: var(--bg-editor);
-            color: var(--text-primary);
-            padding: 16px 20px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            line-height: 1.75;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            overflow-y: auto;
-            pointer-events: none;
-            tab-size: 2;
-        }
+    /* ── Editor ────────────────────────────────────────── */
+    .editor-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+      position: relative;
+    }
 
-        #editor {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            background: transparent;
-            color: transparent;
-            caret-color: var(--accent);
-            border: none;
-            padding: 16px 20px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            line-height: 1.75;
-            resize: none;
-            outline: none;
-            tab-size: 2;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
+    .editor-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
 
-        #editor::placeholder { color: var(--text-muted); }
+    #highlight-layer {
+      position: absolute;
+      inset: 0;
+      background: var(--bg-editor);
+      color: var(--text-primary);
+      padding: 16px 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.75;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow-y: auto;
+      pointer-events: none;
+      tab-size: 2;
+    }
 
-        /* Syntax classes */
-        .syn-keyword  { color: var(--syn-keyword); }
-        .syn-type     { color: var(--syn-type); }
-        .syn-string   { color: var(--syn-string); }
-        .syn-number   { color: var(--syn-number); }
-        .syn-comment  { color: var(--syn-comment); font-style: italic; }
-        .syn-operator { color: var(--syn-operator); }
-        .syn-variable { color: var(--syn-variable); }
-        .syn-function { color: var(--syn-function); }
-        .syn-bracket  { color: var(--syn-bracket); }
+    #editor {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      color: transparent;
+      caret-color: var(--accent);
+      border: none;
+      padding: 16px 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.75;
+      resize: none;
+      outline: none;
+      tab-size: 2;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
 
-        /* ── Stage Buttons ─────────────────────────────────── */
-        .stage-bar {
-            display: flex;
-            padding: 10px 16px;
-            gap: 6px;
-            background: var(--bg-secondary);
-            border-top: 1px solid var(--border);
-            flex-wrap: wrap;
-            flex-shrink: 0;
-            align-items: center;
-        }
+    #editor::placeholder {
+      color: var(--text-muted);
+    }
 
-        .stage-btn {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.7rem;
-            font-weight: 500;
-            padding: 5px 10px;
-            border-radius: 4px;
-            border: 1px solid var(--border);
-            background: var(--bg-surface);
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.15s;
-            letter-spacing: 0.01em;
-        }
+    /* Syntax classes */
+    .syn-keyword {
+      color: var(--syn-keyword);
+    }
 
-        .stage-btn:hover {
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-            border-color: var(--text-muted);
-        }
+    .syn-type {
+      color: var(--syn-type);
+    }
 
-        .stage-btn.active {
-            background: var(--accent);
-            color: #fff;
-            border-color: var(--accent);
-        }
+    .syn-string {
+      color: var(--syn-string);
+    }
 
-        .stage-divider {
-            width: 1px;
-            height: 20px;
-            background: var(--border);
-            margin: 0 4px;
-        }
+    .syn-number {
+      color: var(--syn-number);
+    }
 
-        /* ── Output Panel ──────────────────────────────────── */
-        .output-panel {
-            display: flex;
-            flex-direction: column;
-            background: var(--bg-primary);
-            overflow: hidden;
-        }
+    .syn-comment {
+      color: var(--syn-comment);
+      font-style: italic;
+    }
 
-        .output-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 16px 20px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12.5px;
-            line-height: 1.75;
-            min-height: 0;
-        }
+    .syn-operator {
+      color: var(--syn-operator);
+    }
 
-        .output-content::-webkit-scrollbar { width: 6px; }
-        .output-content::-webkit-scrollbar-track { background: transparent; }
-        .output-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .syn-variable {
+      color: var(--syn-variable);
+    }
 
-        .output-entry {
-            margin-bottom: 20px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--border-subtle);
-        }
-        .output-entry:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+    .syn-function {
+      color: var(--syn-function);
+    }
 
-        .output-label {
-            display: inline-block;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.625rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            padding: 2px 8px;
-            border-radius: 3px;
-            margin-bottom: 10px;
-        }
+    .syn-bracket {
+      color: var(--syn-bracket);
+    }
 
-        .output-label.stage   { background: var(--bg-surface); color: var(--text-secondary); }
-        .output-label.error   { background: rgba(248,81,73,0.15); color: var(--error); }
-        .output-label.success { background: rgba(63,185,80,0.15); color: var(--success); }
+    /* ── Stage Buttons ─────────────────────────────────── */
+    .stage-bar {
+      display: flex;
+      padding: 10px 16px;
+      gap: 6px;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      flex-wrap: wrap;
+      flex-shrink: 0;
+      align-items: center;
+    }
 
-        .output-text {
-            white-space: pre-wrap;
-            word-break: break-word;
-            color: var(--text-primary);
-        }
-        .output-text.error { color: var(--error); }
+    .stage-btn {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 5px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.01em;
+    }
 
-        /* ── Status Bar ────────────────────────────────────── */
-        .status-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 6px 16px;
-            background: var(--bg-secondary);
-            border-top: 1px solid var(--border);
-            font-size: 0.6875rem;
-            color: var(--text-muted);
-            flex-shrink: 0;
-        }
+    .stage-btn:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border-color: var(--text-muted);
+    }
 
-        .status-indicator { display: flex; align-items: center; gap: 6px; }
+    .stage-btn.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
 
-        .status-dot {
-            width: 7px; height: 7px;
-            border-radius: 50%;
-            background: var(--text-muted);
-        }
-        .status-dot.ready   { background: var(--success); }
-        .status-dot.loading { background: var(--warning); animation: pulse 1.2s infinite; }
-        .status-dot.error   { background: var(--error); }
+    .stage-divider {
+      width: 1px;
+      height: 20px;
+      background: var(--border);
+      margin: 0 4px;
+    }
 
-        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+    /* ── Output Panel ──────────────────────────────────── */
+    .output-panel {
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-primary);
+      overflow: hidden;
+    }
 
-        /* ── Empty State ───────────────────────────────────── */
-        .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: var(--text-muted);
-            text-align: center;
-            padding: 40px;
-        }
+    .output-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      line-height: 1.75;
+      min-height: 0;
+    }
 
-        .empty-state-icon {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 2.5rem;
-            margin-bottom: 12px;
-            color: var(--accent);
-            opacity: 0.4;
-        }
+    .output-content::-webkit-scrollbar {
+      width: 6px;
+    }
 
-        .empty-state p { font-size: 0.85rem; max-width: 260px; line-height: 1.6; }
+    .output-content::-webkit-scrollbar-track {
+      background: transparent;
+    }
 
-        /* ── Responsive ────────────────────────────────────── */
-        @media (max-width: 900px) {
-            main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
-            .editor-panel { border-right: none; border-bottom: 1px solid var(--border); }
-        }
-    </style>
+    .output-content::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+
+    .output-entry {
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .output-entry:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .output-label {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.625rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 2px 8px;
+      border-radius: 3px;
+      margin-bottom: 10px;
+    }
+
+    .output-label.stage {
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+    }
+
+    .output-label.error {
+      background: rgba(248, 81, 73, 0.15);
+      color: var(--error);
+    }
+
+    .output-label.success {
+      background: rgba(63, 185, 80, 0.15);
+      color: var(--success);
+    }
+
+    .output-text {
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--text-primary);
+    }
+
+    .output-text.error {
+      color: var(--error);
+    }
+
+    /* ── Status Bar ────────────────────────────────────── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 16px;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      font-size: 0.6875rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+
+    .status-dot.ready {
+      background: var(--success);
+    }
+
+    .status-dot.loading {
+      background: var(--warning);
+      animation: pulse 1.2s infinite;
+    }
+
+    .status-dot.error {
+      background: var(--error);
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.4;
+      }
+    }
+
+    /* ── Empty State ───────────────────────────────────── */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 40px;
+    }
+
+    .empty-state-icon {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 2.5rem;
+      margin-bottom: 12px;
+      color: var(--accent);
+      opacity: 0.4;
+    }
+
+    .empty-state p {
+      font-size: 0.85rem;
+      max-width: 260px;
+      line-height: 1.6;
+    }
+
+    /* ── Responsive ────────────────────────────────────── */
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+      }
+
+      .editor-panel {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+    }
+  </style>
 </head>
+
 <body>
-    <header>
-        <div class="logo">
-            <h1>EnvML | CoreFE</h1>
-            <span>Playground</span>
+  <header>
+    <div class="logo">
+      <h1>EnvML | CoreFE</h1>
+      <span>Playground</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="editor-panel">
+      <div class="panel-bar">
+        <div class="panel-bar-left">
+          <div class="mode-switcher">
+            <button class="mode-btn active" id="mode-envml" onclick="setMode('envml')">EnvML</button>
+            <button class="mode-btn" id="mode-core" onclick="setMode('core')">Core FE</button>
+          </div>
+          <select class="styled-select" id="exampleSelect" onchange="loadExample(this.value)">
+            <option value="">Load example…</option>
+          </select>
         </div>
-    </header>
+        <div class="panel-bar-right">
+          <button class="btn" onclick="clearEditor()">Clear</button>
+        </div>
+      </div>
+      <div class="editor-wrapper">
+        <div class="editor-container">
+          <div id="highlight-layer" aria-hidden="true"></div>
+          <textarea id="editor" spellcheck="false" placeholder="(* Enter code here *)"></textarea>
+        </div>
+      </div>
+      <div class="stage-bar" id="stageBar"></div>
+    </section>
 
-    <main>
-        <section class="editor-panel">
-            <div class="panel-bar">
-                <div class="panel-bar-left">
-                    <div class="mode-switcher">
-                        <button class="mode-btn active" id="mode-envml" onclick="setMode('envml')">EnvML</button>
-                        <button class="mode-btn" id="mode-core" onclick="setMode('core')">Core FE</button>
-                    </div>
-                    <select class="styled-select" id="exampleSelect" onchange="loadExample(this.value)">
-                        <option value="">Load example…</option>
-                    </select>
-                </div>
-                <div class="panel-bar-right">
-                    <button class="btn" onclick="clearEditor()">Clear</button>
-                </div>
-            </div>
-            <div class="editor-wrapper">
-                <div class="editor-container">
-                    <div id="highlight-layer" aria-hidden="true"></div>
-                    <textarea id="editor" spellcheck="false" placeholder="(* Enter code here *)"></textarea>
-                </div>
-            </div>
-            <div class="stage-bar" id="stageBar"></div>
-        </section>
+    <section class="output-panel">
+      <div class="panel-bar">
+        <div class="panel-bar-left">
+          <span class="panel-label">Output</span>
+          <div class="display-mode-switcher">
+            <button class="display-mode-btn active" id="display-detailed"
+              onclick="setDisplayMode('detailed')">Detailed</button>
+            <button class="display-mode-btn" id="display-simplified"
+              onclick="setDisplayMode('simplified')">Simplified</button>
+          </div>
+        </div>
+        <button class="btn" onclick="clearOutput()">Clear</button>
+      </div>
+      <div class="output-content" id="output">
+        <div class="empty-state">
+          <div class="empty-state-icon">λ.∀</div>
+          <p>Select a mode and run a stage to see output.</p>
+        </div>
+      </div>
+      <div class="status-bar">
+        <div class="status-indicator">
+          <span class="status-dot loading" id="statusDot"></span>
+          <span id="statusText">Loading WASM…</span>
+        </div>
+        <span id="modeIndicator">EnvML v0.1</span>
+      </div>
+    </section>
+  </main>
 
-        <section class="output-panel">
-            <div class="panel-bar">
-                <div class="panel-bar-left">
-                    <span class="panel-label">Output</span>
-                    <div class="display-mode-switcher">
-                        <button class="display-mode-btn active" id="display-detailed" onclick="setDisplayMode('detailed')">Detailed</button>
-                        <button class="display-mode-btn" id="display-simplified" onclick="setDisplayMode('simplified')">Simplified</button>
-                    </div>
-                </div>
-                <button class="btn" onclick="clearOutput()">Clear</button>
-            </div>
-            <div class="output-content" id="output">
-                <div class="empty-state">
-                    <div class="empty-state-icon">λ.∀</div>
-                    <p>Select a mode and run a stage to see output.</p>
-                </div>
-            </div>
-            <div class="status-bar">
-                <div class="status-indicator">
-                    <span class="status-dot loading" id="statusDot"></span>
-                    <span id="statusText">Loading WASM…</span>
-                </div>
-                <span id="modeIndicator">EnvML v0.1</span>
-            </div>
-        </section>
-    </main>
+  <script type="module">
+    import { WASI } from "https://cdn.jsdelivr.net/npm/@runno/wasi@0.7.0/dist/wasi.js";
+    import ghc_wasm_jsffi from "./ghc_wasm_jsffi.js";
 
-<script type="module">
-import { WASI } from "https://cdn.jsdelivr.net/npm/@runno/wasi@0.7.0/dist/wasi.js";
-import ghc_wasm_jsffi from "./ghc_wasm_jsffi.js";
+    // ═══════════════════════════════════════════════════════════════
+    // Data
+    // ═══════════════════════════════════════════════════════════════
 
-// ═══════════════════════════════════════════════════════════════
-// Data
-// ═══════════════════════════════════════════════════════════════
-
-const envmlExamples = [
-  {id: "e0", label: "Policies as first-class modules",
-    code: `module type ACCESS_POLICY = 
-  forall t. sig 
+    const envmlExamples = [
+      {
+        id: "e0", label: "Policies as first-class modules",
+        code: `module type ACCESS_POLICY = 
+  forallm t. sig 
     val reshape : list t -> list t; 
   end;
 
@@ -536,7 +650,7 @@ module mockPolicy : ACCESS_POLICY =
     end;
 
 module queryProcessor : 
-  (forall t. sig val reshape : list t -> list t; end)
+  (forallm t. sig val reshape : list t -> list t; end)
   ->m sig 
         type a = int; 
         val query : list a -> list a; 
@@ -544,7 +658,7 @@ module queryProcessor :
   = functor (policy) ->
       struct
         type a = int;
-        let query : list a -> list a = ((policy @a) :: sig val reshape : list int -> list int; end).reshape;
+        let query : list a -> list a = ((policy @m a) ::m sig val reshape : list int -> list int; end).reshape;
       end;
 
 let executeQuery : sig type a = int; val query : list a -> list a; end -> list int = 
@@ -552,29 +666,33 @@ let executeQuery : sig type a = int; val query : list a -> list a; end -> list i
     box [proc = processor] in proc.query(List[3, 1, 2]) :: list int;
 
 let previewResult : list int = 
-  executeQuery(queryProcessor(previewPolicy));
+  executeQuery(queryProcessor(|previewPolicy|));
 
 let mockResult : list int = 
-  executeQuery(queryProcessor(mockPolicy));
-`},
-  { id: "e1", label: "Policy Functors",
-    code: `module type POLICY = 
-  forall t. 
+  executeQuery(queryProcessor(|mockPolicy|));`
+      },
+      {
+        id: "e1", label: "Policy Functors",
+        code: `module type POLICY = 
+  forallm t. 
     sig
       val trans : t -> t; 
     end;
+
 module policy1 : POLICY = 
   functor (type t) ->
     struct
       let trans : t -> t = (fun (x) -> x);
     end;
+
 module policy2 : POLICY =
   functor (type t) ->
     struct
       let trans : t -> t = fun (x) -> x;
     end;
+
 module foo : 
-  (forall t. sig val trans : t -> t; end) 
+  (forallm t. sig val trans : t -> t; end) 
   ->m ( sig
           type a = int;
           val f : a -> a;
@@ -583,29 +701,34 @@ module foo :
   = functor (m) ->
       struct
         type a = int;
-        let f : a -> a = ((m @ a)::(sig val trans : int -> int; end)).trans;
+        let f : a -> a = ((m @m a)::(sig val trans : int -> int; end)).trans;
       end;
-let result1 : int = box [impl = foo(policy1)] in (impl.f::int -> int)(42);
-let result2 : int = box [impl = foo(policy1)] in (impl.f::int -> int)(42);`
-  },
-  { id: "e2", label: "Policy Composition",
-    code: `module type POLICY = 
-  forall t. 
+
+let result1 : int = box [impl = foo(|policy1|)] in (impl.f::int -> int)(42);
+let result2 : int = box [impl = foo(|policy1|)] in (impl.f::int -> int)(42);`
+      },
+      {
+        id: "e2", label: "Policy Composition",
+        code: `module type POLICY = 
+  forallm t. 
     sig
       val trans : t -> t; 
     end;
+
 module policy1 : POLICY = 
   functor (type t) ->
     struct
       let trans : t -> t = (fun (x) -> x);
     end;
+
 module policy2 : POLICY =
   functor (type t) ->
     struct
       let trans : t -> t = fun (x) -> x;
     end;
+
 module foo : 
-  (forall t. sig val trans : t -> t; end) 
+  (forallm t. sig val trans : t -> t; end) 
   ->m ( sig
           type a = int;
           val f : a -> a;
@@ -614,54 +737,65 @@ module foo :
   = functor (m) ->
       struct
         type a = int;
-        let f : a -> a = ((m @ a)::(sig val trans : int -> int; end)).trans;
+        let f : a -> a = ((m @m a)::(sig val trans : int -> int; end)).trans;
       end;
+
 let comp : {f : int -> int, x: int} -> int = 
     fun (env) -> box [e = env] in e.f(e.x);
-let result1 : int = comp({f = foo(policy1).f, x = 42});
-let result2 : int = comp({f = foo(policy2).f, x = 42});`
-  },
-  { id: "e3", label: "Module + Signature",
-    code: `module m : sig val y : int; end
+
+let result1 : int = comp({f = foo(|policy1|).f, x = 42});
+let result2 : int = comp({f = foo(|policy2|).f, x = 42});`
+      },
+      {
+        id: "e3", label: "Module + Signature",
+        code: `module m : sig val y : int; end
   = struct
       let y : int = 1;
     end;
 let x : sig val res : int; end = struct let res = 2; end;
 let z : int = x.res;`
-  },
-  { id: "e4", label: "Polymorphic Composition",
-    code: `let comp : (forall a. {f : a -> a}) -> int -> int = 
+      },
+      {
+        id: "e4", label: "Polymorphic Composition",
+        code: `let comp : (forall a. {f : a -> a}) -> int -> int = 
     fun (env) (x) -> box [e = (env @int :: {f : int -> int}), x=42] in e.f(x);
+
 let f : int -> int  = comp(fun (type t) -> {f = (fun (x) -> x):: t -> t});
+
 let value : int = f(10);`
-  },
-  { id: "e5", label: "Box with Record Env",
-    code: `let comp : {f : int -> [int], x : int} -> [int] = 
+      },
+      {
+        id: "e5", label: "Box with Record Env",
+        code: `let comp : {f : int -> [a : int], x : int} -> [a : int] = 
     fun (env) -> box [e = env] in e.f(e.x);`
-  },
-  { id: "e6", label: "Left/Right with Signatures",
-    code: `let left : forall a. (sig val l : a; val r : a; end -> a) = 
+      },
+      {
+        id: "e6", label: "Left/Right with Signatures",
+        code: `
+let left : forall a. (sig val l : a; val r : a; end -> a) = 
   fun (type t) (m) -> m.l;
 let right : forall a. (sig val l : a; val r : a; end -> a) = 
   fun (type t) (m) -> m.r;
+
 module FUNC :
-  forall t.
+  forallm t.
     (forall a. (sig val l : a; val r : a; end -> a))
     ->m (sig val l : t; val r : t; end)
     ->m (sig val result : t; end)
   = functor (type t) (tag) (env) ->
       struct
-        let result = 
-            (tag@t ::
-                (sig val l : t; val r : t; end -> t)
-            )(env);
-      end;`
-  },
-  { id: "e7", label: "Left/Right with Records",
-    code: `let left : forall a. ({l : a, r : a} -> a) = 
+        let result = (tag @ t :: (sig val l : t; val r : t; end -> t))(env);
+      end;
+
+`
+      },
+      {
+        id: "e7", label: "Left/Right with Records",
+        code: `let left : forall a. ({l : a, r : a} -> a) = 
   fun (type t) (m) -> m.l;
 let right : forall a. ({l : a, r : a} -> a) = 
   fun (type t) (m) -> m.r;
+
 let FUNC :
   forall t.
     (forall a. {l : a, r : a} -> a)
@@ -672,30 +806,39 @@ let FUNC :
             (tag@t
                 :: ({l : t, r : t} -> t)
             )(env)};`
-  },
-  { id: "e8", label: "Simple Let Bindings",
-    code: `let x : int = 1;
+      },
+      {
+        id: "e8", label: "Simple Let Bindings",
+        code: `let x : int = 1;
 let y : int = x;
 let z : bool = true;`
-  },
-  { id: "e9", label: "Polymorphic Field Access",
-    code: `let f : forall a. {l : a} -> a = 
+      },
+      {
+        id: "e9", label: "Polymorphic Field Access",
+        code: `let f : forall a. {l : a} -> a = 
   fun (type t) (x) -> x.l;
+
 let result : ({l : int} -> int) = (f @ int);
+
 let final  : int = result({l = 1});`
-  },
-  { id: "e10", label: "Functor + Projection",
-    code: `type a = int;
+      },
+      {
+        id: "e10", label: "Functor + Projection",
+        code: `type a = int;
+
 module policy1 =
   functor (type t) ->
     struct
       let id : t -> t = (fun (x) -> x);
     end;
-let result = policy1 @a;
-let final = (result::(sig val id : a -> a; end)).id(1);`
-  },
-  { id: "e11", label: "Module with Type Decl",
-    code: `module m : 
+
+module result = policy1 @m a;
+
+let final = (result::m(sig val id : a -> a; end)).id(1);`
+      },
+      {
+        id: "e11", label: "Module with Type Decl",
+        code: `module m : 
   sig 
     type t = int;
     val y : t;
@@ -703,28 +846,19 @@ let final = (result::(sig val id : a -> a; end)).id(1);`
           type t = int;
           let y : t = 10;
         end;`
-  },
-  { id: "e12", label: "Fix Factorial",
-    code: ` let fact : int -> int -> int =
-	fun (p : int) -> fix f. fun (x : int) -> 
+      },
+      {
+        id: "e12", label: "Fix Factorial",
+        code: `let fact : int -> int -> int =
+        fun (p : int) -> fix f. fun (x : int) -> 
     (if x == 1 then 1 else (x * f(x - 1)) + p);
 
 let placeholder : int = 0; -- test interaction with bindings outside fix
-let result : int = fact(placeholder)(4);
-    `
-  },
-  { id: "e12", label: "Fix Factorial",
-    code: ` let fact : int -> int -> int =
-	fun (p : int) -> fix f. fun (x : int) -> 
-    (if x == 1 then 1 else (x * f(x - 1)) + p);
-
-let placeholder : int = 0; -- test interaction with bindings outside fix
-let result : int = fact(placeholder)(4);
-    `
-  },
-  { id: "e13", label: "Sum types and case statements",
-    code: ` 
-type Shape = Square as int | Rect as {w : int, h : int};
+let result : int = fact(placeholder)(4);`
+      },
+      {
+        id: "e13", label: "Sum types and case statements",
+        code: `type Shape = Square as int | Rect as {w : int, h : int};
 
 let a = Square(2) as Shape;
 let b = Rect({w = 3, h = 4}) as Shape;
@@ -736,12 +870,26 @@ let area : Shape -> int =
     | <Rect=dim> => dim.w * dim.h;
 
 let resultA : int = area(a);
-let resultB : int = area(b);
-`
-  },
-  { id: "e14", label: "STLC implementation",
-    code: ` 
-type ty =
+let resultB : int = area(b);`
+      },
+      {
+        id: "e14", label: "Recursive NatList",
+        code: `type NatList = Nil as int | Cons as NatList;
+
+let a = Nil(2) as NatList;
+let b = Cons(Nil(2) as NatList) as NatList;
+let c = Cons(b) as NatList;
+let getNum : NatList -> int = fix f. fun (l : NatList) -> (
+    case l of
+    | <Nil = x> => x
+    | <Cons = x> => f(x)
+);
+
+let res = getNum(c);`
+      },
+      {
+        id: "e15", label: "STLC implementation",
+        code: `type ty =
   TNat as unit
 | TBool as unit
 | TArrow as {arg : ty, ret : ty};
@@ -859,10 +1007,10 @@ let substExample = box [
 -- ***** human readable version *****
 -- target == (fun(y : nat) -> x(y)) (y)
 -- value == 42
- subst ("y") (value) (target);
+subst ("y") (value) (target);
 
 
----- ========== eval and check test ==========
+------ ========== eval and check test ==========
 let emptyTyCtx = CtxNil(0) as tyCtx;
 
 let checkExample = box [
@@ -882,334 +1030,342 @@ let checkExample = box [
 -- ***** human readable version ******
 -- app2 == (fun (x : nat -> nat) -> fun (y : nat) -> x(y)) (fun (x : nat) -> x) (2)
 [
-    {typeCheckRes = typeCheck (emptyTyCtx) (app2)},
-    {evalRes = eval (app2)}
-];
+    typeCheckRes = typeCheck (emptyTyCtx) (app2),
+    evalRes = eval (app2)
+];`
+      },
+    ];
 
-`
-  },
-];
+    const coreExamples = [
+      {
+        id: "c1", label: "Polymorphic Identity",
+        code: `((((Lam. lam. x0) : forall. 0 -> 0) @ Int) 42) : Int`
+      },
+      {
+        id: "c2", label: "Closure + Capture",
+        code: `((<[7] | lam. x0 ** x1> : [Int] |> Int -> Int) 6) : Int`
+      },
+      {
+        id: "c3", label: "Env + Box Application",
+        code: `[{f = (lam. x0 ** 10) : Int -> Int }, { x = 5 : Int }] |> ([x1].f [x0].x) : Int`
+      },
+      {
+        id: "c4", label: "Record via Env",
+        code: `([{greeting = "hello"}, {name = "Iron Man"}]: Env[{greeting : String}, {name : String}]).greeting`
+      },
+      {
+        id: "c5", label: "Apply Twice",
+        code: `((lam. (x0) (x0 5)): (Int -> Int) -> Int) ((lam. x0 - 1) : Int -> Int)`
+      },
+      {
+        id: "c6", label: "Nested Env Projection",
+        code: `[{inner = [{val1 = 99}, {val2 = 100}]}].inner.val1`
+      },
+      {
+        id: "c7", label: "Type Closure",
+        code: `((((<[] | Lam. lam. x0> : [] |>forall. 0 -> 0) : forall. 0 -> 0) @Int) : Int -> Int) 42`
+      }
+    ];
 
-const coreExamples = [
-  { id: "c1", label: "Polymorphic Identity",
-    code: `((((Lam. lam. x0) : forall. 0 -> 0) @ Int) 42) : Int`
-  },
-  { id: "c2", label: "Closure + Capture",
-    code: `((<[7] | lam. x0 ** x1> : [Int] |> Int -> Int) 6) : Int`
-  },
-  { id: "c3", label: "Env + Box Application",
-    code: `[{f = (lam. x0 ** 10) : Int -> Int }, { x = 5 : Int }] |> ([x1].f [x0].x) : Int`
-  },
-  { id: "c4", label: "Record via Env",
-    code: `([{greeting = "hello"}, {name = "Iron Man"}]: Env[{greeting : String}, {name : String}]).greeting`
-  },
-  { id: "c5", label: "Apply Twice",
-    code: `((lam. (x0) (x0 5)): (Int -> Int) -> Int) ((lam. x0 - 1) : Int -> Int)`
-  },
-  { id: "c6", label: "Nested Env Projection",
-    code: `[{inner = [{val1 = 99}, {val2 = 100}]}].inner.val1`
-  },
-  { id: "c7", label: "Type Closure",
-    code: `((((<[] | Lam. lam. x0> : [] |>forall. 0 -> 0) : forall. 0 -> 0) @Int) : Int -> Int) 42`
-  }
-];
+    const envmlStages = [
+      { label: "Parse", func: "runParse" },
+      { label: "Desugar", func: "runDesugar" },
+      { label: "Src Check", func: "runSourceCheck" },
+      { label: "Elaborate", func: "runElaborate" },
+      { label: "De Bruijn", func: "runDeBruijn" },
+      null, // divider
+      { label: "Check", func: "runCheck" },
+      { label: "Eval", func: "runEval", active: true },
+    ];
 
-const envmlStages = [
-  { label: "Parse",     func: "runParse" },
-  { label: "Elaborate", func: "runElaborate" },
-  { label: "De Bruijn", func: "runDeBruijn" },
-  null, // divider
-  { label: "Check",     func: "runCheck" },
-  { label: "Eval",      func: "runEval", active: true },
-];
+    const coreStages = [
+      { label: "Parse", func: "coreParseExp" },
+      { label: "Check", func: "coreCheck" },
+      { label: "Eval", func: "coreEval", active: true },
+      null,
+      { label: "Run All", func: "coreRun" },
+    ];
 
-const coreStages = [
-  { label: "Parse",  func: "coreParseExp" },
-  { label: "Check",  func: "coreCheck" },
-  { label: "Eval",   func: "coreEval", active: true },
-  null,
-  { label: "Run All", func: "coreRun" },
-];
+    // ═══════════════════════════════════════════════════════════════
+    // State
+    // ═══════════════════════════════════════════════════════════════
 
-// ═══════════════════════════════════════════════════════════════
-// State
-// ═══════════════════════════════════════════════════════════════
+    let currentMode = 'envml';
+    let displayMode = 'detailed'; // 'detailed' or 'simplified'
+    let wasmInstance = null;
 
-let currentMode = 'envml';
-let displayMode = 'detailed'; // 'detailed' or 'simplified'
-let wasmInstance = null;
+    // ═══════════════════════════════════════════════════════════════
+    // Syntax Highlighting
+    // ═══════════════════════════════════════════════════════════════
 
-// ═══════════════════════════════════════════════════════════════
-// Syntax Highlighting
-// ═══════════════════════════════════════════════════════════════
+    const envmlKeywords = [
+      'module', 'type', 'sig', 'end', 'struct', 'functor', 'forall',
+      'let', 'in', 'fun', 'if', 'then', 'else', 'fix', 'box',
+      'val', 'import', 'open', 'include', 'with', 'and', 'rec', 'clos'
+    ];
+    const envmlTypes = ['int', 'bool', 'string', 'unit'];
 
-const envmlKeywords = [
-  'module','type','sig','end','struct','functor','forall',
-  'let','in','fun','if','then','else','fix','box',
-  'val','import','open','include','with','and','rec','clos'
-];
-const envmlTypes = ['int','bool','string','unit'];
-
-function escapeHtml(t) {
-  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-function highlightEnvML(code) {
-  let r = escapeHtml(code);
-  r = r.replace(/\(\*[\s\S]*?\*\)/g, '<span class="syn-comment">$&</span>');
-  r = r.replace(/"([^"\\]|\\.)*"/g, '<span class="syn-string">$&</span>');
-  r = r.replace(/\b(\d+)\b/g, '<span class="syn-number">$1</span>');
-  const kw = new RegExp(`\\b(${envmlKeywords.join('|')})\\b`, 'g');
-  r = r.replace(kw, '<span class="syn-keyword">$1</span>');
-  const ty = new RegExp(`\\b(${envmlTypes.join('|')})\\b`, 'g');
-  r = r.replace(ty, '<span class="syn-type">$1</span>');
-  r = r.replace(/-&gt;m/g, '<span class="syn-operator">-&gt;m</span>');
-  r = r.replace(/-&gt;/g, '<span class="syn-operator">-&gt;</span>');
-  r = r.replace(/::/g, '<span class="syn-operator">::</span>');
-  r = r.replace(/\|&gt;/g, '<span class="syn-operator">|&gt;</span>');
-  return r;
-}
-
-function highlightCore(code) {
-  // No syntax highlighting for CoreFE - just escape HTML
-  return escapeHtml(code);
-}
-
-function updateHighlight() {
-  const editor = document.getElementById('editor');
-  const hl = document.getElementById('highlight-layer');
-  const code = editor.value;
-  hl.innerHTML = (currentMode === 'envml' ? highlightEnvML(code) : highlightCore(code)) + '\n';
-}
-
-function syncScroll() {
-  const ed = document.getElementById('editor');
-  const hl = document.getElementById('highlight-layer');
-  hl.scrollTop = ed.scrollTop;
-  hl.scrollLeft = ed.scrollLeft;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// Mode Switching
-// ═══════════════════════════════════════════════════════════════
-
-function setMode(mode) {
-  currentMode = mode;
-
-  // Update mode buttons
-  document.getElementById('mode-envml').classList.toggle('active', mode === 'envml');
-  document.getElementById('mode-core').classList.toggle('active', mode === 'core');
-
-  // Update mode indicator
-  document.getElementById('modeIndicator').textContent = mode === 'envml' ? 'EnvML v0.1' : 'Core FE';
-
-  // Update placeholder
-  document.getElementById('editor').placeholder = mode === 'envml'
-    ? '(* Enter EnvML code here *)'
-    : '-- Enter CoreFE FE expression';
-
-  // Update examples dropdown
-  populateExamples();
-
-  // Update stage buttons
-  renderStageBar();
-
-  // Clear editor and output, then load first example
-  clearEditor();
-  clearOutput();
-  const examples = mode === 'envml' ? envmlExamples : coreExamples;
-  if (examples.length > 0) {
-    document.getElementById('editor').value = examples[0].code;
-    document.getElementById('exampleSelect').value = examples[0].id;
-    updateHighlight();
-  }
-}
-
-function setDisplayMode(mode) {
-  displayMode = mode;
-  
-  // Update display mode buttons
-  document.getElementById('display-detailed').classList.toggle('active', mode === 'detailed');
-  document.getElementById('display-simplified').classList.toggle('active', mode === 'simplified');
-  
-  // Re-render stage buttons to update their function names
-  renderStageBar();
-}
-
-function populateExamples() {
-  const sel = document.getElementById('exampleSelect');
-  const examples = currentMode === 'envml' ? envmlExamples : coreExamples;
-  sel.innerHTML = '<option value="">Load example…</option>';
-  examples.forEach(ex => {
-    const opt = document.createElement('option');
-    opt.value = ex.id;
-    opt.textContent = ex.label;
-    sel.appendChild(opt);
-  });
-}
-
-function renderStageBar() {
-  const bar = document.getElementById('stageBar');
-  const stages = currentMode === 'envml' ? envmlStages : coreStages;
-  bar.innerHTML = '';
-  stages.forEach(s => {
-    if (s === null) {
-      const div = document.createElement('div');
-      div.className = 'stage-divider';
-      bar.appendChild(div);
-    } else {
-      const btn = document.createElement('button');
-      btn.className = 'stage-btn' + (s.active ? ' active' : '');
-      btn.textContent = s.label;
-      // Append display mode suffix to function name
-      const funcName = s.func + (displayMode === 'detailed' ? 'Detailed' : 'Simplified');
-      btn.onclick = () => runStage(funcName, s.label, btn);
-      bar.appendChild(btn);
+    function escapeHtml(t) {
+      return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
-  });
-}
 
-// ═══════════════════════════════════════════════════════════════
-// Actions
-// ═══════════════════════════════════════════════════════════════
+    function highlightEnvML(code) {
+      let r = escapeHtml(code);
+      r = r.replace(/\(\*[\s\S]*?\*\)/g, '<span class="syn-comment">$&</span>');
+      r = r.replace(/"([^"\\]|\\.)*"/g, '<span class="syn-string">$&</span>');
+      r = r.replace(/\b(\d+)\b/g, '<span class="syn-number">$1</span>');
+      const kw = new RegExp(`\\b(${envmlKeywords.join('|')})\\b`, 'g');
+      r = r.replace(kw, '<span class="syn-keyword">$1</span>');
+      const ty = new RegExp(`\\b(${envmlTypes.join('|')})\\b`, 'g');
+      r = r.replace(ty, '<span class="syn-type">$1</span>');
+      r = r.replace(/-&gt;m/g, '<span class="syn-operator">-&gt;m</span>');
+      r = r.replace(/-&gt;/g, '<span class="syn-operator">-&gt;</span>');
+      r = r.replace(/::/g, '<span class="syn-operator">::</span>');
+      r = r.replace(/\|&gt;/g, '<span class="syn-operator">|&gt;</span>');
+      return r;
+    }
 
-async function runStage(funcName, label, btnEl) {
-  if (!wasmInstance) {
-    addOutput('Error', 'WASM module not loaded yet', 'error');
-    return;
-  }
+    function highlightCore(code) {
+      // No syntax highlighting for CoreFE - just escape HTML
+      return escapeHtml(code);
+    }
 
-  // Update active button
-  document.querySelectorAll('.stage-btn').forEach(b => b.classList.remove('active'));
-  if (btnEl) btnEl.classList.add('active');
+    function updateHighlight() {
+      const editor = document.getElementById('editor');
+      const hl = document.getElementById('highlight-layer');
+      const code = editor.value;
+      hl.innerHTML = (currentMode === 'envml' ? highlightEnvML(code) : highlightCore(code)) + '\n';
+    }
 
-  const input = document.getElementById('editor').value;
-  try {
-    const result = await wasmInstance.exports[funcName](input);
-    addOutput(label, result, 'stage');
-  } catch (error) {
-    addOutput(label + ' Error', error.message, 'error');
-    console.error(error);
-  }
-}
+    function syncScroll() {
+      const ed = document.getElementById('editor');
+      const hl = document.getElementById('highlight-layer');
+      hl.scrollTop = ed.scrollTop;
+      hl.scrollLeft = ed.scrollLeft;
+    }
 
-function addOutput(label, text, type) {
-  const output = document.getElementById('output');
-  const empty = output.querySelector('.empty-state');
-  if (empty) empty.remove();
+    // ═══════════════════════════════════════════════════════════════
+    // Mode Switching
+    // ═══════════════════════════════════════════════════════════════
 
-  const entry = document.createElement('div');
-  entry.className = 'output-entry';
+    function setMode(mode) {
+      currentMode = mode;
 
-  const labelEl = document.createElement('div');
-  labelEl.className = `output-label ${type}`;
-  labelEl.textContent = label;
+      // Update mode buttons
+      document.getElementById('mode-envml').classList.toggle('active', mode === 'envml');
+      document.getElementById('mode-core').classList.toggle('active', mode === 'core');
 
-  const textEl = document.createElement('pre');
-  textEl.className = `output-text ${type === 'error' ? 'error' : ''}`;
-  textEl.textContent = text;
+      // Update mode indicator
+      document.getElementById('modeIndicator').textContent = mode === 'envml' ? 'EnvML v0.1' : 'Core FE';
 
-  entry.appendChild(labelEl);
-  entry.appendChild(textEl);
-  output.insertBefore(entry, output.firstChild);
-}
+      // Update placeholder
+      document.getElementById('editor').placeholder = mode === 'envml'
+        ? '(* Enter EnvML code here *)'
+        : '-- Enter CoreFE FE expression';
 
-function clearOutput() {
-  document.getElementById('output').innerHTML = `
+      // Update examples dropdown
+      populateExamples();
+
+      // Update stage buttons
+      renderStageBar();
+
+      // Clear editor and output, then load first example
+      clearEditor();
+      clearOutput();
+      const examples = mode === 'envml' ? envmlExamples : coreExamples;
+      if (examples.length > 0) {
+        document.getElementById('editor').value = examples[0].code;
+        document.getElementById('exampleSelect').value = examples[0].id;
+        updateHighlight();
+      }
+    }
+
+    function setDisplayMode(mode) {
+      displayMode = mode;
+
+      // Update display mode buttons
+      document.getElementById('display-detailed').classList.toggle('active', mode === 'detailed');
+      document.getElementById('display-simplified').classList.toggle('active', mode === 'simplified');
+
+      // Re-render stage buttons to update their function names
+      renderStageBar();
+    }
+
+    function populateExamples() {
+      const sel = document.getElementById('exampleSelect');
+      const examples = currentMode === 'envml' ? envmlExamples : coreExamples;
+      sel.innerHTML = '<option value="">Load example…</option>';
+      examples.forEach(ex => {
+        const opt = document.createElement('option');
+        opt.value = ex.id;
+        opt.textContent = ex.label;
+        sel.appendChild(opt);
+      });
+    }
+
+    function renderStageBar() {
+      const bar = document.getElementById('stageBar');
+      const stages = currentMode === 'envml' ? envmlStages : coreStages;
+      bar.innerHTML = '';
+      stages.forEach(s => {
+        if (s === null) {
+          const div = document.createElement('div');
+          div.className = 'stage-divider';
+          bar.appendChild(div);
+        } else {
+          const btn = document.createElement('button');
+          btn.className = 'stage-btn' + (s.active ? ' active' : '');
+          btn.textContent = s.label;
+          // Append display mode suffix to function name
+          const funcName = s.func + (displayMode === 'detailed' ? 'Detailed' : 'Simplified');
+          btn.onclick = () => runStage(funcName, s.label, btn);
+          bar.appendChild(btn);
+        }
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Actions
+    // ═══════════════════════════════════════════════════════════════
+
+    async function runStage(funcName, label, btnEl) {
+      if (!wasmInstance) {
+        addOutput('Error', 'WASM module not loaded yet', 'error');
+        return;
+      }
+
+      // Update active button
+      document.querySelectorAll('.stage-btn').forEach(b => b.classList.remove('active'));
+      if (btnEl) btnEl.classList.add('active');
+
+      const input = document.getElementById('editor').value;
+      try {
+        const result = await wasmInstance.exports[funcName](input);
+        addOutput(label, result, 'stage');
+      } catch (error) {
+        addOutput(label + ' Error', error.message, 'error');
+        console.error(error);
+      }
+    }
+
+    function addOutput(label, text, type) {
+      const output = document.getElementById('output');
+      const empty = output.querySelector('.empty-state');
+      if (empty) empty.remove();
+
+      const entry = document.createElement('div');
+      entry.className = 'output-entry';
+
+      const labelEl = document.createElement('div');
+      labelEl.className = `output-label ${type}`;
+      labelEl.textContent = label;
+
+      const textEl = document.createElement('pre');
+      textEl.className = `output-text ${type === 'error' ? 'error' : ''}`;
+      textEl.textContent = text;
+
+      entry.appendChild(labelEl);
+      entry.appendChild(textEl);
+      output.insertBefore(entry, output.firstChild);
+    }
+
+    function clearOutput() {
+      document.getElementById('output').innerHTML = `
     <div class="empty-state">
       <div class="empty-state-icon">λ.∀</div>
       <p>Select a mode and run a stage to see output.</p>
     </div>`;
-}
+    }
 
-function clearEditor() {
-  document.getElementById('editor').value = '';
-  document.getElementById('exampleSelect').value = '';
-  updateHighlight();
-}
+    function clearEditor() {
+      document.getElementById('editor').value = '';
+      document.getElementById('exampleSelect').value = '';
+      updateHighlight();
+    }
 
-function loadExample(id) {
-  if (!id) return;
-  const examples = currentMode === 'envml' ? envmlExamples : coreExamples;
-  const ex = examples.find(e => e.id === id);
-  if (ex) {
-    document.getElementById('editor').value = ex.code;
-    updateHighlight();
-  }
-}
+    function loadExample(id) {
+      if (!id) return;
+      const examples = currentMode === 'envml' ? envmlExamples : coreExamples;
+      const ex = examples.find(e => e.id === id);
+      if (ex) {
+        document.getElementById('editor').value = ex.code;
+        updateHighlight();
+      }
+    }
 
-// ═══════════════════════════════════════════════════════════════
-// WASM Init
-// ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // WASM Init
+    // ═══════════════════════════════════════════════════════════════
 
-async function initWasm() {
-  const dot = document.getElementById('statusDot');
-  const txt = document.getElementById('statusText');
-  try {
-    const wasi = new WASI({
-      stdout: (out) => console.log("[wasm]", out),
-      stderr: (err) => console.error("[wasm]", err)
+    async function initWasm() {
+      const dot = document.getElementById('statusDot');
+      const txt = document.getElementById('statusText');
+      try {
+        const wasi = new WASI({
+          stdout: (out) => console.log("[wasm]", out),
+          stderr: (err) => console.error("[wasm]", err)
+        });
+        const jsffiExports = {};
+        const importObject = Object.assign(
+          { ghc_wasm_jsffi: ghc_wasm_jsffi(jsffiExports) },
+          wasi.getImportObject()
+        );
+        const wasm = await WebAssembly.instantiateStreaming(
+          fetch('./WASM.wasm'), importObject
+        );
+        Object.assign(jsffiExports, wasm.instance.exports);
+        wasi.initialize(wasm, { ghc_wasm_jsffi: ghc_wasm_jsffi(jsffiExports) });
+        wasm.instance.exports.setup();
+        wasmInstance = wasm.instance;
+        dot.className = 'status-dot ready';
+        txt.textContent = 'Ready';
+      } catch (error) {
+        console.error('WASM init failed:', error);
+        dot.className = 'status-dot error';
+        txt.textContent = 'WASM load failed';
+        addOutput('Init Error', error.message, 'error');
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Bootstrap
+    // ═══════════════════════════════════════════════════════════════
+
+    const editor = document.getElementById('editor');
+    editor.addEventListener('input', updateHighlight);
+    editor.addEventListener('scroll', syncScroll);
+
+    // Handle Tab key in editor
+    editor.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
+        editor.selectionStart = editor.selectionEnd = start + 2;
+        updateHighlight();
+      }
     });
-    const jsffiExports = {};
-    const importObject = Object.assign(
-      { ghc_wasm_jsffi: ghc_wasm_jsffi(jsffiExports) },
-      wasi.getImportObject()
-    );
-    const wasm = await WebAssembly.instantiateStreaming(
-      fetch('./WASM.wasm'), importObject
-    );
-    Object.assign(jsffiExports, wasm.instance.exports);
-    wasi.initialize(wasm, { ghc_wasm_jsffi: ghc_wasm_jsffi(jsffiExports) });
-    wasm.instance.exports.setup();
-    wasmInstance = wasm.instance;
-    dot.className = 'status-dot ready';
-    txt.textContent = 'Ready';
-  } catch (error) {
-    console.error('WASM init failed:', error);
-    dot.className = 'status-dot error';
-    txt.textContent = 'WASM load failed';
-    addOutput('Init Error', error.message, 'error');
-  }
-}
 
-// ═══════════════════════════════════════════════════════════════
-// Bootstrap
-// ═══════════════════════════════════════════════════════════════
-
-const editor = document.getElementById('editor');
-editor.addEventListener('input', updateHighlight);
-editor.addEventListener('scroll', syncScroll);
-
-// Handle Tab key in editor
-editor.addEventListener('keydown', (e) => {
-  if (e.key === 'Tab') {
-    e.preventDefault();
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
-    editor.selectionStart = editor.selectionEnd = start + 2;
+    // Initialize
+    populateExamples();
+    renderStageBar();
     updateHighlight();
-  }
-});
 
-// Initialize
-populateExamples();
-renderStageBar();
-updateHighlight();
+    // Load first EnvML example by default
+    editor.value = envmlExamples[0].code;
+    document.getElementById('exampleSelect').value = envmlExamples[0].id;
+    updateHighlight();
 
-// Load first EnvML example by default
-editor.value = envmlExamples[0].code;
-document.getElementById('exampleSelect').value = envmlExamples[0].id;
-updateHighlight();
+    window.setMode = setMode;
+    window.setDisplayMode = setDisplayMode;
+    window.runStage = runStage;
+    window.clearOutput = clearOutput;
+    window.clearEditor = clearEditor;
+    window.loadExample = loadExample;
 
-window.setMode = setMode;
-window.setDisplayMode = setDisplayMode;
-window.runStage = runStage;
-window.clearOutput = clearOutput;
-window.clearEditor = clearEditor;
-window.loadExample = loadExample;
-
-initWasm();
-</script>
+    initWasm();
+  </script>
 </body>
+
 </html>

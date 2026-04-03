@@ -116,10 +116,10 @@ let substExample = box [
 -- ***** human readable version *****
 -- target == (fun(y : nat) -> x(y)) (y)
 -- value == 42
- subst ("y") (value) (target);
+subst ("y") (value) (target);
 
 
----- ========== eval and check test ==========
+------ ========== eval and check test ==========
 let emptyTyCtx = CtxNil(0) as tyCtx;
 
 let checkExample = box [
@@ -139,6 +139,6 @@ let checkExample = box [
 -- ***** human readable version ******
 -- app2 == (fun (x : nat -> nat) -> fun (y : nat) -> x(y)) (fun (x : nat) -> x) (2)
 [
-    {typeCheckRes = typeCheck (emptyTyCtx) (app2)},
-    {evalRes = eval (app2)}
+    typeCheckRes = typeCheck (emptyTyCtx) (app2),
+    evalRes = eval (app2)
 ];

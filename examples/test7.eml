@@ -1,2 +1,2 @@
-let comp : {f : int -> [int], x : int} -> [int] = 
+let comp : {f : int -> [a : int], x : int} -> [a : int] = 
     fun (env) -> box [e = env] in e.f(e.x);

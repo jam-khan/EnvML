@@ -1,6 +1,6 @@
 
 module type POLICY = 
-  forall t. 
+  forallm t. 
     sig
       val trans : t -> t; 
     end;
@@ -18,7 +18,7 @@ module policy2 : POLICY =
     end;
 
 module foo : 
-  (forall t. sig val trans : t -> t; end) 
+  (forallm t. sig val trans : t -> t; end) 
   ->m ( sig
           type a = int;
           val f : a -> a;
@@ -27,9 +27,9 @@ module foo :
   = functor (m) ->
       struct
         type a = int;
-        let f : a -> a = ((m @ a)::(sig val trans : int -> int; end)).trans;
+        let f : a -> a = ((m @m a)::(sig val trans : int -> int; end)).trans;
       end;
 
-let result1 : int = box [impl = foo(policy1)] in (impl.f::int -> int)(42);
-let result2 : int = box [impl = foo(policy1)] in (impl.f::int -> int)(42);
+let result1 : int = box [impl = foo(|policy1|)] in (impl.f::int -> int)(42);
+let result2 : int = box [impl = foo(|policy1|)] in (impl.f::int -> int)(42);
 

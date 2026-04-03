@@ -12,6 +12,9 @@ library
                         Repl
                         PrettyWeb
                         EnvML.Elab
+                        EnvML.Check
+                        EnvML.Desugar
+                        EnvML.Desugared
                         EnvML.Syntax
                         EnvML.Parse
                         EnvML.Parser.Parser

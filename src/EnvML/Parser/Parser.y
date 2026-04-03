@@ -41,6 +41,7 @@ import Data.Char (isUpper)
   box       { TokBox   }
   in        { TokIn    }
   forall    { TokForall }
+  forallm   { TokForallM }
   module    { TokModule }
   sig       { TokSig }
   end       { TokEnd }
@@ -56,12 +57,16 @@ import Data.Char (isUpper)
   ':'       { TokColon }
   ';'       { TokSemi }
   '::'      { TokDoubleColon }
+  '::m'     { TokDoubleColonM }
   ':='      { TokColonEqual }
   '=>'      { TokFatArrow }
   '->'      { TokArrow }
   '===>'    { TokTripleArrow }
   '->m'     { TokArrowM }
   '@'       { TokAt }
+  '@m'      { TokAtM }
+  '(|'      { TokLBanana }
+  '|)'      { TokRBanana }
   '|'       { TokPipe }
   wildcard  { TokWildcard }
   ','       { TokComma }
@@ -104,7 +109,6 @@ ModuleStructs :: { Structures }
 ModuleStruct :: { Structure }
   : let    id          '=' Exp       ';' { Let $2 Nothing $4              }
   | let    id ':' Typ  '=' Exp       ';' { Let $2 (Just $4) $6            }
-  | type   id '<' TypeVars '>' '=' Constructors ';' { TypDecl $2 (foldr TyAll (TySum $7) $4) }
   | type   id          '=' Constructors ';' { TypDecl $2 (TySum $4)       }
   | type   id          '=' Typ       ';' { TypDecl $2 $4                  }
   | module id          '=' ModuleExp ';' { ModStruct $2 Nothing $4        }
@@ -128,7 +132,7 @@ Constructor :: { (Name, Typ) }
 
 InterfaceBody :: { ModuleTyp }
   : Intf                          { TySig $1 }
-  | forall id '.'   InterfaceBody { ForallM $2 $4 }
+  | forallm id '.'   InterfaceBody { ForallM $2 $4 }
   | Typ       '->m' InterfaceBody { TyArrowM $1 $3 }
 
 Intf :: { Intf }
@@ -167,8 +171,9 @@ Exp :: { Exp }
 
 ModuleExp :: { Module }
   : struct ModuleStructs end              { Struct  $2 }
-  | ModuleExp '(' ModuleExp ')'           { MApp    $1 $3 }
-  | ModuleExp '@' Typ                     { MAppt   $1 $3 }
+  | ModuleExp '(|' ModuleExp '|)'         { MApp    $1 $3 }
+  | ModuleExp '@m' Typ                     { MAppt   $1 $3 }
+  | ModuleExp '::m' ModuleTyp             { MAnno   $1 $3 }
   | functor FunArgs '->' ModuleExp        { Functor $2 $4 }
   | id                                    { VarM    $1 }
   | '(' ModuleExp ')'                     { $2 }
@@ -251,7 +256,7 @@ BaseTyp :: { Typ }
   | '[' TyCtx ']'          { TyCtx $2 }
   | list BaseTyp           { TyList $2 }
   | '(' Typ ')'            { $2 }
-  | ModuleTyp              { TyModule $1 }
+  | sig Intf end           { TyModule (TySig $2) }
 
 TyRcdFields :: { [(Name, Typ)] }
   : id ':' Typ ',' TyRcdFields  { ($1, $3) : $5 }
@@ -260,7 +265,7 @@ TyRcdFields :: { [(Name, Typ)] }
 
 ModuleTyp :: { ModuleTyp }
   : sig Intf end                          { TySig $2 }
-  | forall id '.' ModuleTyp               { ForallM $2 $4 }
+  | forallm id '.' ModuleTyp               { ForallM $2 $4 }
   | id '->m' ModuleTyp                    { TyArrowM (TyVar $1) $3 }
   | '(' Typ ')' '->m' ModuleTyp           { TyArrowM $2 $5 }
   | '(' ModuleTyp ')' '->m' ModuleTyp     { TyArrowM (TyModule $2) $5 }

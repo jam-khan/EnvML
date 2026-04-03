@@ -4,14 +4,11 @@ let right : forall a. (sig val l : a; val r : a; end -> a) =
   fun (type t) (m) -> m.r;
 
 module FUNC :
-  forall t.
+  forallm t.
     (forall a. (sig val l : a; val r : a; end -> a))
     ->m (sig val l : t; val r : t; end)
     ->m (sig val result : t; end)
   = functor (type t) (tag) (env) ->
       struct
-        let result = 
-            (tag@t ::
-                (sig val l : t; val r : t; end -> t)
-            )(env);
+        let result = (tag @ t :: (sig val l : t; val r : t; end -> t))(env);
       end;

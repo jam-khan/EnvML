@@ -35,6 +35,7 @@ tokens :-
   box         { \_ -> TokBox  }
   in          { \_ -> TokIn  }
   forall      { \_ -> TokForall }
+  forallm     { \_ -> TokForallM }
   module      { \_ -> TokModule }
   sig         { \_ -> TokSig  }
   end         { \_ -> TokEnd  }
@@ -68,6 +69,7 @@ tokens :-
   "."         { \_ -> TokDot      } 
   ","         { \_ -> TokComma    }
   ";"         { \_ -> TokSemi     }
+  "::m"       { \_ -> TokDoubleColonM}
   "::"        { \_ -> TokDoubleColon}
   "->"        { \_ -> TokArrow    }
   "->m"       { \_ -> TokArrowM   }
@@ -75,7 +77,10 @@ tokens :-
   "+"         { \_ -> TokPlus     }
   "-"         { \_ -> TokDash     }
   "*"         { \_ -> TokStar     }
+  "@m"        { \_ -> TokAtM   }
   "@"         { \_ -> TokAt    }
+  "(|"        { \_ -> TokLBanana }
+  "|)"        { \_ -> TokRBanana }
   "|"         { \_ -> TokPipe   }
   "_"         { \_ -> TokWildcard }
 
@@ -113,6 +118,7 @@ data Token
   | TokBox
   | TokIn
   | TokForall
+  | TokForallM
   | TokModule
   | TokSig
   | TokEnd
@@ -146,12 +152,16 @@ data Token
   | TokArrowM
   | TokTripleArrow
   | TokDoubleColon
+  | TokDoubleColonM
   | TokColonEqual
   | TokFatArrow
   | TokLink
   | TokPlus
   | TokDash
   | TokStar
+  | TokAtM
+  | TokLBanana
+  | TokRBanana
   | TokPipe
   | TokWildcard
   deriving (Eq, Show)

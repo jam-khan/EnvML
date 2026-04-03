@@ -17,9 +17,9 @@ data FunArg
 type TyCtx    = [TyCtxE]    -- [t : A, t1 : Type, type t2 = A]
 data TyCtxE
   = TypeN    Name Typ       -- t : A
-  | Type     Typ            -- nameless A
+  | Type     Typ            -- nameless A  -- TODO: Currently unused
   | KindN    Name           -- t : *
-  | Kind                    -- nameless *
+  | Kind                    -- nameless * -- -- TODO: Currently unused
   | TypeEqN  Name Typ       -- type x = A !Must be named
   | TyMod    Name ModuleTyp -- module n : A
   | TypeEqM  Name ModuleTyp -- module type m = .. 
@@ -49,11 +49,11 @@ data Typ
   | TyBoxT    TyCtx Typ       -- [t1 : int, t2 : int, t3: bool] ==> A
   | TyRcd     [(Name, Typ)]   -- {l1 : A1, l2 : A2, ln : An}
   | TySum     [(Name, Typ)] -- Tagged union: [(tag, field_type)]
+  | TyMu      Name Typ      -- mu X. T (recursive type)
   | TyCtx     TyCtx           -- [t : A, t1 : Type, t2 : A=]
   | TyModule  ModuleTyp       -- Note: First-class modules
   | TyList    Typ             -- [A]
   deriving (Show, Eq)
-
 
 data Module
   = VarM    Name
@@ -61,7 +61,7 @@ data Module
   | Struct  Structures      -- struct type a = int; x = 1 end
   | MApp    Module Module   -- M1(M2)
   | MAppt   Module Typ      -- (M1 @A)
-  | MAnno   Module ModuleTyp
+  | MAnno   Module ModuleTyp  -- (M1 ::m S)
   deriving (Show, Eq)
 
 type Structures = [Structure]
@@ -93,7 +93,6 @@ data Exp
   | Fix   Name Exp          -- fix f. e
   | If    Exp Exp Exp       -- if e1 then e2 else e3
   | Lam   FunArgs Exp       -- fun (x: A) (y : B) -> x + 1
-  | TLam  FunArgs Exp       -- fun 
   | Clos  Env FunArgs Exp   -- clos [type t = int, x = 1] (y: t) -> x + y
   | App   Exp Exp           -- f(x)
   | TClos Env FunArgs Exp   -- clos [type t = int, x = 1] ->
@@ -106,6 +105,8 @@ data Exp
   | Mod   Module            -- functor or struct
   | DataCon Name Exp Typ    -- Ctor(e) as T
   | Case Exp [CaseBranch]
+  | Fold  Typ Exp            -- fold(e) as T
+  | Unfold Exp               -- unfold(e)
   -- Lists
   | EList [Exp]             -- [e1, e2, e3]
   | ETake Int Exp           -- take(n, ls)
@@ -133,6 +134,7 @@ typPrec t = case t of
   TyVar _     -> 4
   TyRcd {}    -> 4
   TySum {}    -> 4
+  TyMu _ _   -> 4
   TyCtx _     -> 4
   TyModule _  -> 4
   TyList _    -> 4
@@ -159,6 +161,8 @@ expPrec e = case e of
   Mod _     -> 5
   DataCon _ _ _ -> 5
   Case {}   -> 1
+  Fold _ _  -> 3
+  Unfold _  -> 3
   EList _   -> 5
   ETake _ _ -> 5
   _ -> 4 -- TODO: Extensions
@@ -273,7 +277,7 @@ prettyModuleTyp :: ModuleTyp -> String
 prettyModuleTyp (TyArrowM t m) = 
   prettyTyp t ++ " ->m " ++ prettyModuleTyp m
 prettyModuleTyp (ForallM n m) = 
-  "forall " ++ n ++ ". " ++ prettyModuleTyp m
+  "forallm " ++ n ++ ". " ++ prettyModuleTyp m
 prettyModuleTyp (TySig intf) = 
   "sig " ++ prettyIntf intf ++ " end"
 prettyModuleTyp (TyVarM n) = n
@@ -299,6 +303,7 @@ prettyTyp (TyRcd fields) =
   "{" ++ intercalateComma (map (\(l, t) -> l ++ " : " ++ prettyTyp t) fields) ++ "}"
 prettyTyp (TySum ctors) =
   intercalateWith " | " (map prettyCtorSpec ctors)
+prettyTyp (TyMu n t) = "mu " ++ n ++ ". " ++ prettyTyp t
 prettyTyp (TyModule mt) = prettyModuleTyp mt
 prettyTyp (TyList t) = "[" ++ prettyTyp t ++ "]"
 
@@ -335,9 +340,9 @@ prettyModule (Functor args m) =
 prettyModule (Struct structs) =
   "struct " ++ prettyStructures structs ++ " end"
 prettyModule (MApp m1 m2) = 
-  prettyModule m1 ++ "(" ++ prettyModule m2 ++ ")"
+  prettyModule m1 ++ "(|" ++ prettyModule m2 ++ "|)"
 prettyModule (MAppt m t) = 
-  prettyModule m ++ " @" ++ prettyTyp t
+  prettyModule m ++ " @m " ++ prettyTyp t
 prettyModule (MAnno m1 mty) =
   "(" ++ prettyModule m1 ++ " :: " ++ prettyModuleTyp mty ++ ")"
 
@@ -352,9 +357,6 @@ prettyExp (If e1 e2 e3) =
 prettyExp (Lam args e) = 
   "fun " ++ prettyFunArgs args ++ " -> " ++ 
   parensIf (expPrec e < expPrec (Lam args e)) (prettyExp e)
-prettyExp (TLam args e) = 
-  "fun " ++ prettyFunArgs args ++ " -> " ++ 
-  parensIf (expPrec e < expPrec (TLam args e)) (prettyExp e)
 prettyExp (Clos env args e) = 
   "clos [" ++ prettyEnv env ++ "] " ++ prettyFunArgs args ++ " -> " ++ 
   parensIf (expPrec e < expPrec (Clos env args e)) (prettyExp e)
@@ -380,6 +382,8 @@ prettyExp (Anno e t) =
   parensIf (expPrec e < expPrec (Anno e t)) (prettyExp e) ++ " :: " ++ prettyTyp t
 prettyExp (Mod m) = prettyModule m
 prettyExp (DataCon ctor arg ty) = ctor ++ "(" ++ prettyExp arg ++ ") as " ++ prettyTyp ty
+prettyExp (Fold t e) = "fold(" ++ prettyExp e ++ ") as " ++ prettyTyp t
+prettyExp (Unfold e) = "unfold(" ++ prettyExp e ++ ")"
 prettyExp (Case e branches) =
   "case " ++ prettyExp e ++ " of " ++ intercalateWith " " (map (("| " ++) . prettyCaseBranch) branches)
 prettyExp (EList []) = "List[]"

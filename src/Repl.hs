@@ -16,11 +16,14 @@ import qualified EnvML.Parser.Parser as Parser
 import qualified EnvML.Parser.Lexer as Lexer
 import qualified EnvML.Syntax as AST
 import qualified EnvML.Elab as Elab
+import qualified EnvML.Desugar as Desugar
+import qualified EnvML.Desugared as Desugared
 import qualified CoreFE.Named as CoreNamed
 import qualified CoreFE.Syntax as CoreFE
 import qualified CoreFE.Check as Check
 import qualified CoreFE.Eval as Eval
 import qualified CoreFE.DeBruijn as DeBruijn
+import qualified EnvML.Check as SCheck
 
 banner :: String
 banner = unlines
@@ -28,7 +31,7 @@ banner = unlines
   , "║                    EnvML REPL v0.1                           ║"
   , "║  A Module System with First-Class Environments               ║"
   , "╠══════════════════════════════════════════════════════════════╣"
-  , "║  Pipeline: Source → Parse → Elaborate → CoreFE (Named/Less)    ║"
+  , "║  Pipeline: Source → Parse → Desugar → Elaborate → CoreFE          ║"
   , "║  Type :help for available commands                           ║"
   , "╚══════════════════════════════════════════════════════════════╝"
   ]
@@ -59,6 +62,8 @@ processCommand "" = return ()
 processCommand cmd
   | cmd == ":help" || cmd == ":h" = printHelp
   | Just path <- stripPrefix ":p " cmd     = cmdParse (trim path)
+  | Just path <- stripPrefix ":d " cmd     = cmdDesugar (trim path)
+  | Just path <- stripPrefix ":sc " cmd    = cmdSourceCheck (trim path)
   | Just path <- stripPrefix ":e " cmd     = cmdElaborate (trim path)
   | Just path <- stripPrefix ":n " cmd     = cmdDeBruijn (trim path)
   | Just path <- stripPrefix ":check " cmd = cmdCheck (trim path)
@@ -74,8 +79,10 @@ printHelp = putStrLn $ unlines
   , "│                     EnvML REPL Commands                        │"
   , "├─────────────────────────────────────────────────────────────────┤"
   , "│  :p <file>     Parse and print AST                             │"
-  , "│  :e <file>     Parse → Elaborate (CoreFE.Named) → Print          │"
-  , "│  :n <file>     Parse → Elaborate → De Bruijn → Print           │"
+  , "│  :d <file>     Parse → Desugar → Print                         │"
+  , "│  :sc <file>    Parse → Desugar → Source type check              │"
+  , "│  :e <file>     Parse → Desugar → Elaborate (CoreFE.Named)       │"
+  , "│  :n <file>     Parse → Desugar → Elaborate → De Bruijn          │"
   , "│  :check <file> Full pipeline → Type check → Print result       │"
   , "│  :eval <file>  Full pipeline → Evaluate → Print result         │"
   , "│  :c <file>     (shorthand for :check)                          │"
@@ -85,11 +92,13 @@ printHelp = putStrLn $ unlines
   , "├─────────────────────────────────────────────────────────────────┤"
   , "│                     Pipeline Overview                          │"
   , "├─────────────────────────────────────────────────────────────────┤"
-  , "│  1. Parse      Source text → EnvML.Syntax.Module           │"
-  , "│  2. Elaborate  AST → CoreFE.Named (with desugaring built-in)     │"
-  , "│  3. De Bruijn  CoreFE.Named → CoreFE.Syntax (names → indices)      │"
-  , "│  4. Check      Type inference/checking at CoreFE level           │"
-  , "│  5. Eval       Evaluation at CoreFE level                        │"
+  , "│  1. Parse      Source text → EnvML.Syntax.Module               │"
+  , "│  2. Desugar    fold/unfold insertion on constructors/case       │"
+  , "│  2b. Src Check Source-level type inference/checking              │"
+  , "│  3. Elaborate  AST → CoreFE.Named                               │"
+  , "│  4. De Bruijn  CoreFE.Named → CoreFE.Syntax (names → indices)   │"
+  , "│  5. Check      Type inference/checking at CoreFE level          │"
+  , "│  6. Eval       Evaluation at CoreFE level                       │"
   , "└─────────────────────────────────────────────────────────────────┘"
   , ""
   ]
@@ -126,7 +135,7 @@ runPipeline path action = do
     Right ast -> action ast
 
 elaborate :: AST.Module -> CoreNamed.Exp
-elaborate = Elab.elabModule
+elaborate = Elab.elabModule . Desugar.desugarModule
 
 toDeBruijn :: CoreNamed.Exp -> CoreFE.Exp
 toDeBruijn = DeBruijn.toDeBruijn
@@ -135,6 +144,28 @@ cmdParse :: FilePath -> IO ()
 cmdParse path = runPipeline path $ \ast -> do
   putStrLn "=== Parsed AST ==="
   putStrLn $ AST.pretty ast
+
+cmdDesugar :: FilePath -> IO ()
+cmdDesugar path = runPipeline path $ \ast -> do
+  let desugared = Desugar.desugarModule ast
+  putStrLn "=== Desugared AST ==="
+  putStrLn $ Desugared.prettyModule desugared
+
+cmdSourceCheck :: FilePath -> IO ()
+cmdSourceCheck path = runPipeline path $ \ast -> do
+  putStrLn "=== Source Type Checking ==="
+  let desugared = Desugar.desugarModule ast
+  case desugared of
+    Desugared.Struct structs -> case SCheck.inferStructs [] structs of
+      Nothing -> putStrLn "✗ Source type check failed: Could not infer types"
+      Just intf -> do
+        putStrLn "✓ Source type check succeeded!"
+        putStrLn $ AST.prettyIntf intf
+    _ -> case SCheck.inferMod [] desugared of
+      Nothing -> putStrLn "✗ Source type check failed: Could not infer module type"
+      Just mty -> do
+        putStrLn "✓ Source type check succeeded!"
+        putStrLn $ AST.prettyModuleTyp mty
 
 cmdElaborate :: FilePath -> IO ()
 cmdElaborate path = runPipeline path $ \ast -> do

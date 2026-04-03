@@ -57,15 +57,14 @@ prettyEnvMLModuleShort :: EnvML.Module -> String
 prettyEnvMLModuleShort (EnvML.VarM n) = n
 prettyEnvMLModuleShort (EnvML.Functor args _) = "functor " ++ EnvML.prettyFunArgs args ++ " -> ..."
 prettyEnvMLModuleShort (EnvML.Struct _) = "struct ... end"
-prettyEnvMLModuleShort (EnvML.MApp m1 m2) = prettyEnvMLModuleShort m1 ++ "(" ++ prettyEnvMLModuleShort m2 ++ ")"
-prettyEnvMLModuleShort (EnvML.MAppt m t) = prettyEnvMLModuleShort m ++ " @" ++ EnvML.prettyTyp t
+prettyEnvMLModuleShort (EnvML.MApp m1 m2) = prettyEnvMLModuleShort m1 ++ "(|" ++ prettyEnvMLModuleShort m2 ++ "|)"
+prettyEnvMLModuleShort (EnvML.MAppt m t) = prettyEnvMLModuleShort m ++ " @m " ++ EnvML.prettyTyp t
 prettyEnvMLModuleShort (EnvML.MAnno m mt) = "(" ++ prettyEnvMLModuleShort m ++ " : " ++ EnvML.prettyModuleTyp mt ++ ")"
 
 prettyEnvMLExpShort :: EnvML.Exp -> String
 prettyEnvMLExpShort (EnvML.Lit l) = prettyLiteral l
 prettyEnvMLExpShort (EnvML.Var n) = n
 prettyEnvMLExpShort (EnvML.Lam args _) = "fun " ++ EnvML.prettyFunArgs args ++ " -> ..."
-prettyEnvMLExpShort (EnvML.TLam args _) = "fun " ++ EnvML.prettyFunArgs args ++ " -> ..."
 prettyEnvMLExpShort (EnvML.App e1 e2) = prettyEnvMLExpShort e1 ++ "(" ++ prettyEnvMLExpShort e2 ++ ")"
 prettyEnvMLExpShort (EnvML.TApp e t) = prettyEnvMLExpShort e ++ " @" ++ EnvML.prettyTyp t
 prettyEnvMLExpShort (EnvML.Box _ _) = "box [...] in ..."

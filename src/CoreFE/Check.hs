@@ -23,7 +23,7 @@ tshift x (TyRcd l a) = TyRcd l (tshift x a)
 tshift x (TyEnvt bs) = TyEnvt (tshiftBinds x bs)
 tshift x (TyList a) = TyList (tshift x a) -- ADD THIS
 tshift x (TySum ctors) = TySum [(l, tshift x t) | (l, t) <- ctors]
-tshift x (TyMu t) = TyMu (tshift (1 + x) t) -- TODO: Verify
+tshift x (TyMu t) = TyMu (tshift (1 + x) t) 
 
 -- | Type substitution: replace TyVar i with s in t, shifting vars > i down by 1
 typeSubst :: Typ -> Int -> Typ -> Typ
@@ -207,8 +207,7 @@ infer g (App e1 e2) = do
   TyArr a b <- infer g e1
   guard (check g e2 a)
   return b
-infer g (TLam e) =
-  TyAll <$> infer (Kind : g) e
+infer g (TLam e) = TyAll <$> infer (Kind : g) e
 infer g (TApp e t) = do
   TyAll b <- infer g e
   return (TySubstT t b)

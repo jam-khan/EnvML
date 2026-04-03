@@ -7,6 +7,6 @@ module policy1 =
       let id : t -> t = (fun (x) -> x);
     end;
 
-let result = policy1 @a;
+module result = policy1 @m a;
 
-let final = (result::(sig val id : a -> a; end)).id(1);
+let final = (result::m(sig val id : a -> a; end)).id(1);

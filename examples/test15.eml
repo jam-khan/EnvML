@@ -1,8 +1,8 @@
 type NatList = Nil as int | Cons as NatList;
 
+let a = Nil(2) as NatList;
 let b = Cons(Nil(2) as NatList) as NatList;
 let c = Cons(b) as NatList;
-
 let getNum : NatList -> int = fix f. fun (l : NatList) -> (
     case l of
     | <Nil = x> => x

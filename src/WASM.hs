@@ -6,6 +6,9 @@ import qualified EnvML.Parser.Parser as Parser
 import qualified EnvML.Parser.Lexer as Lexer
 import qualified EnvML.Syntax as AST
 import qualified EnvML.Elab as Elab
+import qualified EnvML.Desugar as Desugar
+import qualified EnvML.Desugared as D
+import qualified EnvML.Check as SCheck
 import qualified CoreFE.Named as CoreNamed
 import qualified CoreFE.DeBruijn as DeBruijn
 import qualified CoreFE.Syntax as CoreFE
@@ -41,7 +44,7 @@ parseModule :: String -> AST.Module
 parseModule input = Parser.parseModule (Lexer.lexer input)
 
 elaborate :: AST.Module -> CoreNamed.Exp
-elaborate = Elab.elabModule
+elaborate = Elab.elabModule . Desugar.desugarModule
 
 toDeBruijn :: CoreNamed.Exp -> CoreFE.Exp
 toDeBruijn = DeBruijn.toDeBruijn
@@ -58,7 +61,31 @@ runParseDetailed = safeRun $ \input ->
     let ast = parseModule input
     in "=== Parsed AST ===\n\n" ++ AST.pretty ast
 
--- | Stage 2: Elaborate (Detailed - Named CoreFE)
+-- | Stage 2: Desugar (Detailed)
+foreign export javascript "runDesugarDetailed" runDesugarDetailed :: JSString -> IO JSString
+
+runDesugarDetailed :: JSString -> IO JSString
+runDesugarDetailed = safeRun $ \input ->
+    let ast       = parseModule input
+        desugared = Desugar.desugarModule ast
+    in "=== Desugared AST ===\n\n" ++ D.prettyModule desugared
+
+-- | Stage 2b: Source Type Check (Detailed)
+foreign export javascript "runSourceCheckDetailed" runSourceCheckDetailed :: JSString -> IO JSString
+
+runSourceCheckDetailed :: JSString -> IO JSString
+runSourceCheckDetailed = safeRun $ \input ->
+    let ast       = parseModule input
+        desugared = Desugar.desugarModule ast
+    in case desugared of
+        D.Struct structs -> case SCheck.inferStructs [] structs of
+            Nothing   -> "\10007 Source Type Error\n\nCould not infer types"
+            Just intf -> "\10003 Source Type Check Passed\n\n" ++ AST.prettyIntf intf
+        _ -> case SCheck.inferMod [] desugared of
+            Nothing  -> "\10007 Source Type Error\n\nCould not infer module type"
+            Just mty -> "\10003 Source Type Check Passed\n\n" ++ AST.prettyModuleTyp mty
+
+-- | Stage 3: Elaborate (Detailed - Named CoreFE)
 foreign export javascript "runElaborateDetailed" runElaborateDetailed :: JSString -> IO JSString
 
 runElaborateDetailed :: JSString -> IO JSString
@@ -67,7 +94,7 @@ runElaborateDetailed = safeRun $ \input ->
         coreNamed = elaborate ast
     in "=== Elaborated (Named CoreFE) ===\n\n" ++ CoreNamed.pretty coreNamed
 
--- | Stage 3: De Bruijn (Detailed - Nameless CoreFE)
+-- | Stage 4: De Bruijn (Detailed - Nameless CoreFE)
 foreign export javascript "runDeBruijnDetailed" runDeBruijnDetailed :: JSString -> IO JSString
 
 runDeBruijnDetailed :: JSString -> IO JSString
@@ -77,7 +104,7 @@ runDeBruijnDetailed = safeRun $ \input ->
         coreNameless  = toDeBruijn coreNamed
     in "=== De Bruijn (Nameless CoreFE) ===\n\n" ++ CoreFE.pretty coreNameless
 
--- | Stage 4: Type Check (Detailed)
+-- | Stage 5: Type Check (Detailed)
 foreign export javascript "runCheckDetailed" runCheckDetailed :: JSString -> IO JSString
 
 runCheckDetailed :: JSString -> IO JSString
@@ -89,7 +116,7 @@ runCheckDetailed = safeRun $ \input ->
         Nothing  -> "✗ Type Error\n\nCould not infer type"
         Just typ -> "✓ Type Check Passed\n\n" ++ CoreFE.pretty typ
 
--- | Stage 5: Eval (Detailed)
+-- | Stage 6: Eval (Detailed)
 foreign export javascript "runEvalDetailed" runEvalDetailed :: JSString -> IO JSString
 
 runEvalDetailed :: JSString -> IO JSString
@@ -129,7 +156,31 @@ runParseSimplified = safeRun $ \input ->
     let ast = parseModule input
     in "=== Parsed AST ===\n\n" ++ PW.prettyEnvMLModule ast
 
--- | Stage 2: Elaborate (Simplified)
+-- | Stage 2: Desugar (Simplified)
+foreign export javascript "runDesugarSimplified" runDesugarSimplified :: JSString -> IO JSString
+
+runDesugarSimplified :: JSString -> IO JSString
+runDesugarSimplified = safeRun $ \input ->
+    let ast       = parseModule input
+        desugared = Desugar.desugarModule ast
+    in "=== Desugared AST ===\n\n" ++ D.prettyModule desugared
+
+-- | Stage 2b: Source Type Check (Simplified)
+foreign export javascript "runSourceCheckSimplified" runSourceCheckSimplified :: JSString -> IO JSString
+
+runSourceCheckSimplified :: JSString -> IO JSString
+runSourceCheckSimplified = safeRun $ \input ->
+    let ast       = parseModule input
+        desugared = Desugar.desugarModule ast
+    in case desugared of
+        D.Struct structs -> case SCheck.inferStructs [] structs of
+            Nothing   -> "\10007 Source Type Error\n\nCould not infer types"
+            Just intf -> "\10003 Source Type Check Passed\n\n" ++ AST.prettyIntf intf
+        _ -> case SCheck.inferMod [] desugared of
+            Nothing  -> "\10007 Source Type Error\n\nCould not infer module type"
+            Just mty -> "\10003 Source Type Check Passed\n\n" ++ AST.prettyModuleTyp mty
+
+-- | Stage 3: Elaborate (Simplified)
 foreign export javascript "runElaborateSimplified" runElaborateSimplified :: JSString -> IO JSString
 
 runElaborateSimplified :: JSString -> IO JSString
@@ -138,7 +189,7 @@ runElaborateSimplified = safeRun $ \input ->
         coreNamed = elaborate ast
     in "=== Elaborated (Named CoreFE) ===\n\n" ++ PW.prettyNamedModule coreNamed
 
--- | Stage 3: De Bruijn (Simplified)
+-- | Stage 4: De Bruijn (Simplified)
 foreign export javascript "runDeBruijnSimplified" runDeBruijnSimplified :: JSString -> IO JSString
 
 runDeBruijnSimplified :: JSString -> IO JSString
@@ -148,7 +199,7 @@ runDeBruijnSimplified = safeRun $ \input ->
         coreNameless  = toDeBruijn coreNamed
     in "=== De Bruijn (Nameless CoreFE) ===\n\n" ++ PW.prettyDeBruijnModule coreNameless
 
--- | Stage 4: Type Check (Simplified)
+-- | Stage 5: Type Check (Simplified)
 foreign export javascript "runCheckSimplified" runCheckSimplified :: JSString -> IO JSString
 
 runCheckSimplified :: JSString -> IO JSString
@@ -160,7 +211,7 @@ runCheckSimplified = safeRun $ \input ->
         Nothing  -> "✗ Type Error\n\nCould not infer type"
         Just typ -> "✓ Type Check Passed\n\n" ++ PW.prettyCheckResult typ
 
--- | Stage 5: Eval (Simplified)
+-- | Stage 6: Eval (Simplified)
 foreign export javascript "runEvalSimplified" runEvalSimplified :: JSString -> IO JSString
 
 runEvalSimplified :: JSString -> IO JSString
@@ -256,6 +307,9 @@ runParse = runParseSimplified
 
 foreign export javascript "runElaborate" runElaborate :: JSString -> IO JSString
 runElaborate = runElaborateSimplified
+
+foreign export javascript "runSourceCheck" runSourceCheck :: JSString -> IO JSString
+runSourceCheck = runSourceCheckSimplified
 
 foreign export javascript "runDeBruijn" runDeBruijn :: JSString -> IO JSString
 runDeBruijn = runDeBruijnSimplified

@@ -5,39 +5,39 @@ import EnvML.Syntax as Src
 import EnvML.Parser.Lexer (lexer)
 import EnvML.Parser.Parser (parseExp, parseModule, parseModuleTyp, parseTyp)
 import EnvML.Elab
+import EnvML.Desugar (desugarExp, desugarModule)
+import qualified EnvML.Desugared as D
 import qualified CoreFE.Named as Named
 import qualified CoreFE.DeBruijn as DB
 import qualified CoreFE.Syntax as CoreFE
-import Control.Exception (evaluate)
 import Test.Hspec
+
+-- | Parse and desugar an expression (all elab tests go through desugaring now)
+pde :: String -> D.Exp
+pde input = desugarExp (parseExp (lexer input))
+
+-- | Parse and desugar a module
+pdm :: String -> D.Module
+pdm input = desugarModule (parseModule (lexer input))
 
 spec :: Spec
 spec = do
   describe "Elaborate Simple Expressions" $ do
     
     it "elaborates variable" $ do
-      let input = "x"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
-      -- Variable "x" at index 0 (assumes context [x])
+      let named = elabExp (pde "x")
       named `shouldBe` Named.Var "x"
 
     it "elaborates integer literal" $ do
-      let input = "42"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "42")
       named `shouldBe` Named.Lit (CoreFE.LitInt 42)
 
     it "elaborates boolean literal" $ do
-      let input = "true"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "true")
       named `shouldBe` Named.Lit (CoreFE.LitBool True)
 
     it "elaborates if expression" $ do
-      let input = "if true then 1 else 0"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "if true then 1 else 0")
       named `shouldBe`
         Named.If
           (Named.Lit (CoreFE.LitBool True))
@@ -47,39 +47,27 @@ spec = do
   describe "Elaborate Lambda Expressions" $ do
     
     it "elaborates single-arg lambda" $ do
-      let input = "fun (x : int) -> x"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "fun (x : int) -> x")
       named `shouldBe` Named.Lam "x" (Named.Var "x")
 
     it "elaborates multi-arg lambda to nested lambdas" $ do
-      let input = "fun (x : int) (y : int) -> x"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "fun (x : int) (y : int) -> x")
       named `shouldBe` Named.Lam "x" (Named.Lam "y" (Named.Var "x"))
 
     it "elaborates type lambda" $ do
-      let input = "fun (type a) -> x"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "fun (type a) -> x")
       named `shouldBe` Named.TLam "a" (Named.Var "x")
 
     it "elaborates type arg followed by term arg" $ do
-      let input = "fun (type a) (x : int) -> x"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "fun (type a) (x : int) -> x")
       named `shouldBe` Named.TLam "a" (Named.Lam "x" (Named.Var "x"))
 
     it "elaborates term arg followed by type arg" $ do
-      let input = "fun (x : int) (type a) -> x"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "fun (x : int) (type a) -> x")
       named `shouldBe` Named.Lam "x" (Named.TLam "a" (Named.Var "x"))
 
     it "elaborates complex mixed args" $ do
-      let input = "fun (type a) (x : a) (type b) (y : b) -> x"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "fun (type a) (x : a) (type b) (y : b) -> x")
       named `shouldBe` Named.TLam "a" 
                          (Named.Lam "x" 
                            (Named.TLam "b" 
@@ -88,37 +76,27 @@ spec = do
   describe "Elaborate Applications" $ do
     
     it "elaborates function application" $ do
-      let input = "f(x)"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "f(x)")
       named `shouldBe` Named.App (Named.Var "f") (Named.Var "x")
 
     it "elaborates type application" $ do
-      let input = "f @ int"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "f @ int")
       named `shouldBe` Named.TApp (Named.Var "f") (Named.TyLit CoreFE.TyInt)
 
     it "elaborates named fixpoint" $ do
-      let input = "fix f. fun (x : int) -> f(x)"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "fix f. fun (x : int) -> f(x)")
       named `shouldBe`
         Named.Fix "f" (Named.Lam "x" (Named.App (Named.Var "f") (Named.Var "x")))
 
     it "elaborates data constructor with source-level type annotation into core fold" $ do
-      let input = "Nil(0) as NatList"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "Nil(0) as NatList")
       named
         `shouldBe` Named.Fold
           (Named.TyVar "NatList")
           (Named.DataCon "Nil" (Named.Lit (CoreFE.LitInt 0)))
 
     it "elaborates case by inserting core unfold on the scrutinee" $ do
-      let input = "case xs of | <Nil=h> => h | <Cons=t> => t"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "case xs of | <Nil=h> => h | <Cons=t> => t")
       named
         `shouldBe` Named.Case
           (Named.Unfold (Named.Var "xs"))
@@ -127,9 +105,7 @@ spec = do
           ]
 
     it "elaborates wildcard case branch" $ do
-      let input = "case xs of | _ => 0"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "case xs of | _ => 0")
       named
         `shouldBe` Named.Case
           (Named.Unfold (Named.Var "xs"))
@@ -138,9 +114,7 @@ spec = do
   describe "Elaborate Binary Operators" $ do
 
     it "elaborates comparison operators" $ do
-      let input = "1 <= 2"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "1 <= 2")
       named `shouldBe`
         Named.BinOp
           (Named.Le
@@ -148,9 +122,7 @@ spec = do
             (Named.Lit (CoreFE.LitInt 2)))
 
     it "elaborates inequality operator" $ do
-      let input = "x != y"
-      let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (pde "x != y")
       named `shouldBe` Named.BinOp (Named.Neq (Named.Var "x") (Named.Var "y"))
 
   describe "Elaborate Types" $ do
@@ -181,31 +153,26 @@ spec = do
                          (Named.TyAll "b" 
                            (Named.TyArr (Named.TyVar "a") (Named.TyVar "b")))
 
-    it "rejects inline sum annotations without a declared binder" $ do
+    it "elaborates inline sum type without TyMu wrapping" $ do
       let sumTy = Src.TySum [("Nil", Src.TyLit CoreFE.TyInt), ("Cons", Src.TyVar "NatList")]
-      evaluate
-        (case elabTyp sumTy of
-          Named.TyMu binder _ -> length binder
-          _ -> 0)
-        `shouldThrow` anyErrorCall
+      elabTyp sumTy
+        `shouldBe` Named.TySum
+          [ ("Nil", Named.TyLit CoreFE.TyInt)
+          , ("Cons", Named.TyVar "NatList")
+          ]
 
   describe "Elaborate Modules" $ do
     
     it "elaborates module variable" $ do
-      let m = Src.VarM "M"
-      let named = elabModule m
+      let named = elabModule (D.VarM "M")
       named `shouldBe` Named.Var "M"
 
     it "elaborates simple struct with let" $ do
-      let input = "let x = 1;"
-      let parsed = parseModule (lexer input)
-      let named = elabModule parsed
+      let named = elabModule (pdm "let x = 1;")
       named `shouldBe` Named.FEnv [Named.ModE "x" (Named.Lit (CoreFE.LitInt 1))]
 
     it "wraps type declarations of sum types with the declared binder in core" $ do
-      let input = "type NatList = Nil as int | Cons as NatList;"
-      let parsed = parseModule (lexer input)
-      let named = elabModule parsed
+      let named = elabModule (pdm "type NatList = Nil as int | Cons as NatList;")
       named
         `shouldBe` Named.FEnv
           [ Named.TypE
@@ -219,19 +186,19 @@ spec = do
           ]
 
     it "elaborates functor with term argument" $ do
-      let m = Src.Functor [("x", Src.TmArgType (Src.TyLit CoreFE.TyInt))]
-                          (Src.Struct [])
+      let m = desugarModule $ Src.Functor [("x", Src.TmArgType (Src.TyLit CoreFE.TyInt))]
+                                           (Src.Struct [])
       let named = elabModule m
       named `shouldBe` Named.Lam "x" (Named.FEnv [])
 
     it "elaborates functor with type argument" $ do
-      let m = Src.Functor [("t", Src.TyArg)] (Src.Struct [])
+      let m = desugarModule $ Src.Functor [("t", Src.TyArg)] (Src.Struct [])
       let named = elabModule m
       named `shouldBe` Named.TLam "t" (Named.FEnv [])
 
     it "elaborates multi-arg functor to nested" $ do
-      let m = Src.Functor [("t", Src.TyArg), ("x", Src.TmArgType (Src.TyVar "t"))]
-                          (Src.Struct [])
+      let m = desugarModule $ Src.Functor [("t", Src.TyArg), ("x", Src.TmArgType (Src.TyVar "t"))]
+                                           (Src.Struct [])
       let named = elabModule m
       named `shouldBe` Named.TLam "t" (Named.Lam "x" (Named.FEnv []))
 
