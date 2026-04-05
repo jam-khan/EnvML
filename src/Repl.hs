@@ -127,7 +127,6 @@ printHelp = putStrLn $ unlines
   , ""
   ]
 
--- | Load and execute a .repl script file line by line.
 cmdLoad :: FilePath -> IO ()
 cmdLoad path = do
   result <- (Right <$> readFile path) `catch` handler
@@ -141,7 +140,6 @@ cmdLoad path = do
     handler e = return $ Left $ show e
     isComment s = null s || "--" `isPrefixOf` s
 
--- | Remove all .emlo and .emle files in a directory.
 cmdClean :: FilePath -> IO ()
 cmdClean dir = do
   result <- (Right <$> listDirectory dir) `catch` handler

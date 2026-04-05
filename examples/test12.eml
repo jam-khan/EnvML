@@ -27,12 +27,12 @@ module queryProcessor :
         let query : list a -> list a = ((policy @m a) ::m sig val reshape : list int -> list int; end).reshape;
       end;
 
---let executeQuery : sig type a = int; val query : list a -> list a; end -> list int = 
---  fun (processor) -> 
---    box [proc = processor] in proc.query(List[3, 1, 2]) :: list int;
---
---let previewResult : list int = 
---  executeQuery(queryProcessor(|previewPolicy|));
---
---let mockResult : list int = 
---  executeQuery(queryProcessor(|mockPolicy|));
+let executeQuery : sig type a = int; val query : list a -> list a; end -> list int = 
+  fun (processor) -> 
+    box [proc = processor] in proc.query(List[3, 1, 2]) :: list int;
+
+let previewResult : list int = 
+  executeQuery(queryProcessor(|previewPolicy|));
+
+let mockResult : list int = 
+  executeQuery(queryProcessor(|mockPolicy|));
