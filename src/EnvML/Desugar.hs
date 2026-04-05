@@ -31,7 +31,6 @@ desugarStructure s = case s of
 -- | Desugar a module whose imports have been resolved to their interface types.
 -- Each 'Import M' in the top-level struct becomes the outermost functor parameter
 -- (M : <type from M.emli>), wrapping the remaining struct body.
--- This should be called before all other desugar functions
 desugarModuleWithImports :: [(Src.Name, Src.ModuleTyp)] -> Src.Module -> D.Module
 desugarModuleWithImports importTypes m =
   case m of

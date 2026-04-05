@@ -128,33 +128,47 @@ spec = do
     it "loads and parses the single-import example" $ do
       m <- compileEmlFile singleImportFile
       case m of
-        D.Functor "math" _ (D.Struct _) -> return ()
+        D.MAnno (D.Functor "math" _ (D.Struct _)) _ -> return ()
         _ -> expectationFailure $
-               "Expected Functor math -> Struct, got: " ++ show m
+               "Expected MAnno (Functor math -> Struct) _, got: " ++ show m
 
     it "functor type comes from math.emli" $ do
       m <- compileEmlFile singleImportFile
       case m of
-        D.Functor _ (TmArgType (TyModule (TySig intf))) _ -> do
+        D.MAnno (D.Functor _ (TmArgType (TyModule (TySig intf))) _) _ -> do
           let names = [n | ValDecl n _ <- intf]
           names `shouldSatisfy` ("add" `elem`)
           names `shouldSatisfy` ("square" `elem`)
         _ -> expectationFailure $
-               "Expected functor with TySig from math.emli, got: " ++ show m
+               "Expected MAnno (functor with TySig from math.emli) _, got: " ++ show m
+
+    it "annotation type has import arg as TyArrowM" $ do
+      m <- compileEmlFile singleImportFile
+      case m of
+        D.MAnno _ (TyArrowM (TyModule (TySig _)) (TySig _)) -> return ()
+        _ -> expectationFailure $
+               "Expected annotation TyArrowM (TyModule (TySig _)) (TySig _), got: " ++ show m
 
   describe "compileEmlFile – multi_import.eml" $ do
 
     it "loads and parses the multi-import example" $ do
       m <- compileEmlFile multiImportFile
       case m of
-        D.Functor "math" _ (D.Functor "utils" _ (D.Struct _)) -> return ()
+        D.MAnno (D.Functor "math" _ (D.Functor "utils" _ (D.Struct _))) _ -> return ()
         _ -> expectationFailure $
-               "Expected Functor math -> Functor utils -> Struct, got: " ++ show m
+               "Expected MAnno (Functor math -> Functor utils -> Struct) _, got: " ++ show m
 
     it "body struct has all three let bindings" $ do
       m <- compileEmlFile multiImportFile
       case m of
-        D.Functor _ _ (D.Functor _ _ (D.Struct structs)) ->
+        D.MAnno (D.Functor _ _ (D.Functor _ _ (D.Struct structs))) _ ->
           length structs `shouldBe` 3
         _ -> expectationFailure $
-               "Expected nested functors wrapping 3 bindings, got: " ++ show m
+               "Expected MAnno (nested functors wrapping 3 bindings) _, got: " ++ show m
+
+    it "annotation type chains import sigs then main sig" $ do
+      m <- compileEmlFile multiImportFile
+      case m of
+        D.MAnno _ (TyArrowM (TyModule (TySig _)) (TyArrowM (TyModule (TySig _)) (TySig _))) -> return ()
+        _ -> expectationFailure $
+               "Expected annotation TyArrowM _ (TyArrowM _ (TySig _)), got: " ++ show m

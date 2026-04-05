@@ -69,7 +69,10 @@ processCommand cmd
   | Just path <- stripPrefix ":n " cmd     = cmdDeBruijn (trim path)
   | Just path <- stripPrefix ":check " cmd = cmdCheck (trim path)
   | Just path <- stripPrefix ":eval " cmd  = cmdEval (trim path)
-  | Just path <- stripPrefix ":comp " cmd  = cmdCompile (trim path)
+  | Just path <- stripPrefix ":sep-sc " cmd = cmdSepSourceCheck (trim path)
+  | Just path <- stripPrefix ":sep-e " cmd  = cmdSepElab (trim path)
+  | Just path <- stripPrefix ":sep-c " cmd  = cmdSepCheck (trim path)
+  | Just path <- stripPrefix ":sep-d " cmd  = cmdSep (trim path)
   | Just path <- stripPrefix ":c " cmd     = cmdCheck (trim path)
   | Just path <- stripPrefix ":v " cmd     = cmdEval (trim path)
   | otherwise = putStrLn $ "Unknown command: " ++ cmd ++ "\nType :help for available commands."
@@ -80,28 +83,27 @@ printHelp = putStrLn $ unlines
   , "┌─────────────────────────────────────────────────────────────────┐"
   , "│                     EnvML REPL Commands                        │"
   , "├─────────────────────────────────────────────────────────────────┤"
+  , "│  Single-file pipeline                                          │"
+  , "├─────────────────────────────────────────────────────────────────┤"
   , "│  :p <file>     Parse and print AST                             │"
   , "│  :d <file>     Parse → Desugar → Print                         │"
-  , "│  :sc <file>    Parse → Desugar → Source type check              │"
-  , "│  :e <file>     Parse → Desugar → Elaborate (CoreFE.Named)       │"
-  , "│  :n <file>     Parse → Desugar → Elaborate → De Bruijn          │"
-  , "│  :check <file> Full pipeline → Type check → Print result       │"
-  , "│  :eval <file>  Full pipeline → Evaluate → Print result         │"
-  , "│  :comp <file>  Resolve imports → Desugar → Print desugared     │"
+  , "│  :sc <file>    Parse → Desugar → Source type check             │"
+  , "│  :e <file>     Parse → Desugar → Elaborate (CoreFE.Named)      │"
+  , "│  :n <file>     Parse → Desugar → Elaborate → De Bruijn         │"
+  , "│  :check <file> Full pipeline → Core type check                 │"
+  , "│  :eval <file>  Full pipeline → Evaluate                        │"
   , "│  :c <file>     (shorthand for :check)                          │"
   , "│  :v <file>     (shorthand for :eval)                           │"
+  , "├─────────────────────────────────────────────────────────────────┤"
+  , "│  Separate compilation (import-aware)                           │"
+  , "├─────────────────────────────────────────────────────────────────┤"
+  , "│  :sep-d    <file>  Resolve imports → Desugar → Print           │"
+  , "│  :sep-sc <file>  → Source type check                           │"
+  , "│  :sep-e  <file>  → Elaborate (CoreFE.Named)                    │"
+  , "│  :sep-c  <file>  → Core type check                             │"
+  , "├─────────────────────────────────────────────────────────────────┤"
   , "│  :help, :h     Show this help                                  │"
   , "│  :quit, :q     Exit the REPL                                   │"
-  , "├─────────────────────────────────────────────────────────────────┤"
-  , "│                     Pipeline Overview                          │"
-  , "├─────────────────────────────────────────────────────────────────┤"
-  , "│  1. Parse      Source text → EnvML.Syntax.Module               │"
-  , "│  2. Desugar    fold/unfold insertion on constructors/case       │"
-  , "│  2b. Src Check Source-level type inference/checking              │"
-  , "│  3. Elaborate  AST → CoreFE.Named                               │"
-  , "│  4. De Bruijn  CoreFE.Named → CoreFE.Syntax (names → indices)   │"
-  , "│  5. Check      Type inference/checking at CoreFE level          │"
-  , "│  6. Eval       Evaluation at CoreFE level                       │"
   , "└─────────────────────────────────────────────────────────────────┘"
   , ""
   ]
@@ -212,14 +214,61 @@ cmdEval path = runPipeline path $ \ast -> do
       putStrLn $ "  " ++ CoreFE.pretty result
 
 -- | Parse an .eml file, resolve imports from neighbouring .emli files, desugar.
-cmdCompile :: FilePath -> IO ()
-cmdCompile path = do
+cmdSep :: FilePath -> IO ()
+cmdSep path = do
   result <- (Right <$> Parse.compileEmlFile path) `Control.Exception.catch` handler
   case result of
     Left err      -> putStrLn $ "Error: " ++ err
     Right desugared -> do
-      putStrLn "=== Compiled (imports resolved, desugared) ==="
+      putStrLn "=== Sep: Imports resolved, desugared ==="
       putStrLn $ Desugared.prettyModule desugared
+  where
+    handler :: SomeException -> IO (Either String Desugared.Module)
+    handler e = return $ Left $ show e
+
+cmdSepSourceCheck :: FilePath -> IO ()
+cmdSepSourceCheck path = do
+  result <- (Right <$> Parse.compileEmlFile path) `Control.Exception.catch` handler
+  case result of
+    Left err -> putStrLn $ "Error: " ++ err
+    Right desugared -> do
+      putStrLn "=== Sep: Source type checking ==="
+      case desugared of
+        Desugared.Struct structs -> case SCheck.inferStructs [] structs of
+          Nothing   -> putStrLn "✗ Source type check failed"
+          Just intf -> putStrLn "✓ Source type check succeeded!" >> putStrLn (AST.prettyIntf intf)
+        _ -> case SCheck.inferMod [] desugared of
+          Nothing  -> putStrLn "✗ Source type check failed"
+          Just mty -> putStrLn "✓ Source type check succeeded!" >> putStrLn (AST.prettyModuleTyp mty)
+  where
+    handler :: SomeException -> IO (Either String Desugared.Module)
+    handler e = return $ Left $ show e
+
+cmdSepElab :: FilePath -> IO ()
+cmdSepElab path = do
+  result <- (Right <$> Parse.compileEmlFile path) `Control.Exception.catch` handler
+  case result of
+    Left err -> putStrLn $ "Error: " ++ err
+    Right desugared -> do
+      let coreNamed = Elab.elabModule desugared
+      putStrLn "=== Sep: Elaborated CoreFE (Named) ==="
+      print coreNamed
+  where
+    handler :: SomeException -> IO (Either String Desugared.Module)
+    handler e = return $ Left $ show e
+
+cmdSepCheck :: FilePath -> IO ()
+cmdSepCheck path = do
+  result <- (Right <$> Parse.compileEmlFile path) `Control.Exception.catch` handler
+  case result of
+    Left err -> putStrLn $ "Error: " ++ err
+    Right desugared -> do
+      let coreNamed     = Elab.elabModule desugared
+          coreNameless  = DeBruijn.toDeBruijn coreNamed
+      putStrLn "=== Sep: Core type checking ==="
+      case Check.infer [] coreNameless of
+        Nothing  -> putStrLn "✗ Core type check failed"
+        Just typ -> putStrLn "✓ Core type check succeeded!" >> putStrLn ("  Type: " ++ CoreFE.pretty typ)
   where
     handler :: SomeException -> IO (Either String Desugared.Module)
     handler e = return $ Left $ show e
