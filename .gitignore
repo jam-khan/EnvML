@@ -27,6 +27,7 @@ rocq/Theories/Makefile
 rocq/Theories//Makefile.conf
 rocq/Theories//Makefile
 src/EnvML/Parser/Happy.info
+lean-sce/.lake
 
 *.vo
 *.vos
@@ -46,6 +47,10 @@ src/EnvML/Parser/Happy.info
 # Editor / OS noise
 .DS_Store
 *~
+
+# Separate compilation intermediate files
+examples/*/*.emlo
+examples/*/*.emle
 
 practice/*
 tapl-haskell-0.1/*

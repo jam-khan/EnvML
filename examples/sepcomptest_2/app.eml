@@ -1,0 +1,5 @@
+import arith;
+
+let r1 : int = arith.add_pi(7);
+let r2 : int = arith.add_e(arith.add_pi(0));
+let r3 : int = arith.scale(arith.add_e(1));

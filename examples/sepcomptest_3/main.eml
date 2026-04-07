@@ -1,0 +1,6 @@
+import evens;
+import odds;
+
+let r1 : int = evens.double(odds.seed);
+let r2 : int = odds.triple(evens.seed);
+let r3 : int = evens.quad(odds.inc(evens.seed));

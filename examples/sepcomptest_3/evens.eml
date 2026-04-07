@@ -1,0 +1,5 @@
+import base;
+
+let double : int -> int = fun (x) -> x + x;
+let quad   : int -> int = fun (x) -> x + x + (x + x);
+let seed   : int = base.two * base.two;

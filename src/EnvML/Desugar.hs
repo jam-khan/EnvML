@@ -1,7 +1,10 @@
-module EnvML.Desugar (desugarModule, desugarExp) where
+module EnvML.Desugar (desugarModule, desugarModuleWithImports, desugarExp, desugarModuleTyp, resolveImports) where
 
 import qualified EnvML.Syntax as Src
 import qualified EnvML.Desugared as D
+import EnvML.Parser.Lexer (lexer)
+import EnvML.Parser.Parser (parseModule, parseModuleTyp)
+import System.FilePath (takeDirectory, (</>), replaceExtension)
 
 desugarModule :: Src.Module -> D.Module
 desugarModule m = case m of
@@ -26,6 +29,43 @@ desugarStructure s = case s of
   Src.ModStruct n mt m    -> D.ModStruct n mt (desugarModule m)
   -- FunctStruct desugars into ModStruct with nested Functor body
   Src.FunctStruct n as mt m -> D.ModStruct n mt (desugarFunctor as m)
+  Src.Import n -> error $ "Import '" ++ n ++ "' reached desugarStructure; it should've been desugared with desugarModuleWithImports before this point"
+
+-- Each 'Import M' in the top-level struct becomes the outermost functor parameter
+-- (M : <type from M.emli>), wrapping the remaining struct body.
+desugarModuleWithImports :: [(Src.Name, Src.ModuleTyp)] -> Src.Module -> D.Module
+desugarModuleWithImports importTypes m =
+  case m of
+    Src.Struct structs ->
+      let importNames = [n | Src.Import n <- structs]
+          rest        = filter (not . isImport) structs
+          body        = desugarModule (Src.Struct rest)
+      in foldr wrapFunctor body importNames
+    _ -> desugarModule m
+  where
+    isImport :: Src.Structure -> Bool
+    isImport (Src.Import _) = True
+    isImport _              = False
+
+    wrapFunctor :: Src.Name -> D.Module -> D.Module
+    wrapFunctor n acc =
+      case lookup n importTypes of
+        Just mty -> D.Functor n (Src.TmArgType (Src.TyModule mty)) acc
+        Nothing  -> error $ "No .emli file found for import: '" ++ n ++ "'"
+
+-- | Parse an .eml file, resolve imports by reading neighbouring .emli files,
+-- desugar, and wrap in an MAnno using <file>.emli as the module's own
+-- signature. 
+resolveImports :: FilePath -> IO D.Module
+resolveImports path = do
+  m <- parseModule . lexer <$> readFile path
+  let baseDir     = takeDirectory path
+      importNames = [n | Src.Import n <- case m of Src.Struct ss -> ss; _ -> []]
+  importTypes <- mapM (\n -> fmap (\mty -> (n, desugarModuleTyp mty)) (parseModuleTyp . lexer <$> readFile (baseDir </> n ++ ".emli"))) importNames
+  mainSig     <- desugarModuleTyp . parseModuleTyp . lexer <$> readFile (replaceExtension path ".emli")
+  let desugared      = desugarModuleWithImports importTypes m
+      annotationType = foldr (\(_, impSig) acc -> Src.TyArrowM (Src.TyModule impSig) acc) mainSig importTypes
+  return $ D.MAnno desugared annotationType
 
 desugarExp :: Src.Exp -> D.Exp
 desugarExp e = case e of
@@ -95,6 +135,19 @@ desugarEnvE envE = case envE of
 desugarTyp :: Src.Typ -> Src.Typ
 desugarTyp = desugarTypWithBinder Nothing
 
+desugarModuleTyp :: Src.ModuleTyp -> Src.ModuleTyp
+desugarModuleTyp (Src.TySig intf)   = Src.TySig (map desugarIntfE intf)
+desugarModuleTyp (Src.TyArrowM t m) = Src.TyArrowM (desugarTyp t) (desugarModuleTyp m)
+desugarModuleTyp (Src.ForallM n m)  = Src.ForallM n (desugarModuleTyp m)
+desugarModuleTyp other              = other
+
+desugarIntfE :: Src.IntfE -> Src.IntfE
+desugarIntfE (Src.TyDef n t)         = Src.TyDef n (desugarTypWithBinder (Just n) t)
+desugarIntfE (Src.ValDecl n t)       = Src.ValDecl n (desugarTyp t)
+desugarIntfE (Src.ModDecl n t)       = Src.ModDecl n (desugarTyp t)
+desugarIntfE (Src.FunctorDecl n a t) = Src.FunctorDecl n a (desugarTyp t)
+desugarIntfE (Src.SigDecl n intf)    = Src.SigDecl n (map desugarIntfE intf)
+
 desugarTypWithBinder :: Maybe Src.Name -> Src.Typ -> Src.Typ
 desugarTypWithBinder mb ty = case ty of
   Src.TyLit l      -> Src.TyLit l
@@ -110,5 +163,5 @@ desugarTypWithBinder mb ty = case ty of
       Nothing     -> Src.TySum ctors'
   Src.TyMu n t     -> Src.TyMu n (desugarTypWithBinder (Just n) t)
   Src.TyCtx ctx    -> Src.TyCtx (reverse ctx)
-  Src.TyModule mt  -> Src.TyModule mt
+  Src.TyModule mt  -> Src.TyModule (desugarModuleTyp mt)
   Src.TyList t     -> Src.TyList (desugarTypWithBinder mb t)

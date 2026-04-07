@@ -1,0 +1,11 @@
+-- sepcomptest_4: fixpoint recursive functions
+--
+--   core   (fact, fib via fix)
+--     │
+--   stats  (applies them)
+--
+:sep-obj examples/sepcomptest_4/core.eml
+:sep-link examples/sepcomptest_4/core.emlo
+:sep-obj examples/sepcomptest_4/stats.eml
+:sep-link examples/sepcomptest_4/stats.emlo examples/sepcomptest_4/core.emle
+:sep-eval examples/sepcomptest_4/stats.emle

@@ -71,6 +71,7 @@ data Structure
   | ModTypDecl    Name ModuleTyp -- module type S = ...
   | ModStruct     Name (Maybe ModuleTyp) Module -- module M : S = struct ... endj
   | FunctStruct   Name FunArgs (Maybe ModuleTyp) Module  -- functor F (type t) (x : A) : S = struct ... end
+  | Import        Name  -- import M;
   deriving (Eq, Show)
 
 data CaseBranch
@@ -331,6 +332,8 @@ prettyStructure (FunctStruct n args Nothing s) =
   "functor " ++ n ++ " " ++ prettyFunArgs args ++ " = " ++ prettyModule s
 prettyStructure (FunctStruct n args (Just mt) s) = 
   "functor " ++ n ++ " " ++ prettyFunArgs args ++ " : " ++ prettyModuleTyp mt ++ " = " ++ prettyModule s
+prettyStructure (Import n) =
+  "import " ++ n ++ ";"
 
 -- Module pretty printing
 prettyModule :: Module -> String

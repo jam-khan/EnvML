@@ -1,0 +1,6 @@
+import math;
+import utils;
+
+let r1 : int = math.add(10)(utils.version);
+let r2 : int = math.square(utils.version);
+let r3 : int = utils.greet(math.add(1)(2));

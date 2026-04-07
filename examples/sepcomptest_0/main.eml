@@ -1,0 +1,4 @@
+import math;
+
+let result1 : int = math.add(3)(4);
+let result2 : int = math.square(5);

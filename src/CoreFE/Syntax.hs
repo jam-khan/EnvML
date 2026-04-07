@@ -8,7 +8,7 @@ data TyEnvE
   = Type Typ
   | Kind
   | TypeEq Typ
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 data Typ
   = TyLit TyLit
@@ -22,19 +22,19 @@ data Typ
   | TySum [(String, Typ)]
   | TyEnvt TyEnv
   | TyList Typ -- [A]
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 data TyLit
   = TyInt
   | TyBool
   | TyStr
   | TyUnit
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 type Env = [EnvE]
 
 data EnvE = ExpE Exp | RecE Exp | TypE Typ -- RecE is internal (used for fixpoints to avoid infinite envs when printing)
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 data Exp
   = Lit Literal
@@ -60,11 +60,11 @@ data Exp
   | -- List primitives
     EList [Exp] -- [e1, e2, e3]
   | ETake Int Exp -- take(n, ls)
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 data CaseBranch
   = CaseBranch String Exp
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 data BinOp
   = Add Exp Exp
@@ -76,14 +76,14 @@ data BinOp
   | Le Exp Exp
   | Gt Exp Exp
   | Ge Exp Exp
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 data Literal
   = LitInt Int
   | LitBool Bool
   | LitStr String
   | LitUnit
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 class Pretty a where
   pretty :: a -> String

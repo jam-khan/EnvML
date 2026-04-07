@@ -1,0 +1,1 @@
+type Shape = Circle as int | Rect as {w : int, h : int} | Square as int;

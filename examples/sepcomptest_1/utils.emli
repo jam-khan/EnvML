@@ -1,0 +1,2 @@
+val greet   : int -> int;
+val version : int;
