@@ -1,0 +1,4 @@
+import shapes;
+
+let total_area  : int = shapes.circle_area + shapes.rect_area + shapes.square_area;
+let perim_ratio : int = shapes.circle_perim + shapes.square_area;

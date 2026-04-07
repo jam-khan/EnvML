@@ -1,0 +1,3 @@
+val id          : forall a. a -> a;
+val apply_twice : forall a. (a -> a) -> a -> a;
+val flip_args   : forall a. (a -> a -> a) -> a -> a -> a;

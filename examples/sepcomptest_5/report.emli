@@ -1,0 +1,2 @@
+val total_area  : int;
+val perim_ratio : int;

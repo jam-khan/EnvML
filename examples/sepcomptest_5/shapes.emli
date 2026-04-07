@@ -1,0 +1,7 @@
+type Shape = Circle as int | Rect as {w : int, h : int} | Square as int;
+val area         : Shape -> int;
+val perimeter    : Shape -> int;
+val circle_area  : int;
+val rect_area    : int;
+val square_area  : int;
+val circle_perim : int;

@@ -48,6 +48,10 @@ lean-sce/.lake
 .DS_Store
 *~
 
+# Separate compilation intermediate files
+examples/*/*.emlo
+examples/*/*.emle
+
 practice/*
 tapl-haskell-0.1/*
 oopsla24-artifact/*

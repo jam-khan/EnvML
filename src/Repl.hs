@@ -27,6 +27,7 @@ import qualified CoreFE.Check as Check
 import qualified CoreFE.Eval as Eval
 import qualified CoreFE.DeBruijn as DeBruijn
 import qualified EnvML.Check as SCheck
+import Debug.Trace
 
 banner :: String
 banner = unlines
@@ -205,17 +206,9 @@ cmdSourceCheck :: FilePath -> IO ()
 cmdSourceCheck path = runPipeline path $ \ast -> do
   putStrLn "=== Source Type Checking ==="
   let desugared = Desugar.desugarModule ast
-  case desugared of
-    Desugared.Struct structs -> case SCheck.inferStructs [] structs of
-      Nothing -> putStrLn "✗ Source type check failed: Could not infer types"
-      Just intf -> do
-        putStrLn "✓ Source type check succeeded!"
-        putStrLn $ AST.prettyIntf intf
-    _ -> case SCheck.inferMod [] desugared of
-      Nothing -> putStrLn "✗ Source type check failed: Could not infer module type"
-      Just mty -> do
-        putStrLn "✓ Source type check succeeded!"
-        putStrLn $ AST.prettyModuleTyp mty
+  case SCheck.inferMod [] desugared of
+    Nothing  -> putStrLn "✗ Source type check failed"
+    Just mty -> putStrLn "✓ Source type check succeeded!" >> putStrLn (AST.prettyModuleTyp mty)
 
 cmdElaborate :: FilePath -> IO ()
 cmdElaborate path = runPipeline path $ \ast -> do
@@ -261,7 +254,7 @@ cmdEval path = runPipeline path $ \ast -> do
 -- | Parse an .eml file, resolve imports from neighbouring .emli files, desugar.
 cmdSep :: FilePath -> IO ()
 cmdSep path = do
-  result <- (Right <$> Parse.compileEmlFile path) `Control.Exception.catch` handler
+  result <- (Right <$> Desugar.resolveImports path) `Control.Exception.catch` handler
   case result of
     Left err      -> putStrLn $ "Error: " ++ err
     Right desugared -> do
@@ -273,25 +266,22 @@ cmdSep path = do
 
 cmdSepSourceCheck :: FilePath -> IO ()
 cmdSepSourceCheck path = do
-  result <- (Right <$> Parse.compileEmlFile path) `Control.Exception.catch` handler
+  result <- (Right <$> Desugar.resolveImports path) `Control.Exception.catch` handler
   case result of
     Left err -> putStrLn $ "Error: " ++ err
     Right desugared -> do
       putStrLn "=== Sep: Source type checking ==="
-      case desugared of
-        Desugared.Struct structs -> case SCheck.inferStructs [] structs of
-          Nothing   -> putStrLn "✗ Source type check failed"
-          Just intf -> putStrLn "✓ Source type check succeeded!" >> putStrLn (AST.prettyIntf intf)
-        _ -> case SCheck.inferMod [] desugared of
-          Nothing  -> putStrLn "✗ Source type check failed"
-          Just mty -> putStrLn "✓ Source type check succeeded!" >> putStrLn (AST.prettyModuleTyp mty)
+      case SCheck.inferMod [] desugared of
+        Nothing  -> trace (show (desugared)) $ putStrLn "✗ Source type check failed"
+        Just mty -> putStrLn "✓ Source type check succeeded!" >> putStrLn (AST.prettyModuleTyp mty)
   where
     handler :: SomeException -> IO (Either String Desugared.Module)
     handler e = return $ Left $ show e
 
+
 cmdSepElab :: FilePath -> IO ()
 cmdSepElab path = do
-  result <- (Right <$> Parse.compileEmlFile path) `Control.Exception.catch` handler
+  result <- (Right <$> Desugar.resolveImports path) `Control.Exception.catch` handler
   case result of
     Left err -> putStrLn $ "Error: " ++ err
     Right desugared -> do
@@ -304,7 +294,7 @@ cmdSepElab path = do
 
 cmdSepDeBruijn :: FilePath -> IO ()
 cmdSepDeBruijn path = do
-  result <- (Right <$> Parse.compileEmlFile path) `Control.Exception.catch` handler
+  result <- (Right <$> Desugar.resolveImports path) `Control.Exception.catch` handler
   case result of
     Left err -> putStrLn $ "Error: " ++ err
     Right desugared -> do
@@ -326,7 +316,7 @@ data ObjFile = ObjFile
 -- The .emlo contains the serialized ObjFile (deps + De Bruijn expression).
 cmdSepObj :: FilePath -> IO ()
 cmdSepObj path = do
-  result <- (Right <$> Parse.compileEmlFile path) `Control.Exception.catch` handler
+  result <- (Right <$> Desugar.resolveImports path) `Control.Exception.catch` handler
   case result of
     Left err -> putStrLn $ "Error: " ++ err
     Right desugared -> do
@@ -421,7 +411,7 @@ cmdSepInfo path = do
 
 cmdSepCheck :: FilePath -> IO ()
 cmdSepCheck path = do
-  result <- (Right <$> Parse.compileEmlFile path) `Control.Exception.catch` handler
+  result <- (Right <$> Desugar.resolveImports path) `Control.Exception.catch` handler
   case result of
     Left err -> putStrLn $ "Error: " ++ err
     Right desugared -> do

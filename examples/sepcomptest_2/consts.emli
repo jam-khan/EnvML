@@ -1,0 +1,3 @@
+val pi  : int;
+val e   : int;
+val ten : int;

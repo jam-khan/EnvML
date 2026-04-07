@@ -1,0 +1,3 @@
+val add_pi  : int -> int;
+val add_e   : int -> int;
+val scale   : int -> int;

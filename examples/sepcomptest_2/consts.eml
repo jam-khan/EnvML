@@ -1,0 +1,3 @@
+let pi  : int = 3;
+let e   : int = 2;
+let ten : int = 10;

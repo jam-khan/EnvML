@@ -1,0 +1,4 @@
+val fact5  : int;
+val fact10 : int;
+val fib7   : int;
+val fib10  : int;

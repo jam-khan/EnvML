@@ -2,12 +2,12 @@
 module EnvML.ImportSpec (spec) where
 
 import EnvML.Syntax (Name, ModuleTyp(..), Intf, IntfE(..), Typ(..), FunArg(..))
+import qualified CoreFE.Syntax as CoreFE
 import qualified EnvML.Desugared as D
-import EnvML.Desugar (desugarModuleWithImports)
-import EnvML.Parse (compileEmlFile)
+import EnvML.Desugar (desugarModuleWithImports, desugarModuleTyp)
+import EnvML.Desugar (resolveImports)
 import EnvML.Parser.Lexer (lexer)
 import EnvML.Parser.Parser (parseModule, parseModuleTyp)
-import qualified CoreFE.Syntax as CoreFE
 import Control.Exception (evaluate, SomeException, try)
 import Data.Maybe (isJust)
 import Test.Hspec
@@ -123,17 +123,17 @@ spec = do
         Left _ -> return ()     -- expected: error thrown
         Right _ -> expectationFailure "Expected an error for missing .emli, but got success"
 
-  describe "compileEmlFile – single_import.eml" $ do
+  describe "resolveImports – single_import.eml" $ do
 
     it "loads and parses the single-import example" $ do
-      m <- compileEmlFile singleImportFile
+      m <- resolveImports singleImportFile
       case m of
         D.MAnno (D.Functor "math" _ (D.Struct _)) _ -> return ()
         _ -> expectationFailure $
                "Expected MAnno (Functor math -> Struct) _, got: " ++ show m
 
     it "functor type comes from math.emli" $ do
-      m <- compileEmlFile singleImportFile
+      m <- resolveImports singleImportFile
       case m of
         D.MAnno (D.Functor _ (TmArgType (TyModule (TySig intf))) _) _ -> do
           let names = [n | ValDecl n _ <- intf]
@@ -143,23 +143,23 @@ spec = do
                "Expected MAnno (functor with TySig from math.emli) _, got: " ++ show m
 
     it "annotation type has import arg as TyArrowM" $ do
-      m <- compileEmlFile singleImportFile
+      m <- resolveImports singleImportFile
       case m of
         D.MAnno _ (TyArrowM (TyModule (TySig _)) (TySig _)) -> return ()
         _ -> expectationFailure $
                "Expected annotation TyArrowM (TyModule (TySig _)) (TySig _), got: " ++ show m
 
-  describe "compileEmlFile – multi_import.eml" $ do
+  describe "resolveImports – multi_import.eml" $ do
 
     it "loads and parses the multi-import example" $ do
-      m <- compileEmlFile multiImportFile
+      m <- resolveImports multiImportFile
       case m of
         D.MAnno (D.Functor "math" _ (D.Functor "utils" _ (D.Struct _))) _ -> return ()
         _ -> expectationFailure $
                "Expected MAnno (Functor math -> Functor utils -> Struct) _, got: " ++ show m
 
     it "body struct has all three let bindings" $ do
-      m <- compileEmlFile multiImportFile
+      m <- resolveImports multiImportFile
       case m of
         D.MAnno (D.Functor _ _ (D.Functor _ _ (D.Struct structs))) _ ->
           length structs `shouldBe` 3
@@ -167,8 +167,44 @@ spec = do
                "Expected MAnno (nested functors wrapping 3 bindings) _, got: " ++ show m
 
     it "annotation type chains import sigs then main sig" $ do
-      m <- compileEmlFile multiImportFile
+      m <- resolveImports multiImportFile
       case m of
         D.MAnno _ (TyArrowM (TyModule (TySig _)) (TyArrowM (TyModule (TySig _)) (TySig _))) -> return ()
         _ -> expectationFailure $
                "Expected annotation TyArrowM _ (TyArrowM _ (TySig _)), got: " ++ show m
+
+    it "wraps a TySum in TyDef with TyMu" $ do
+      let raw = TySig [TyDef "Color" (TySum [("Red", TyLit CoreFE.TyInt), ("Blue", TyLit CoreFE.TyInt)])]
+          desugared = desugarModuleTyp raw
+      case desugared of
+        TySig [TyDef "Color" (TyMu "Color" (TySum _))] -> return ()
+        _ -> expectationFailure $ "Expected TyDef Color (TyMu Color (TySum _)), got: " ++ show desugared
+
+    it "leaves non-sum TyDef entries unchanged" $ do
+      let raw = TySig [TyDef "MyInt" (TyVar "int")]
+          desugared = desugarModuleTyp raw
+      desugared `shouldBe` TySig [TyDef "MyInt" (TyVar "int")]
+
+    it "desugars ValDecl types including those referencing the sum type" $ do
+      let raw = TySig [ TyDef "Color" (TySum [("Red", TyLit CoreFE.TyInt)])
+                      , ValDecl "paint" (TySum [("Red", TyLit CoreFE.TyInt)]) ]
+          desugared = desugarModuleTyp raw
+      case desugared of
+        TySig [TyDef "Color" (TyMu "Color" _), ValDecl "paint" (TySum _)] -> return ()
+        _ -> expectationFailure $ "Unexpected: " ++ show desugared
+
+    it "recurses into TyArrowM argument types" $ do
+      let innerSig = TySig [TyDef "Shape" (TySum [("Circle", TyLit CoreFE.TyInt)])]
+          raw = TyArrowM (TyModule innerSig) (TySig [ValDecl "x" (TyLit CoreFE.TyInt)])
+          desugared = desugarModuleTyp raw
+      case desugared of
+        TyArrowM (TyModule (TySig [TyDef "Shape" (TyMu "Shape" _)])) _ -> return ()
+        _ -> expectationFailure $ "Expected TyArrowM with desugared inner sig, got: " ++ show desugared
+
+    it "recurses into nested TyModule inside ValDecl" $ do
+      let innerSig = TySig [TyDef "T" (TySum [("A", TyLit CoreFE.TyInt)])]
+          raw = TySig [ValDecl "m" (TyModule innerSig)]
+          desugared = desugarModuleTyp raw
+      case desugared of
+        TySig [ValDecl "m" (TyModule (TySig [TyDef "T" (TyMu "T" _)]))] -> return ()
+        _ -> expectationFailure $ "Expected nested TyMu inside ValDecl TyModule, got: " ++ show desugared

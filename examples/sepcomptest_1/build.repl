@@ -1,4 +1,9 @@
--- sepcomptest_1: compile and link
+-- sepcomptest_1: two independent imports
+--
+--   math   utils
+--      \   /
+--      main
+--
 :sep-obj examples/sepcomptest_1/math.eml
 :sep-link examples/sepcomptest_1/math.emlo
 :sep-obj examples/sepcomptest_1/utils.eml
