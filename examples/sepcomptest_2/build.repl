@@ -1,0 +1,15 @@
+-- sepcomptest_2: three-level linear chain
+--
+--   consts
+--     │
+--   arith
+--     │
+--    app
+--
+:sep-obj examples/sepcomptest_2/consts.eml
+:sep-link examples/sepcomptest_2/consts.emlo
+:sep-obj examples/sepcomptest_2/arith.eml
+:sep-link examples/sepcomptest_2/arith.emlo examples/sepcomptest_2/consts.emle
+:sep-obj examples/sepcomptest_2/app.eml
+:sep-link examples/sepcomptest_2/app.emlo examples/sepcomptest_2/arith.emle
+:sep-eval examples/sepcomptest_2/app.emle

@@ -1,0 +1,17 @@
+-- sepcomptest_3: diamond dependency
+--
+--       base
+--      /    \
+--   evens   odds
+--      \    /
+--       main
+--
+:sep-obj examples/sepcomptest_3/base.eml
+:sep-link examples/sepcomptest_3/base.emlo
+:sep-obj examples/sepcomptest_3/evens.eml
+:sep-link examples/sepcomptest_3/evens.emlo examples/sepcomptest_3/base.emle
+:sep-obj examples/sepcomptest_3/odds.eml
+:sep-link examples/sepcomptest_3/odds.emlo examples/sepcomptest_3/base.emle
+:sep-obj examples/sepcomptest_3/main.eml
+:sep-link examples/sepcomptest_3/main.emlo examples/sepcomptest_3/evens.emle examples/sepcomptest_3/odds.emle
+:sep-eval examples/sepcomptest_3/main.emle

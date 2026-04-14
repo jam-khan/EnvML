@@ -1,0 +1,20 @@
+type Shape = Circle as int | Rect as {w : int, h : int} | Square as int;
+
+let area : Shape -> int =
+  fun (s : Shape) ->
+    case s of
+    | <Circle = r>   => r * r
+    | <Rect = dim>   => dim.w * dim.h
+    | <Square = s>   => s * s;
+
+let perimeter : Shape -> int =
+  fun (s : Shape) ->
+    case s of
+    | <Circle = r>   => r + r + r + r
+    | <Rect = dim>   => dim.w + dim.w + dim.h + dim.h
+    | <Square = s>   => s + s + s + s;
+
+let circle_area  : int = area(Circle(5) as Shape);
+let rect_area    : int = area(Rect({w = 3, h = 4}) as Shape);
+let square_area  : int = area(Square(6) as Shape);
+let circle_perim : int = perimeter(Circle(5) as Shape);

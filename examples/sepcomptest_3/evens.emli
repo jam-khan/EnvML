@@ -1,0 +1,3 @@
+val double : int -> int;
+val quad   : int -> int;
+val seed   : int;

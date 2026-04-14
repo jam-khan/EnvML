@@ -1,0 +1,3 @@
+val inc    : int -> int;
+val triple : int -> int;
+val seed   : int;

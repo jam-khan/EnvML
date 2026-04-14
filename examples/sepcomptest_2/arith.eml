@@ -1,0 +1,5 @@
+import consts;
+
+let add_pi  : int -> int = fun (x) -> x + consts.pi;
+let add_e   : int -> int = fun (x) -> x + consts.e;
+let scale   : int -> int = fun (x) -> x * consts.ten;

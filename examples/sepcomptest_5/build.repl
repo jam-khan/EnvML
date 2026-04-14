@@ -1,0 +1,11 @@
+-- sepcomptest_5: ADT (sum types + case) split across modules
+--
+--   shapes  (Shape ADT, area, perimeter, concrete values)
+--     │
+--   report  (combines results arithmetically)
+--
+:sep-obj examples/sepcomptest_5/shapes.eml
+:sep-link examples/sepcomptest_5/shapes.emlo
+:sep-obj examples/sepcomptest_5/report.eml
+:sep-link examples/sepcomptest_5/report.emlo examples/sepcomptest_5/shapes.emle
+:sep-eval examples/sepcomptest_5/report.emle

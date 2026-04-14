@@ -1,0 +1,5 @@
+val double : int -> int;
+val add    : int -> int -> int;
+val r1     : int;
+val r2     : int;
+val r3     : int;

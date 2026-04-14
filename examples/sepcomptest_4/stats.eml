@@ -1,0 +1,6 @@
+import core;
+
+let fact5  : int = core.fact(5);
+let fact10 : int = core.fact(10);
+let fib7   : int = core.fib(7);
+let fib10  : int = core.fib(10);

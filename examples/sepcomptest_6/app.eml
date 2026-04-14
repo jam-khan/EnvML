@@ -1,0 +1,8 @@
+import poly;
+
+let double : int -> int = fun (x : int) -> x + x;
+let add    : int -> int -> int = fun (x : int) (y : int) -> x + y;
+
+let r1 : int = (poly.id @int)(42);
+let r2 : int = (poly.apply_twice @int)(double)(3);
+let r3 : int = (poly.flip_args @int)(add)(10)(1);

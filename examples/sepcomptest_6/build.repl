@@ -1,0 +1,11 @@
+-- sepcomptest_6: polymorphic functions and type application
+--
+--   poly  (forall a. id, apply_twice, flip_args)
+--     │
+--    app  (instantiates with @int, computes results)
+--
+:sep-obj examples/sepcomptest_6/poly.eml
+:sep-link examples/sepcomptest_6/poly.emlo
+:sep-obj examples/sepcomptest_6/app.eml
+:sep-link examples/sepcomptest_6/app.emlo examples/sepcomptest_6/poly.emle
+:sep-eval examples/sepcomptest_6/app.emle

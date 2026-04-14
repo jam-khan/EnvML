@@ -1,0 +1,2 @@
+let add    : int -> int -> int = fun (x) -> fun (y) -> x + y;
+let square : int -> int = fun (x) -> x * x;

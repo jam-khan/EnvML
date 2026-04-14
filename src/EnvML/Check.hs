@@ -147,6 +147,8 @@ infer g (D.App e1 e2) = do
   TyArr a b <- infer g e1
   guard (check g e2 a)
   return b
+infer g (D.Lam name (Just t) e) = TyArr t <$> infer (TypeN name t : g) e
+infer _ (D.Lam _ Nothing _) = error "Cannot infer type of lambda parameter without explicit arg type annotation."
 infer g (D.TLam name e) = TyAll name <$> infer (KindN name : g) e
 infer g (D.TApp e t) = do
   TyAll name b <- infer g e

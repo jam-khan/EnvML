@@ -1,0 +1,8 @@
+let id : forall a. a -> a =
+  fun (type t) (x : t) -> x;
+
+let apply_twice : forall a. (a -> a) -> a -> a =
+  fun (type t) (f : t -> t) (x : t) -> f(f(x));
+
+let flip_args : forall a. (a -> a -> a) -> a -> a -> a =
+  fun (type t) (f : t -> t -> t) (x : t) (y : t) -> f(y)(x);

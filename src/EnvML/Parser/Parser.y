@@ -48,6 +48,7 @@ import Data.Char (isUpper)
   functor   { TokFunctor }
   struct    { TokStruct }
   link      { TokLink }
+  import    { TokImport }
   take      { TokTake }
   nil       { TokNil }
   list      { TokList }
@@ -118,6 +119,7 @@ ModuleStruct :: { Structure }
   | functor id FunArgs '=' ModuleExp ';' { FunctStruct $2 $3 Nothing $5   }
   | functor id FunArgs ':' ModuleTyp 
                        '=' ModuleExp ';' { FunctStruct $2 $3 (Just $5) $7 }
+  | import id                       ';' { Import $2 }
 
 Constructors :: { [(Name, Typ)] }
   : Constructor '|' Constructors { $1 : $3 }
