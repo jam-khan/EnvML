@@ -59,6 +59,7 @@ tokens :-
   "->"        { \_ -> TokArrow    }
   "->m"       { \_ -> TokArrowM   }
   "===>"      { \_ -> TokTripleArrow}
+  "++"        { \_ -> TokPlusPlus }
   "+"         { \_ -> TokPlus     }
   "-"         { \_ -> TokDash     }
   "*"         { \_ -> TokStar     }
@@ -122,6 +123,7 @@ data Token
   | TokColonEqual
   | TokLink
   | TokPlus
+  | TokPlusPlus
   | TokDash
   | TokStar
   deriving (Eq, Show)

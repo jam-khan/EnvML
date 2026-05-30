@@ -30,6 +30,7 @@ data ModuleTyp
   | ForallM   Name ModuleTyp  -- ∀t. I
   | TySig     Intf            -- (sig .. end)
   | TyVarM    Name            -- M
+  | MConcatT  ModuleTyp ModuleTyp -- X ++ Y  (signature concatenation)
   deriving (Show, Eq)
 
 type Intf = [IntfE]                    -- (sig ... end) .eli
@@ -61,6 +62,7 @@ data Module
   | MApp    Module Module   -- M1(M2)
   | MAppt   Module Typ      -- (M1 @A)
   | MAnno   Module ModuleTyp
+  | MConcat Module Module   -- m1 ++ m2  (module concatenation)
   deriving (Show, Eq)
 
 type Structures = [Structure]
@@ -105,10 +107,11 @@ data Exp
   deriving (Show, Eq)
 
 data BinOp
-  = Add   Exp Exp
-  | Sub   Exp Exp
-  | Mul   Exp Exp
-  | EqEq  Exp Exp
+  = Add    Exp Exp
+  | Sub    Exp Exp
+  | Mul    Exp Exp
+  | EqEq   Exp Exp
+  | Concat Exp Exp
   deriving (Eq, Show)
 
 type Precedence = Int
@@ -250,9 +253,11 @@ prettyModuleTyp (TyArrowM t m) =
   prettyTyp t ++ " ->m " ++ prettyModuleTyp m
 prettyModuleTyp (ForallM n m) = 
   "forall " ++ n ++ ". " ++ prettyModuleTyp m
-prettyModuleTyp (TySig intf) = 
+prettyModuleTyp (TySig intf) =
   "sig " ++ prettyIntf intf ++ " end"
 prettyModuleTyp (TyVarM n) = n
+prettyModuleTyp (MConcatT a b) =
+  prettyModuleTyp a ++ " ++ " ++ prettyModuleTyp b
 
 -- Type pretty printing
 prettyTyp :: Typ -> String
@@ -311,6 +316,8 @@ prettyModule (MAppt m t) =
   prettyModule m ++ " @" ++ prettyTyp t
 prettyModule (MAnno m1 mty) =
   "(" ++ prettyModule m1 ++ " :: " ++ prettyModuleTyp mty ++ ")"
+prettyModule (MConcat m1 m2) =
+  prettyModule m1 ++ " ++ " ++ prettyModule m2
 
 -- Expression pretty printing
 prettyExp :: Exp -> String
@@ -353,3 +360,4 @@ prettyExp (BinOp (Add e1 e2)) = prettyExp e1 ++ " + " ++ prettyExp e2
 prettyExp (BinOp (Sub e1 e2)) = prettyExp e1 ++ " - " ++ prettyExp e2
 prettyExp (BinOp (Mul e1 e2)) = prettyExp e1 ++ " * " ++ prettyExp e2
 prettyExp (BinOp (EqEq e1 e2)) = prettyExp e1 ++ " == " ++ prettyExp e2
+prettyExp (BinOp (Concat e1 e2)) = prettyExp e1 ++ " ++ " ++ prettyExp e2

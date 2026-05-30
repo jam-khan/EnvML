@@ -40,6 +40,10 @@ toNamelessExp eNames tNames e =
       Nameless.App
         (toNamelessExp eNames tNames e1)
         (toNamelessExp eNames tNames e2)
+    (Named.Concat e1 e2) ->
+      Nameless.Concat
+        (toNamelessExp eNames tNames e1)
+        (toNamelessExp eNames tNames e2)
     (Named.TLam n e1)    ->
       Nameless.TLam (toNamelessExp eNames (n:tNames) e1)
     (Named.TClos env e1) ->

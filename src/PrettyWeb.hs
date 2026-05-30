@@ -60,6 +60,7 @@ prettyEnvMLModuleShort (EnvML.Struct _) = "struct ... end"
 prettyEnvMLModuleShort (EnvML.MApp m1 m2) = prettyEnvMLModuleShort m1 ++ "(" ++ prettyEnvMLModuleShort m2 ++ ")"
 prettyEnvMLModuleShort (EnvML.MAppt m t) = prettyEnvMLModuleShort m ++ " @" ++ EnvML.prettyTyp t
 prettyEnvMLModuleShort (EnvML.MAnno m mt) = "(" ++ prettyEnvMLModuleShort m ++ " : " ++ EnvML.prettyModuleTyp mt ++ ")"
+prettyEnvMLModuleShort (EnvML.MConcat m1 m2) = prettyEnvMLModuleShort m1 ++ " ++ " ++ prettyEnvMLModuleShort m2
 
 prettyEnvMLExpShort :: EnvML.Exp -> String
 prettyEnvMLExpShort (EnvML.Lit l) = prettyLiteral l
@@ -112,6 +113,7 @@ prettyNamedExpShort (Named.FEnv env) = prettyNamedEnvShort env
 prettyNamedExpShort (Named.Anno e _) = prettyNamedExpShort e
 prettyNamedExpShort (Named.EList es) = foldr (\e acc -> acc ++ prettyNamedExpShort e ++ ",") "" es
 prettyNamedExpShort (Named.ETake i e) = "take(" ++ show i ++ "," ++ prettyNamedExpShort e ++ ")"
+prettyNamedExpShort (Named.Concat e1 e2) = prettyNamedExpShort e1 ++ " ++ " ++ prettyNamedExpShort e2
 
 
 prettyNamedEnvShort :: Named.Env -> String
@@ -164,6 +166,7 @@ prettyDeBruijnExpShort (CoreFE.Anno e _) = prettyDeBruijnExpShort e
 prettyDeBruijnExpShort (CoreFE.BinOp op) = prettyDeBruijnBinOpShort op
 prettyDeBruijnExpShort (CoreFE.EList es) = foldr (\e acc -> acc ++ prettyDeBruijnExpShort e ++ ",") "" es
 prettyDeBruijnExpShort (CoreFE.ETake i e) = "take(" ++ show i ++ "," ++ prettyDeBruijnExpShort e ++ ")"
+prettyDeBruijnExpShort (CoreFE.Concat e1 e2) = prettyDeBruijnExpShort e1 ++ " ++ " ++ parenIf (needsParenCore e2) (prettyDeBruijnExpShort e2)
 
 
 prettyDeBruijnBinOpShort :: CoreFE.BinOp -> String
@@ -206,6 +209,7 @@ prettyDeBruijnExp (CoreFE.Anno e t) = parenIf (needsParenCore e) (prettyDeBruijn
 prettyDeBruijnExp (CoreFE.BinOp op) = prettyDeBruijnBinOp op
 prettyDeBruijnExp (CoreFE.EList es) = foldr (\e acc -> acc ++ prettyDeBruijnExpShort e ++ ",") "" es
 prettyDeBruijnExp (CoreFE.ETake i e) = "take(" ++ show i ++ "," ++ prettyDeBruijnExpShort e ++ ")"
+prettyDeBruijnExp (CoreFE.Concat e1 e2) = prettyDeBruijnExp e1 ++ " ++ " ++ parenIf (needsParenCore e2) (prettyDeBruijnExp e2)
 
 
 prettyDeBruijnBinOp :: CoreFE.BinOp -> String

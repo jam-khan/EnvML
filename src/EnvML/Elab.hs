@@ -26,6 +26,8 @@ elabModuleExp modl =
       CoreFE.TApp (elabModuleExp m1) (elabTyp a)
     EnvML.MAnno m mty       ->
       CoreFE.Anno (elabModuleExp m) (elabModTyp mty)
+    EnvML.MConcat m1 m2     ->
+      CoreFE.Concat (elabModuleExp m1) (elabModuleExp m2)
   
 
 -- Functors elaboration
@@ -175,6 +177,16 @@ elabModTyp mty =
       CoreFE.TyEnvt (elabIntf intf)
     (EnvML.TyVarM name)       ->
       CoreFE.TyVar name
+    (EnvML.MConcatT x y)      ->
+      -- Flat signature concatenation: append the two type environments,
+      -- with Y on the head side to match the term-level Concat ordering.
+      CoreFE.TyEnvt (tyEnvOf (elabModTyp y) ++ tyEnvOf (elabModTyp x))
+
+-- | View a (module) type as a type environment. Signatures are TyEnvt;
+--   anything else is treated as a single anonymous entry.
+tyEnvOf :: CoreFE.Typ -> CoreFE.TyEnv
+tyEnvOf (CoreFE.TyEnvt g) = g
+tyEnvOf t                 = [CoreFE.Type "_" t]
 
 elabIntf :: EnvML.Intf -> CoreFE.TyEnv
 elabIntf = reverse . map elabIntfE

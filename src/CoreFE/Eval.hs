@@ -45,6 +45,10 @@ eval env = go
       Clos env' e <- eval env e1
       v2 <- eval env e2
       eval (ExpE v2 : env') e
+    go (Concat e1 e2) = do
+      FEnv v1 <- eval env e1
+      FEnv v2 <- eval env e2
+      pure $ FEnv (v2 ++ v1)
     go (TLam e) = pure $ TClos env e
     go e@(TClos _ _) = pure e
     go (TApp e a) = do

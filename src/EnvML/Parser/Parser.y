@@ -63,6 +63,7 @@ import qualified CoreFE.Syntax as CoreFE
   '<'       { TokLAngle }
   '>'       { TokRAngle }
   '+'       { TokPlus   }
+  '++'      { TokPlusPlus }
   '-'       { TokDash   }
   '*'       { TokStar   }
 
@@ -127,6 +128,7 @@ ModuleExp :: { Module }
   : struct ModuleStructs end              { Struct  $2 }
   | ModuleExp '(' ModuleExp ')'           { MApp    $1 $3 }
   | ModuleExp '@' Typ                     { MAppt   $1 $3 }
+  | ModuleExp '++' ModuleExp              { MConcat $1 $3 }
   | functor FunArgs '->' ModuleExp        { Functor $2 $4 }
   | id                                    { VarM    $1 }
   | '(' ModuleExp ')'                     { $2 }
@@ -212,6 +214,7 @@ ModuleTyp :: { ModuleTyp }
   | '(' Typ ')' '->m' ModuleTyp           { TyArrowM $2 $5 }
   | '(' ModuleTyp ')' '->m' ModuleTyp     { TyArrowM (TyModule $2) $5 }
   | '(' ModuleTyp ')'                     { $2 }
+  | ModuleTyp '++' ModuleTyp              { MConcatT $1 $3 }
   | id                                    { TyVarM $1 }
 
 TyCtx :: { TyCtx }

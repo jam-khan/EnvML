@@ -27,6 +27,7 @@ data Exp
   | RProj Exp String
   | FEnv  Env
   | Anno  Exp Typ
+  | Concat Exp Exp      -- e1 ++ e2  (environment concatenation)
   -- List primitives
   | EList  [Exp]        -- [e1, e2, e3]
   | ETake  Int Exp      -- take(n, ls)
@@ -133,6 +134,9 @@ prettyExp (Anno e t) =
 prettyExp (EList []) = "List[]"
 prettyExp (EList es) = "List[" ++ intercalate ", " (map prettyExp es) ++ "]"
 prettyExp (ETake n ls) = "take(" ++ show n ++ ", " ++ prettyExp ls ++ ")"
+prettyExp (Concat e1 e2) =
+    parenIf (needsParenExp e1) (prettyExp e1) ++ " ++ "
+    ++ parenIf (needsParenExp e2) (prettyExp e2)
 
 needsParenExp :: Exp -> Bool
 needsParenExp (App _ _) = True

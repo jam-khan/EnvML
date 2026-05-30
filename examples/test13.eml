@@ -1,0 +1,27 @@
+module m1 :
+  sig
+    type A = int;
+    val x : A -> A;
+  end = struct
+          type A = int;
+          let x : A -> A = fun (a) -> a;
+        end;
+
+module m2 :
+  sig
+    type B = string;
+    val y : B -> B;
+  end = struct
+          type B = string;
+          let y : B -> B = fun (b) -> b;
+        end;
+
+module m3 :
+  ( sig type A = int;    val x : A -> A; end
+    ++
+    sig type B = string; val y : B -> B; end )
+  = m1 ++ m2;
+
+-- Project components that came from both halves of the merge.
+let useX : int    = (m3.x :: int -> int)(42);
+let useY : string = (m3.y :: string -> string)("hi");
