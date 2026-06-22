@@ -123,28 +123,31 @@ spec = do
       let named = elabModule m
       named `shouldBe` Named.Var "M"
 
+    -- Modules are sandboxed: every standalone struct / whole functor elaborates
+    -- to an empty-environment box ([] ▷ e). A functor's body struct stays unboxed
+    -- (it sits inside the functor's box).
     it "elaborates simple struct with let" $ do
       let input = "let x = 1;"
       let parsed = parseModule (lexer input)
       let named = elabModule parsed
-      named `shouldBe` Named.FEnv [Named.ModE "x" (Named.Lit (CoreFE.LitInt 1))]
+      named `shouldBe` Named.Box [] (Named.FEnv [Named.ModE "x" (Named.Lit (CoreFE.LitInt 1))])
 
     it "elaborates functor with term argument" $ do
       let m = Src.Functor [("x", Src.TmArgType (Src.TyLit CoreFE.TyInt))]
                           (Src.Struct [])
       let named = elabModule m
-      named `shouldBe` Named.Lam "x" (Named.FEnv [])
+      named `shouldBe` Named.Box [] (Named.Lam "x" (Named.FEnv []))
 
     it "elaborates functor with type argument" $ do
       let m = Src.Functor [("t", Src.TyArg)] (Src.Struct [])
       let named = elabModule m
-      named `shouldBe` Named.TLam "t" (Named.FEnv [])
+      named `shouldBe` Named.Box [] (Named.TLam "t" (Named.FEnv []))
 
     it "elaborates multi-arg functor to nested" $ do
       let m = Src.Functor [("t", Src.TyArg), ("x", Src.TmArgType (Src.TyVar "t"))]
                           (Src.Struct [])
       let named = elabModule m
-      named `shouldBe` Named.TLam "t" (Named.Lam "x" (Named.FEnv []))
+      named `shouldBe` Named.Box [] (Named.TLam "t" (Named.Lam "x" (Named.FEnv [])))
 
   describe "De Bruijn Conversion" $ do
     

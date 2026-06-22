@@ -58,6 +58,14 @@ lookt (Kind : t) x = tshift 0 <$> lookt t (x - 1)
 concrete :: TyEnv -> Bool
 concrete g = all (/= Kind) g
 
+-- | An empty-environment box is transparent: [] ▷ A ≡ A.
+--   Sandboxed modules elaborate to [] ▷ e, so their types are []-boxed; a
+--   sandboxed module's type is necessarily closed, hence peeling is sound.
+--   Used at elimination sites so boxed modules stay directly usable.
+unbox :: Typ -> Typ
+unbox (TyBoxT [] a) = unbox a
+unbox a             = a
+
 teq :: TyEnv -> Typ -> Typ -> TyEnv -> Bool
 teq _ (TyLit a) (TyLit b) _ = a == b
 teq g1 (TyVar x) b g2 =
@@ -155,12 +163,12 @@ infer _ (Lit lit) = pure $ TyLit $ inferLit lit
     inferLit (LitStr _) = TyStr
 infer g (Var x) = getVar g x
 infer g (App e1 e2) = do
-  TyArr a b <- infer g e1
+  TyArr a b <- unbox <$> infer g e1
   guard (check g e2 a)
   return b
 infer g (TLam e) = TyAll <$> infer (Kind : g) e
 infer g (TApp e t) = do
-  TyAll b <- infer g e
+  TyAll b <- unbox <$> infer g e
   return (TySubstT t b)
 infer g (Box d e) = do
   TyEnvt g1 <- infer g (FEnv d)
@@ -175,7 +183,7 @@ infer g (FEnv (TypE t : d)) = do
   return (TyEnvt (TypeEq t : g1))
 infer g (Rec l e) = TyRcd l <$> infer g e
 infer g (RProj e l) = do
-  TyEnvt g1 <- infer g e
+  TyEnvt g1 <- unbox <$> infer g e
   rlk g1 l
 infer g (Anno e t) =
   if check g e t then Just t else Nothing
@@ -212,8 +220,8 @@ infer g (ETake _ e) = do
 -- e2 (the right operand) goes on the head side to match the source ordering
 -- (m1 ++ m2 ~> e2's entries then e1's), and the evaluator's v2 ++ v1.
 infer g (Concat e1 e2) = do
-  TyEnvt g1 <- infer g e1
-  TyEnvt g2 <- infer g e2
+  TyEnvt g1 <- unbox <$> infer g e1
+  TyEnvt g2 <- unbox <$> infer g e2
   return (TyEnvt (g2 ++ g1))
 
 infer _ _ = Nothing
@@ -237,6 +245,13 @@ check g (App e1 e2) tyB   =
 -- List checking
 check _ (EList []) (TyList _) = True  -- Empty list checks against any list type
 check g (EList es) (TyList t) = all (\e -> check g e t) es
+
+-- Sandboxed module: [] ▷ e is transparent. The body e is closed (De Bruijn
+-- converted it under the empty box env), so it ignores g; we keep g only so the
+-- expected type t can still resolve ambient type aliases (e.g. module-type
+-- names like POLICY). This handles annotated functors ([] ▷ λ…) whose body
+-- lambda is checkable but not inferable. Non-empty box expressions don't match.
+check g (Box [] e) t = check g e t
 
 check g e t =
   case infer g e of

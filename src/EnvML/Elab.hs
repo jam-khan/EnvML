@@ -17,9 +17,11 @@ elabModuleExp ::
 elabModuleExp modl =
   case modl of
     EnvML.VarM name         -> CoreFE.Var name
-    EnvML.Functor args m    -> elabFunctor args m
+    -- Sandbox: a standalone struct / whole functor elaborates to an
+    -- empty-environment box [] ▷ e, isolating it from the ambient context.
+    EnvML.Functor args m    -> box0 (elabFunctorBody args m)
     EnvML.Struct structs    ->
-      CoreFE.FEnv $ elabStructures structs
+      box0 (CoreFE.FEnv $ elabStructures structs)
     EnvML.MApp m1 m2        ->
       CoreFE.App (elabModuleExp m1) (elabModuleExp m2)
     EnvML.MAppt m1 a        ->
@@ -28,19 +30,33 @@ elabModuleExp modl =
       CoreFE.Anno (elabModuleExp m) (elabModTyp mty)
     EnvML.MConcat m1 m2     ->
       CoreFE.Concat (elabModuleExp m1) (elabModuleExp m2)
-  
 
--- Functors elaboration
-elabFunctor :: EnvML.FunArgs -> EnvML.Module -> CoreFE.Exp
-elabFunctor [] body = elabModuleExp body
-elabFunctor ((name, arg):rest) body =
-  let restExp = elabFunctor rest body
+-- Wrap a core term in an empty-environment box (the sandbox wrapper).
+box0 :: CoreFE.Exp -> CoreFE.Exp
+box0 = CoreFE.Box []
+
+-- Functors elaboration: nested lambdas. The box is placed by the caller AROUND
+-- the whole functor (so the λ/Λ binders sit inside the box and rebind the body's
+-- free vars). The functor's body is elaborated RAW via elabBodyRaw so a body
+-- struct is NOT separately boxed (that would re-sever the params).
+elabFunctorBody :: EnvML.FunArgs -> EnvML.Module -> CoreFE.Exp
+elabFunctorBody [] body = elabBodyRaw body
+elabFunctorBody ((name, arg):rest) body =
+  let restExp = elabFunctorBody rest body
   in  case arg of
         EnvML.TyArg -> CoreFE.TLam name restExp
         EnvML.TmArg -> CoreFE.Lam  name restExp
         EnvML.TmArgType _ ->
           -- NOTE: We ignore type annotations on parameters for now
           CoreFE.Lam name restExp
+
+-- Elaborate a functor body WITHOUT adding an outer sandbox box: a struct body
+-- and nested functor stay unboxed (covered by the enclosing functor's box);
+-- everything else delegates to elabModuleExp (which adds no box for those forms).
+elabBodyRaw :: EnvML.Module -> CoreFE.Exp
+elabBodyRaw (EnvML.Struct structs) = CoreFE.FEnv $ elabStructures structs
+elabBodyRaw (EnvML.Functor args m) = elabFunctorBody args m
+elabBodyRaw other                  = elabModuleExp other
 
 -- Structures elaboration
 elabStructures :: EnvML.Structures -> CoreFE.Env
@@ -64,8 +80,8 @@ elabStructure struct =
         Just mty  -> CoreFE.ModE name (CoreFE.Anno (elabModuleExp mod1) (elabModTyp mty))       
     (EnvML.FunctStruct name args maybeTyp mod1) ->
       case maybeTyp of
-        Nothing   -> CoreFE.ModE name (elabFunctor args mod1)
-        Just mty  -> CoreFE.ModE name (CoreFE.Anno (elabFunctor args mod1) (elabModTyp mty))
+        Nothing   -> CoreFE.ModE name (box0 (elabFunctorBody args mod1))
+        Just mty  -> CoreFE.ModE name (CoreFE.Anno (box0 (elabFunctorBody args mod1)) (elabModTyp mty))
   
 elabExp :: EnvML.Exp -> CoreFE.Exp
 elabExp e = 
