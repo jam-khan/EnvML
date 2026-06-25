@@ -8,9 +8,7 @@
 -- to [] ▷ (λ processor. ...): it has no ambient authority and can act only
 -- through its `processor` parameter — the capability granted by application.
 
--- ============================================================
 -- (1) FIRST-CLASS MODULES
--- ============================================================
 
 module type ACCESS_POLICY =
   forall t. sig val reshape : list t -> list t; end;
@@ -34,9 +32,7 @@ module MakeQuery :
 module previewQuery = MakeQuery(previewPolicy);
 module mockQuery    = MakeQuery(mockPolicy);
 
--- ============================================================
 -- (2) DYNAMIC MODULE COMPOSITION  (dependent merge `+`)
--- ============================================================
 -- The audit fragment's `report` depends on the base's `process`.
 
 module previewProcessor = previewQuery + struct
@@ -51,9 +47,7 @@ module mockProcessor = mockQuery + struct
     fun (xs) -> length((mockQuery.process :: list int -> list int)(xs)) < length(xs);
 end;
 
--- ============================================================
 -- (3) SANDBOXING AS CAPABILITIES  (a sandboxed functor, no box)
--- ============================================================
 -- executeQuery's only authority is `processor`; it runs the composed report.
 
 module executeQuery :
