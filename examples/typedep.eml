@@ -1,0 +1,16 @@
+-- Type-level dependency via the dependent merge `+` of two literal structs.
+--
+-- The right struct's `type b = a` refers to the left struct's `type a` by BARE
+-- name. Because two literal structs flatten into ONE environment (FE's
+-- dependent merge ∆, e), later declarations see earlier ones -- so `b` resolves
+-- to `a` (= int). This is type-level dependency, available at define time.
+-- (For a dynamic `M + struct ...` with an opaque M, term-level dependency works
+--  via projection M.field, but type-level would need type projection M.t.)
+
+module m =
+  struct type a = int; end
+  +
+  struct type b = a; let y : b = 7; end;
+
+-- y has type b = a = int, so it is usable as an int.
+let useY : int = box [mm = m] in (mm.y :: int);

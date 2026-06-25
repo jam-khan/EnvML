@@ -133,6 +133,7 @@ ModuleExp :: { Module }
   | ModuleExp '(' ModuleExp ')'           { MApp    $1 $3 }
   | ModuleExp '@' Typ                     { MAppt   $1 $3 }
   | ModuleExp '++' ModuleExp              { MConcat $1 $3 }
+  | ModuleExp '+' ModuleExp               { MDepConcat $1 $3 }
   | functor FunArgs '->' ModuleExp        { Functor $2 $4 }
   | id                                    { VarM    $1 }
   | '(' ModuleExp ')'                     { $2 }

@@ -1,0 +1,55 @@
+-- Section 2.4, dependent-merge variant.
+--
+-- Two merge operators, matching FE's two merge modes:
+--   ++  independent merge  (both operands closed/sandboxed; FE's value-env δ)
+--   +   dependent  merge  (right fragment may depend on the context; FE's ∆, e)
+--
+-- With `+`, the inline `struct` fragment is NOT sandboxed, so it can reference
+-- the earlier module. Following FE, that reference is a PROJECTION
+-- (previewQuery.process) — FE accesses earlier entries by index + projection;
+-- it has no implicit `open`, so there is no bare `process`.
+
+module type ACCESS_POLICY =
+  forall t. sig val reshape : list t -> list t; end;
+
+module previewPolicy : ACCESS_POLICY =
+  functor (type t) -> struct let reshape : list t -> list t = fun (ls) -> take(2, ls); end;
+
+module mockPolicy : ACCESS_POLICY =
+  functor (type t) -> struct let reshape : list t -> list t = fun (ls) -> ls; end;
+
+module MakeQuery :
+  (forall t. sig val reshape : list t -> list t; end)
+  ->m (sig type a = int; val process : list a -> list a; end) =
+  functor (s) ->
+    struct
+      type a = int;
+      let process : list a -> list a =
+        ((s @a) :: sig val reshape : list int -> list int; end).reshape;
+    end;
+
+module previewQuery = MakeQuery(previewPolicy);
+module mockQuery    = MakeQuery(mockPolicy);
+
+-- (2) DYNAMIC COMPOSITION via the dependent merge `+`.
+-- The inline audit fragment depends on the base's `process`.
+module previewProcessor = previewQuery + struct
+  type b = bool;
+  let report : list int -> b =
+    fun (xs) -> length((previewQuery.process :: list int -> list int)(xs)) < length(xs);
+end;
+
+module mockProcessor = mockQuery + struct
+  type b = bool;
+  let report : list int -> b =
+    fun (xs) -> length((mockQuery.process :: list int -> list int)(xs)) < length(xs);
+end;
+
+-- (3) SANDBOXING via explicit box (body is an expression).
+let runReport :
+  ( sig type a = int; val process : list a -> list a; type b = bool; val report : list int -> b; end ) -> bool =
+  fun (processor) ->
+    box [proc = processor] in (proc.report :: list int -> bool)(List[3, 1, 2]) :: bool;
+
+let previewResult : bool = runReport(previewProcessor);   -- preview truncates 3 -> 2, so true
+let mockResult    : bool = runReport(mockProcessor);      -- mock keeps all 3,        so false

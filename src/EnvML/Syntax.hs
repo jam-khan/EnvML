@@ -62,7 +62,8 @@ data Module
   | MApp    Module Module   -- M1(M2)
   | MAppt   Module Typ      -- (M1 @A)
   | MAnno   Module ModuleTyp
-  | MConcat Module Module   -- m1 ++ m2  (module concatenation)
+  | MConcat Module Module   -- m1 ++ m2  (independent merge; both operands closed)
+  | MDepConcat Module Module -- m1 + m2  (dependent merge; right fragment may depend on the context)
   deriving (Show, Eq)
 
 type Structures = [Structure]
@@ -321,6 +322,8 @@ prettyModule (MAnno m1 mty) =
   "(" ++ prettyModule m1 ++ " :: " ++ prettyModuleTyp mty ++ ")"
 prettyModule (MConcat m1 m2) =
   prettyModule m1 ++ " ++ " ++ prettyModule m2
+prettyModule (MDepConcat m1 m2) =
+  prettyModule m1 ++ " + " ++ prettyModule m2
 
 -- Expression pretty printing
 prettyExp :: Exp -> String

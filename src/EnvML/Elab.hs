@@ -30,6 +30,18 @@ elabModuleExp modl =
       CoreFE.Anno (elabModuleExp m) (elabModTyp mty)
     EnvML.MConcat m1 m2     ->
       CoreFE.Concat (elabModuleExp m1) (elabModuleExp m2)
+    -- Dependent merge `m1 + m2` (FE's ∆, e), vs `++` (closed δ-merge).
+    -- When BOTH operands are literal structs, flatten their declaration lists
+    -- into ONE (un-boxed) environment: the right struct's fields then see the
+    -- left struct's fields by NAME (the calculus's dependent merge, where later
+    -- entries see earlier ones). No signature needed — the decls are in hand.
+    EnvML.MDepConcat (EnvML.Struct s1) (EnvML.Struct s2) ->
+      CoreFE.FEnv (elabStructures (s1 ++ s2))
+    -- Otherwise the left is opaque (a variable/application): we can't splice its
+    -- fields by name, so the right fragment (elaborated RAW, un-boxed) depends on
+    -- the left by PROJECTION (e.g. m1.field), FE-style index+projection.
+    EnvML.MDepConcat m1 m2  ->
+      CoreFE.Concat (elabModuleExp m1) (elabBodyRaw m2)
 
 -- Wrap a core term in an empty-environment box (the sandbox wrapper).
 box0 :: CoreFE.Exp -> CoreFE.Exp

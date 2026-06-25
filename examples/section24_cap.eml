@@ -1,0 +1,64 @@
+-- Section 2.4 — sandboxing framed as object-capabilities.
+--
+-- A module is sandboxed by construction: it elaborates to an empty-env box
+-- [] ▷ ... and therefore has NO ambient authority. A FUNCTOR is thus a
+-- capability transformer: the only thing it can use is what it is handed as a
+-- parameter. `runReport` below cannot reach previewQuery, MakeQuery, or any
+-- other binding in the program — its entire authority is the `processor` it is
+-- applied to. Applying it grants exactly that capability and nothing more.
+--
+-- (This replaces the `box [proc = processor] in ...` form: the box also grants
+--  one binding into a sandboxed body, but the sandboxed functor is the
+--  first-class, reusable version — and needs no box construct.)
+
+module type ACCESS_POLICY =
+  forall t. sig val reshape : list t -> list t; end;
+
+module previewPolicy : ACCESS_POLICY =
+  functor (type t) -> struct let reshape : list t -> list t = fun (ls) -> take(2, ls); end;
+
+module mockPolicy : ACCESS_POLICY =
+  functor (type t) -> struct let reshape : list t -> list t = fun (ls) -> ls; end;
+
+module MakeQuery :
+  (forall t. sig val reshape : list t -> list t; end)
+  ->m (sig type a = int; val process : list a -> list a; end) =
+  functor (s) ->
+    struct
+      type a = int;
+      let process : list a -> list a =
+        ((s @a) :: sig val reshape : list int -> list int; end).reshape;
+    end;
+
+module previewQuery = MakeQuery(previewPolicy);
+module mockQuery    = MakeQuery(mockPolicy);
+
+-- (2) dynamic composition via dependent merge `+`
+module previewProcessor = previewQuery + struct
+  type b = bool;
+  let report : list int -> b =
+    fun (xs) -> length((previewQuery.process :: list int -> list int)(xs)) < length(xs);
+end;
+
+module mockProcessor = mockQuery + struct
+  type b = bool;
+  let report : list int -> b =
+    fun (xs) -> length((mockQuery.process :: list int -> list int)(xs)) < length(xs);
+end;
+
+-- (3) sandboxing as a capability transformer: a functor whose ONLY authority is
+-- its `processor` parameter. The body can call `processor.report` and nothing
+-- ambient. No `box` needed — the functor is sandboxed by construction.
+module runReport :
+  ( sig type a = int; val process : list a -> list a; type b = bool; val report : list int -> b; end )
+  ->m ( sig val result : bool; end )
+  = functor (processor) ->
+      struct
+        let result : bool = (processor.report :: list int -> bool)(List[3, 1, 2]);
+      end;
+
+module previewRun = runReport(previewProcessor);
+module mockRun    = runReport(mockProcessor);
+
+let previewResult : bool = previewRun.result;   -- preview truncates 3 -> 2, so true
+let mockResult    : bool = mockRun.result;       -- mock keeps all 3,        so false

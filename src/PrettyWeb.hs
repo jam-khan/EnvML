@@ -61,6 +61,7 @@ prettyEnvMLModuleShort (EnvML.MApp m1 m2) = prettyEnvMLModuleShort m1 ++ "(" ++ 
 prettyEnvMLModuleShort (EnvML.MAppt m t) = prettyEnvMLModuleShort m ++ " @" ++ EnvML.prettyTyp t
 prettyEnvMLModuleShort (EnvML.MAnno m mt) = "(" ++ prettyEnvMLModuleShort m ++ " : " ++ EnvML.prettyModuleTyp mt ++ ")"
 prettyEnvMLModuleShort (EnvML.MConcat m1 m2) = prettyEnvMLModuleShort m1 ++ " ++ " ++ prettyEnvMLModuleShort m2
+prettyEnvMLModuleShort (EnvML.MDepConcat m1 m2) = prettyEnvMLModuleShort m1 ++ " + " ++ prettyEnvMLModuleShort m2
 
 prettyEnvMLExpShort :: EnvML.Exp -> String
 prettyEnvMLExpShort (EnvML.Lit l) = prettyLiteral l

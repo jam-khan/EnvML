@@ -1,0 +1,69 @@
+-- Section 2.4 — the full overview, three features in one pipeline:
+--   (1) first-class modules        : MakeQuery is a module-to-module functor
+--   (2) dynamic module composition : previewProcessor = base + audit-fragment (the `+` dependent merge)
+--   (3) sandboxing as capabilities : executeQuery is a sandboxed functor whose
+--                                     ONLY authority is the processor it is handed
+--
+-- (3) consumes the module composed in (2) and runs it. executeQuery elaborates
+-- to [] ▷ (λ processor. ...): it has no ambient authority and can act only
+-- through its `processor` parameter — the capability granted by application.
+
+-- ============================================================
+-- (1) FIRST-CLASS MODULES
+-- ============================================================
+
+module type ACCESS_POLICY =
+  forall t. sig val reshape : list t -> list t; end;
+
+module previewPolicy : ACCESS_POLICY =
+  functor (type t) -> struct let reshape : list t -> list t = fun (ls) -> take(2, ls); end;
+
+module mockPolicy : ACCESS_POLICY =
+  functor (type t) -> struct let reshape : list t -> list t = fun (ls) -> ls; end;
+
+module MakeQuery :
+  (forall t. sig val reshape : list t -> list t; end)
+  ->m (sig type a = int; val process : list a -> list a; end) =
+  functor (s) ->
+    struct
+      type a = int;
+      let process : list a -> list a =
+        ((s @a) :: sig val reshape : list int -> list int; end).reshape;
+    end;
+
+module previewQuery = MakeQuery(previewPolicy);
+module mockQuery    = MakeQuery(mockPolicy);
+
+-- ============================================================
+-- (2) DYNAMIC MODULE COMPOSITION  (dependent merge `+`)
+-- ============================================================
+-- The audit fragment's `report` depends on the base's `process`.
+
+module previewProcessor = previewQuery + struct
+  type b = bool;
+  let report : list int -> b =
+    fun (xs) -> length((previewQuery.process :: list int -> list int)(xs)) < length(xs);
+end;
+
+module mockProcessor = mockQuery + struct
+  type b = bool;
+  let report : list int -> b =
+    fun (xs) -> length((mockQuery.process :: list int -> list int)(xs)) < length(xs);
+end;
+
+-- ============================================================
+-- (3) SANDBOXING AS CAPABILITIES  (a sandboxed functor, no box)
+-- ============================================================
+-- executeQuery's only authority is `processor`; it runs the composed report.
+
+module executeQuery :
+  ( sig type a = int; val process : list a -> list a; type b = bool; val report : list int -> b; end )
+  ->m ( sig val input : list int; val result : bool; end )
+  = functor (processor) ->
+      struct
+        let input  : list int = List[3, 1, 2];
+        let result : bool      = processor.report(input);   -- only authority: the param
+      end;
+
+let previewResult : bool = executeQuery(previewProcessor).result;   -- preview truncates 3 -> 2, so true
+let mockResult    : bool = executeQuery(mockProcessor).result;       -- mock keeps all 3,        so false
