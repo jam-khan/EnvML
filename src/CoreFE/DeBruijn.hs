@@ -72,6 +72,24 @@ toNamelessExp eNames tNames e =
       Nameless.EList (map (toNamelessExp eNames tNames) es)
     (Named.ETake i e1)    ->
       Nameless.ETake i (toNamelessExp eNames tNames e1)
+    (Named.ELength e1)    ->
+      Nameless.ELength (toNamelessExp eNames tNames e1)
+    (Named.BinOp op)      ->
+      Nameless.BinOp (toNamelessBinOp eNames tNames op)
+
+toNamelessBinOp ::
+  ExpNames
+  -> TypNames
+  -> Named.BinOp
+  -> Nameless.BinOp
+toNamelessBinOp eNames tNames op =
+  let conv = toNamelessExp eNames tNames
+  in case op of
+       Named.Add      a b -> Nameless.Add      (conv a) (conv b)
+       Named.Sub      a b -> Nameless.Sub      (conv a) (conv b)
+       Named.Mul      a b -> Nameless.Mul      (conv a) (conv b)
+       Named.EqEq     a b -> Nameless.EqEq     (conv a) (conv b)
+       Named.LessThan a b -> Nameless.LessThan (conv a) (conv b)
 
 envToExpNames ::
   Named.Env

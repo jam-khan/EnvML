@@ -112,10 +112,20 @@ elabExp e =
     (EnvML.Anno e1 ty)      ->
       CoreFE.Anno (elabExp e1) (elabTyp ty)
     (EnvML.Mod m)           -> elabModuleExp m
-    (EnvML.BinOp op)        ->
-      error $ "TODO: Binary operators to be supported " ++ show op
+    (EnvML.BinOp op)        -> elabBinOp op
     (EnvML.EList es)        -> CoreFE.EList (map elabExp es)
     (EnvML.ETake i e1)      -> CoreFE.ETake i (elabExp e1)
+    (EnvML.ELength e1)      -> CoreFE.ELength (elabExp e1)
+
+elabBinOp :: EnvML.BinOp -> CoreFE.Exp
+elabBinOp op =
+  case op of
+    EnvML.Add    e1 e2 -> CoreFE.BinOp (CoreFE.Add      (elabExp e1) (elabExp e2))
+    EnvML.Sub    e1 e2 -> CoreFE.BinOp (CoreFE.Sub      (elabExp e1) (elabExp e2))
+    EnvML.Mul    e1 e2 -> CoreFE.BinOp (CoreFE.Mul      (elabExp e1) (elabExp e2))
+    EnvML.EqEq   e1 e2 -> CoreFE.BinOp (CoreFE.EqEq     (elabExp e1) (elabExp e2))
+    EnvML.LessThan e1 e2 -> CoreFE.BinOp (CoreFE.LessThan (elabExp e1) (elabExp e2))
+    EnvML.Concat e1 e2 -> CoreFE.Concat (elabExp e1) (elabExp e2)
 
 elabLambda :: EnvML.FunArgs -> EnvML.Exp -> CoreFE.Exp
 elabLambda [] body = elabExp body

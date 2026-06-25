@@ -102,6 +102,7 @@ data Exp
   -- Lists
   | EList [Exp]             -- [e1, e2, e3]
   | ETake Int Exp           -- take(n, ls)
+  | ELength Exp             -- length(ls)
   -- Extensions
   | BinOp BinOp
   deriving (Show, Eq)
@@ -111,6 +112,7 @@ data BinOp
   | Sub    Exp Exp
   | Mul    Exp Exp
   | EqEq   Exp Exp
+  | LessThan Exp Exp
   | Concat Exp Exp
   deriving (Eq, Show)
 
@@ -145,6 +147,7 @@ expPrec e = case e of
   Mod _     -> 5
   EList _   -> 5
   ETake _ _ -> 5
+  ELength _ -> 5
   _ -> 4 -- TODO: Extensions
 
 
@@ -356,8 +359,10 @@ prettyExp (Mod m) = prettyModule m
 prettyExp (EList []) = "List[]"
 prettyExp (EList es) = "List[" ++ intercalateComma (map prettyExp es) ++ "]"
 prettyExp (ETake n ls) = "take(" ++ show n ++ ", " ++ prettyExp ls ++ ")"
+prettyExp (ELength ls) = "length(" ++ prettyExp ls ++ ")"
 prettyExp (BinOp (Add e1 e2)) = prettyExp e1 ++ " + " ++ prettyExp e2
 prettyExp (BinOp (Sub e1 e2)) = prettyExp e1 ++ " - " ++ prettyExp e2
 prettyExp (BinOp (Mul e1 e2)) = prettyExp e1 ++ " * " ++ prettyExp e2
 prettyExp (BinOp (EqEq e1 e2)) = prettyExp e1 ++ " == " ++ prettyExp e2
+prettyExp (BinOp (LessThan e1 e2)) = prettyExp e1 ++ " < " ++ prettyExp e2
 prettyExp (BinOp (Concat e1 e2)) = prettyExp e1 ++ " ++ " ++ prettyExp e2

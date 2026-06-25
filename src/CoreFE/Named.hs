@@ -28,9 +28,19 @@ data Exp
   | FEnv  Env
   | Anno  Exp Typ
   | Concat Exp Exp      -- e1 ++ e2  (environment concatenation)
+  | BinOp BinOp         -- e1 op e2
   -- List primitives
   | EList  [Exp]        -- [e1, e2, e3]
   | ETake  Int Exp      -- take(n, ls)
+  | ELength Exp         -- length(ls)
+  deriving (Eq, Show)
+
+data BinOp
+  = Add      Exp Exp
+  | Sub      Exp Exp
+  | Mul      Exp Exp
+  | EqEq     Exp Exp
+  | LessThan Exp Exp
   deriving (Eq, Show)
 
 type TyEnv = [TyEnvE]
@@ -134,9 +144,15 @@ prettyExp (Anno e t) =
 prettyExp (EList []) = "List[]"
 prettyExp (EList es) = "List[" ++ intercalate ", " (map prettyExp es) ++ "]"
 prettyExp (ETake n ls) = "take(" ++ show n ++ ", " ++ prettyExp ls ++ ")"
+prettyExp (ELength ls) = "length(" ++ prettyExp ls ++ ")"
 prettyExp (Concat e1 e2) =
     parenIf (needsParenExp e1) (prettyExp e1) ++ " ++ "
     ++ parenIf (needsParenExp e2) (prettyExp e2)
+prettyExp (BinOp (Add e1 e2))      = prettyExp e1 ++ " + "  ++ prettyExp e2
+prettyExp (BinOp (Sub e1 e2))      = prettyExp e1 ++ " - "  ++ prettyExp e2
+prettyExp (BinOp (Mul e1 e2))      = prettyExp e1 ++ " * "  ++ prettyExp e2
+prettyExp (BinOp (EqEq e1 e2))     = prettyExp e1 ++ " == " ++ prettyExp e2
+prettyExp (BinOp (LessThan e1 e2)) = prettyExp e1 ++ " < "  ++ prettyExp e2
 
 needsParenExp :: Exp -> Bool
 needsParenExp (App _ _) = True

@@ -40,10 +40,12 @@ import qualified CoreFE.Syntax as CoreFE
   struct    { TokStruct }
   link      { TokLink }
   take      { TokTake }
+  length    { TokLength }
   nil       { TokNil }
   list      { TokList }
   List      { TokListE }
   '='       { TokEq }
+  '=='      { TokEqEq }
   ':'       { TokColon }
   ';'       { TokSemi }
   '::'      { TokDoubleColon }
@@ -122,6 +124,8 @@ Exp :: { Exp }
   | Exp '+' Exp                           { BinOp (Add $1 $3) }
   | Exp '-' Exp                           { BinOp (Sub $1 $3) }
   | Exp '*' Exp                           { BinOp (Mul $1 $3) }
+  | Exp '==' Exp                          { BinOp (EqEq $1 $3) }
+  | Exp '<' Exp                           { BinOp (LessThan $1 $3) }
   | Term                                  { $1 }
 
 ModuleExp :: { Module }
@@ -150,6 +154,7 @@ Atom :: { Exp }
   | List '[' ListElems ']'    { EList $3 }
   | nil                       { EList [] }
   | take '(' num ',' Exp ')'  { ETake $3 $5 }
+  | length '(' Exp ')'        { ELength $3 }
   | '(' Exp ')'               { $2 }
   | ModuleExp                 { Mod $1 }
 

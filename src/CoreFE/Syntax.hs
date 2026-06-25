@@ -51,13 +51,15 @@ data Exp
   -- List primitives
   | EList  [Exp]        -- [e1, e2, e3]
   | ETake  Int Exp      -- take(n, ls)
+  | ELength Exp         -- length(ls)
   deriving (Eq, Show)
 
 data BinOp
-  = Add   Exp Exp
-  | Sub   Exp Exp
-  | Mul   Exp Exp
-  | EqEq  Exp Exp
+  = Add      Exp Exp
+  | Sub      Exp Exp
+  | Mul      Exp Exp
+  | EqEq     Exp Exp
+  | LessThan Exp Exp
   deriving (Eq, Show)
 
 data Literal
@@ -238,8 +240,10 @@ stringOfExpI lvl op@(Anno e t) =
 -- List expressions
 stringOfExpI _lvl (EList [])  = "List[]"
 stringOfExpI lvl (EList es)   = "List[" ++ stringOfList (stringOfExpI lvl) es ++ "]"
-stringOfExpI lvl (ETake n ls) = 
+stringOfExpI lvl (ETake n ls) =
     "take(" ++ show n ++ ", " ++ stringOfExpI lvl ls ++ ")"
+stringOfExpI lvl (ELength ls) =
+    "length(" ++ stringOfExpI lvl ls ++ ")"
 
 -- Heuristic: an env is "small" if it has <= 2 entries and no nested FEnv
 isSmallEnv :: [EnvE] -> Bool
@@ -284,6 +288,10 @@ stringOfBinOpI lvl op@(EqEq e1 e2) =
     let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
         s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
      in s1 ++ " == " ++ s2
+stringOfBinOpI lvl op@(LessThan e1 e2) =
+    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
+        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
+     in s1 ++ " < " ++ s2
 
 stringOfLiteral :: Literal -> String
 stringOfLiteral (LitInt n)  = show n
@@ -297,6 +305,7 @@ expPrec (FEnv _)    = 10
 expPrec (Rec _ _)   = 10
 expPrec (EList _)   = 10
 expPrec (ETake _ _) = 10
+expPrec (ELength _) = 10
 expPrec (RProj _ _) = 9
 expPrec (App _ _)   = 8
 expPrec (TApp _ _)  = 8
@@ -314,6 +323,7 @@ binOpPrec (Mul _ _)  = 7
 binOpPrec (Add _ _)  = 6
 binOpPrec (Sub _ _)  = 6
 binOpPrec (EqEq _ _) = 5
+binOpPrec (LessThan _ _) = 5
 
 stringOfList :: (a -> String) -> [a] -> String
 stringOfList _ [] = ""

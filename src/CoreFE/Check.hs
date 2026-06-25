@@ -8,7 +8,7 @@ import CoreFE.Syntax
       Typ(..),
       TyLit(TyBool, TyStr, TyInt),
       Literal(LitStr, LitInt, LitBool),
-      BinOp(EqEq, Add, Sub, Mul),
+      BinOp(EqEq, Add, Sub, Mul, LessThan),
       TyEnv,
       Env )
 
@@ -203,6 +203,10 @@ infer g (BinOp (EqEq e1 e2)) = do
   t1 <- infer g e1
   guard (check g e2 t1)
   return (TyLit TyBool)
+infer g (BinOp (LessThan e1 e2)) = do
+  guard (check g e1 (TyLit TyInt))
+  guard (check g e2 (TyLit TyInt))
+  return (TyLit TyBool)
 
 -- List inference
 infer _ (EList []) = Nothing -- Cannot infer empty list type
@@ -215,6 +219,9 @@ infer g (EList (e:es)) = do
 infer g (ETake _ e) = do
   TyList t <- infer g e
   return (TyList t)
+infer g (ELength e) = do
+  TyList _ <- infer g e
+  return (TyLit TyInt)
 
 -- Module/environment concatenation: flat append of two environment types.
 -- e2 (the right operand) goes on the head side to match the source ordering

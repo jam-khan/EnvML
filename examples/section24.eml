@@ -1,0 +1,68 @@
+-- Section 2.4 of the FE paper, runnable in EnvML.
+-- (1) first-class modules, (2) dynamic module composition, (3) sandboxing.
+
+-- ============================================================
+-- (1) FIRST-CLASS MODULES
+-- ============================================================
+
+module type ACCESS_POLICY =
+  forall t. sig val reshape : list t -> list t; end;
+
+module previewPolicy : ACCESS_POLICY =
+  functor (type t) ->
+    struct let reshape : list t -> list t = fun (ls) -> take(2, ls); end;
+
+module mockPolicy : ACCESS_POLICY =
+  functor (type t) ->
+    struct let reshape : list t -> list t = fun (ls) -> ls; end;
+
+-- MakeQuery takes a policy module and returns a module, re-exporting the
+-- argument's `reshape` as `process`. Pure functor (module-to-module) application.
+module MakeQuery :
+  (forall t. sig val reshape : list t -> list t; end)
+  ->m (sig type a = int; val process : list a -> list a; end) =
+  functor (s) ->
+    struct
+      type a = int;
+      let process : list a -> list a =
+        ((s @a) :: sig val reshape : list int -> list int; end).reshape;
+    end;
+
+-- ============================================================
+-- (2) DYNAMIC MODULE COMPOSITION
+-- ============================================================
+-- `audit` is a fragment that depends on the VALUE `process` from the base.
+-- A fragment that depends on another module is naturally a FUNCTOR over it;
+-- composition is then `base ++ audit(base)`. So dependent composition is
+-- DERIVED from first-class functor application + the `++` merge, not primitive.
+
+module audit :
+  ( sig type a = int; val process : list a -> list a; end )
+  ->m ( sig val report : list int -> bool; end ) =
+  functor (base) ->
+    struct
+      let report : list int -> bool =
+        fun (xs) -> length((base.process :: list int -> list int)(xs)) < length(xs);
+    end;
+
+module previewQuery     = MakeQuery(previewPolicy);
+module previewProcessor = previewQuery ++ audit(previewQuery);
+
+module mockQuery        = MakeQuery(mockPolicy);
+module mockProcessor    = mockQuery ++ audit(mockQuery);
+
+-- ============================================================
+-- (3) SANDBOXING
+-- ============================================================
+-- The box confines its body to `proc` (ambient bindings are unreachable) and
+-- runs `proc.report` on the local input. Swapping previewPolicy for mockPolicy
+-- reuses the same functor, audit, and boxed logic; only the operation behind
+-- `process` changes, and that changes the result.
+
+let runReport :
+  ( sig type a = int; val process : list a -> list a; val report : list int -> bool; end ) -> bool =
+  fun (processor) ->
+    box [proc = processor] in (proc.report :: list int -> bool)(List[3, 1, 2]) :: bool;
+
+let previewResult : bool = runReport(previewProcessor);   -- preview truncates 3 -> 2, so true
+let mockResult    : bool = runReport(mockProcessor);      -- mock keeps all 3,        so false

@@ -113,7 +113,13 @@ prettyNamedExpShort (Named.FEnv env) = prettyNamedEnvShort env
 prettyNamedExpShort (Named.Anno e _) = prettyNamedExpShort e
 prettyNamedExpShort (Named.EList es) = foldr (\e acc -> acc ++ prettyNamedExpShort e ++ ",") "" es
 prettyNamedExpShort (Named.ETake i e) = "take(" ++ show i ++ "," ++ prettyNamedExpShort e ++ ")"
+prettyNamedExpShort (Named.ELength e) = "length(" ++ prettyNamedExpShort e ++ ")"
 prettyNamedExpShort (Named.Concat e1 e2) = prettyNamedExpShort e1 ++ " ++ " ++ prettyNamedExpShort e2
+prettyNamedExpShort (Named.BinOp (Named.Add e1 e2))      = prettyNamedExpShort e1 ++ " + "  ++ prettyNamedExpShort e2
+prettyNamedExpShort (Named.BinOp (Named.Sub e1 e2))      = prettyNamedExpShort e1 ++ " - "  ++ prettyNamedExpShort e2
+prettyNamedExpShort (Named.BinOp (Named.Mul e1 e2))      = prettyNamedExpShort e1 ++ " * "  ++ prettyNamedExpShort e2
+prettyNamedExpShort (Named.BinOp (Named.EqEq e1 e2))     = prettyNamedExpShort e1 ++ " == " ++ prettyNamedExpShort e2
+prettyNamedExpShort (Named.BinOp (Named.LessThan e1 e2)) = prettyNamedExpShort e1 ++ " < "  ++ prettyNamedExpShort e2
 
 
 prettyNamedEnvShort :: Named.Env -> String
@@ -166,6 +172,7 @@ prettyDeBruijnExpShort (CoreFE.Anno e _) = prettyDeBruijnExpShort e
 prettyDeBruijnExpShort (CoreFE.BinOp op) = prettyDeBruijnBinOpShort op
 prettyDeBruijnExpShort (CoreFE.EList es) = foldr (\e acc -> acc ++ prettyDeBruijnExpShort e ++ ",") "" es
 prettyDeBruijnExpShort (CoreFE.ETake i e) = "take(" ++ show i ++ "," ++ prettyDeBruijnExpShort e ++ ")"
+prettyDeBruijnExpShort (CoreFE.ELength e) = "length(" ++ prettyDeBruijnExpShort e ++ ")"
 prettyDeBruijnExpShort (CoreFE.Concat e1 e2) = prettyDeBruijnExpShort e1 ++ " ++ " ++ parenIf (needsParenCore e2) (prettyDeBruijnExpShort e2)
 
 
@@ -174,6 +181,7 @@ prettyDeBruijnBinOpShort (CoreFE.Add e1 e2) = prettyDeBruijnExpShort e1 ++ " + "
 prettyDeBruijnBinOpShort (CoreFE.Sub e1 e2) = prettyDeBruijnExpShort e1 ++ " - " ++ prettyDeBruijnExpShort e2
 prettyDeBruijnBinOpShort (CoreFE.Mul e1 e2) = prettyDeBruijnExpShort e1 ++ " * " ++ prettyDeBruijnExpShort e2
 prettyDeBruijnBinOpShort (CoreFE.EqEq e1 e2) = prettyDeBruijnExpShort e1 ++ " == " ++ prettyDeBruijnExpShort e2
+prettyDeBruijnBinOpShort (CoreFE.LessThan e1 e2) = prettyDeBruijnExpShort e1 ++ " < " ++ prettyDeBruijnExpShort e2
 
 prettyDeBruijnEnvShort :: CoreFE.Env -> String
 prettyDeBruijnEnvShort [] = "[]"
@@ -209,6 +217,7 @@ prettyDeBruijnExp (CoreFE.Anno e t) = parenIf (needsParenCore e) (prettyDeBruijn
 prettyDeBruijnExp (CoreFE.BinOp op) = prettyDeBruijnBinOp op
 prettyDeBruijnExp (CoreFE.EList es) = foldr (\e acc -> acc ++ prettyDeBruijnExpShort e ++ ",") "" es
 prettyDeBruijnExp (CoreFE.ETake i e) = "take(" ++ show i ++ "," ++ prettyDeBruijnExpShort e ++ ")"
+prettyDeBruijnExp (CoreFE.ELength e) = "length(" ++ prettyDeBruijnExp e ++ ")"
 prettyDeBruijnExp (CoreFE.Concat e1 e2) = prettyDeBruijnExp e1 ++ " ++ " ++ parenIf (needsParenCore e2) (prettyDeBruijnExp e2)
 
 
@@ -217,6 +226,7 @@ prettyDeBruijnBinOp (CoreFE.Add e1 e2) = prettyDeBruijnExp e1 ++ " + " ++ pretty
 prettyDeBruijnBinOp (CoreFE.Sub e1 e2) = prettyDeBruijnExp e1 ++ " - " ++ prettyDeBruijnExp e2
 prettyDeBruijnBinOp (CoreFE.Mul e1 e2) = prettyDeBruijnExp e1 ++ " * " ++ prettyDeBruijnExp e2
 prettyDeBruijnBinOp (CoreFE.EqEq e1 e2) = prettyDeBruijnExp e1 ++ " == " ++ prettyDeBruijnExp e2
+prettyDeBruijnBinOp (CoreFE.LessThan e1 e2) = prettyDeBruijnExp e1 ++ " < " ++ prettyDeBruijnExp e2
 
 prettyDeBruijnEnv :: CoreFE.Env -> String
 prettyDeBruijnEnv [] = ""

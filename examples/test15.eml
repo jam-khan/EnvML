@@ -1,0 +1,30 @@
+-- Composing two modules where one provides an element type + data (m1) and the
+-- other an operation over that element type (m2-as-ops), then merged with ++.
+--
+-- Key point: modules are SANDBOXED and ++ flattens two INDEPENDENTLY-typed
+-- modules, so the operation module cannot reference m1's `Elem` directly
+-- (m1's internals are not in scope, and there is no `open`/type-projection).
+-- The dependency is expressed by PARAMETERIZING the operation module over the
+-- element type, instantiating it, and concatenating.
+
+module m1 = struct
+  type Elem = int;
+  let items : list Elem = List[3, 1, 2];
+end;
+
+-- The operation module, parameterized over its element type (sees only its param):
+module mkOps = functor (type Elem) ->
+  struct
+    let op : list Elem -> list Elem = fun (xs) -> take(2, xs);
+  end;
+
+-- Instantiate at m1's element type (int) and pin its signature so it is an
+-- environment type (so ++ accepts it):
+module ops : sig val op : list int -> list int; end = mkOps @ int;
+
+-- Merge: m3 has all of m1's components AND ops's op.
+module m3 = m1 ++ ops;
+
+-- Use the composed module: run op on items.
+let result : list int =
+  box [m = m3] in (m.op :: list int -> list int)(m.items :: list int) :: list int;

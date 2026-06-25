@@ -6,7 +6,7 @@ import CoreFE.Syntax
       Exp(..),
       Typ(TyBoxT),
       Literal(LitBool, LitInt),
-      BinOp(EqEq, Add, Sub, Mul),
+      BinOp(EqEq, Add, Sub, Mul, LessThan),
       TyEnv,
       Env )
 
@@ -89,9 +89,16 @@ eval env = go
         v1 <- eval env e1
         v2 <- eval env e2
         pure $ Lit (LitBool (v1 == v2))
+    go (BinOp (LessThan e1 e2)) = do
+        Lit (LitInt v1) <- eval env e1
+        Lit (LitInt v2) <- eval env e2
+        pure $ Lit (LitBool (v1 < v2))
     go (EList es) = do
         vs <- mapM (eval env) es
         pure $ EList vs
     go (ETake n e) = do
         EList vs <- eval env e
         pure $ EList (take n vs)
+    go (ELength e) = do
+        EList vs <- eval env e
+        pure $ Lit (LitInt (length vs))

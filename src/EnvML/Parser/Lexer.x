@@ -36,11 +36,13 @@ tokens :-
   link        { \_ -> TokLink  }
   import      { \_ -> TokImport  }
   take        { \_ -> TokTake }
+  length      { \_ -> TokLength }
   nil         { \_ -> TokNil  }
   list        { \_ -> TokList }
   List        { \_ -> TokListE }
 
   -- Symbols
+  "=="        { \_ -> TokEqEq     }
   "="         { \_ -> TokEq       }
   ":"         { \_ -> TokColon    }
   ":="        { \_ -> TokColonEqual    }
@@ -99,11 +101,13 @@ data Token
   | TokStruct
   | TokImport
   | TokTake
+  | TokLength
   | TokNil
   | TokList
   | TokListE
   -- Symbol Tokens
   | TokEq
+  | TokEqEq
   | TokColon    
   | TokLParen   
   | TokRParen   
