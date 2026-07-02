@@ -79,7 +79,22 @@ module mockProcessor = assemble(mockQuery)(mockAudit);
 -- ============================================================
 -- (3) RUN THE COMPOSED PROCESSORS
 -- ============================================================
--- Each processor is a sandboxed module; `report` is the composed capability.
+-- executeQuery is a sandboxed functor whose only authority is `proc`; it runs
+-- the composed `report`. Its parameter signature must match the processor
+-- exactly (EnvML has no width subtyping), so it lists all of mockProcessor's
+-- fields even though it only calls `report`.
+module executeQuery :
+  ( sig type a = int; val process : list a -> list a; val decide : list int -> bool;
+        type b = bool; val report : list int -> b; end )
+  ->m ( sig val input : list int; val result : bool; end )
+  = functor (proc) ->
+      struct
+        let input  : list int = List[3, 1, 2];
+        let result : bool      = proc.report(input);
+      end;
 
+let mockResult : bool = executeQuery(mockProcessor).result;                               -- false
+
+-- previewProcessor has a different signature ({process, report} — no `decide`),
+-- so it can't go through the same executeQuery; run its report directly.
 let previewResult : bool = (previewProcessor.report :: list int -> bool)(List[3, 1, 2]);  -- true
-let mockResult    : bool = (mockProcessor.report    :: list int -> bool)(List[3, 1, 2]);  -- false
