@@ -1,0 +1,85 @@
+-- Section 2.4 — composition done INSIDE functors.
+--   (1) first-class modules        : MakeQuery : policy -> query module
+--   (2) dynamic composition        : addAudit / assemble are functors that take
+--                                     module(s) and perform `q + ...` in the body
+--   (3) run the composed processors : project and call `report`
+--
+-- Two EnvML notes used throughout:
+--   * a functor's parameter type goes in the functor's ARROW annotation
+--     (module f : DOM ->m RET = functor (q) -> ...), not inline `(q : DOM)`.
+--   * the DOM must be an inline `sig ... end`, not a module-type ALIAS: inside
+--     the body we project `q.process`, which needs an environment type; an alias
+--     stays a type variable at projection sites. (Aliases are fine as *value*
+--     annotations, e.g. `module previewQuery : QUERY = ...`, where teq resolves them.)
+
+-- ============================================================
+-- (1) FIRST-CLASS MODULES
+-- ============================================================
+
+module type ACCESS_POLICY =
+  forall t. sig val reshape : list t -> list t; end;
+
+module previewPolicy : ACCESS_POLICY =
+  functor (type t) -> struct let reshape : list t -> list t = fun (ls) -> take(2, ls); end;
+
+module mockPolicy : ACCESS_POLICY =
+  functor (type t) -> struct let reshape : list t -> list t = fun (ls) -> ls; end;
+
+module MakeQuery :
+  (forall t. sig val reshape : list t -> list t; end)
+  ->m (sig type a = int; val process : list a -> list a; end) =
+  functor (s) ->
+    struct
+      type a = int;
+      let process : list a -> list a =
+        ((s @a) :: sig val reshape : list int -> list int; end).reshape;
+    end;
+
+module type QUERY = sig type a = int; val process : list a -> list a; end;
+module type AUDIT = sig val decide : list int -> bool; end;
+
+module previewQuery : QUERY = MakeQuery(previewPolicy);
+module mockQuery    : QUERY = MakeQuery(mockPolicy);
+
+-- ============================================================
+-- (2) DYNAMIC COMPOSITION INSIDE FUNCTORS
+-- ============================================================
+
+-- addAudit takes one query module and composes an audit fragment onto it.
+-- The fragment's `report` depends on the argument's `process` (q.process).
+module addAudit :
+  ( sig type a = int; val process : list a -> list a; end )                          -- = QUERY
+  ->m ( sig type a = int; val process : list a -> list a; type b = bool; val report : list int -> b; end )
+  = functor (q) ->
+      q + struct
+        type b = bool;
+        let report : list int -> b =
+          fun (xs) -> length((q.process :: list int -> list int)(xs)) < length(xs);
+      end;
+
+module previewProcessor = addAudit(previewQuery);
+
+-- assemble takes a query module AND an audit module, and composes q + a + fragment.
+-- The fragment's `report` uses BOTH: a.decide (from a) on q.process (from q).
+module mockAudit : AUDIT = struct let decide : list int -> bool = fun (xs) -> false; end;
+
+module assemble :
+  ( sig type a = int; val process : list a -> list a; end )                          -- = QUERY
+  ->m ( sig val decide : list int -> bool; end )                                     -- = AUDIT
+  ->m ( sig type a = int; val process : list a -> list a; val decide : list int -> bool; type b = bool; val report : list int -> b; end )
+  = functor (q) (a) ->
+      q + a + struct
+        type b = bool;
+        let report : list int -> b =
+          fun (xs) -> a.decide((q.process :: list int -> list int)(xs));
+      end;
+
+module mockProcessor = assemble(mockQuery)(mockAudit);
+
+-- ============================================================
+-- (3) RUN THE COMPOSED PROCESSORS
+-- ============================================================
+-- Each processor is a sandboxed module; `report` is the composed capability.
+
+let previewResult : bool = (previewProcessor.report :: list int -> bool)(List[3, 1, 2]);  -- true
+let mockResult    : bool = (mockProcessor.report    :: list int -> bool)(List[3, 1, 2]);  -- false
