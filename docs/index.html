@@ -517,6 +517,67 @@ import ghc_wasm_jsffi from "./ghc_wasm_jsffi.js";
 // ═══════════════════════════════════════════════════════════════
 
 const envmlExamples = [
+  {id: "e01", label: "Main example",
+    code: 
+    `
+    -- Section 2.4 (latest): composition via functors + capability sandboxing.
+
+module type ACCESS_POLICY = forall t. sig val reshape : list t -> list t; end;
+
+-- makeQuery : policy -> query module.  (domain inlined; param type in the arrow)
+module makeQuery :
+  ( forall t. sig val reshape : list t -> list t; end )
+  ->m ( sig type a = int; val query : list a -> list a; end )
+  = functor (policy) ->
+      struct
+        type a = int;
+        let query : list a -> list a =
+          ((policy @a) :: sig val reshape : list int -> list int; end).reshape;
+      end;
+
+module previewPolicy : ACCESS_POLICY =
+  functor (type t) -> struct let reshape : list t -> list t = fun (ls) -> take(2, ls); end;
+module mockPolicy : ACCESS_POLICY =
+  functor (type t) -> struct let reshape : list t -> list t = fun (ls) -> ls; end;
+
+module previewQuery = makeQuery(previewPolicy);
+module mockQuery    = makeQuery(mockPolicy);
+
+-- audit modules (provide "decide")
+module audit     = struct type b = bool; let decide : list int -> b = fun (xs) -> 0 < length(xs); end;
+module mockAudit = struct type b = bool; let decide : list int -> b = fun (xs) -> false; end;
+
+-- assemble : query module + audit module -> composed processor (m1 + m2 + report)
+module assemble :
+  ( sig type a = int; val query : list a -> list a; end )
+  ->m ( sig type b = bool; val decide : list int -> b; end )
+  ->m ( sig type a = int; val query : list a -> list a;
+            type b = bool; val decide : list int -> b;
+            val report : list int -> bool; end )
+  = functor (m1) (m2) ->
+      m1 + m2 + struct
+        let report : list int -> bool =
+          fun (xs) -> (m2.decide :: list int -> bool)((m1.query :: list int -> list int)(xs));
+      end;
+
+module previewProcessor = assemble(previewQuery)(audit);
+module mockProcessor    = assemble(mockQuery)(mockAudit);
+
+-- executeQuery : sandboxed functor; its only authority is "proc". Runs report.
+module executeQuery :
+  ( sig type a = int; val query : list a -> list a;
+        type b = bool; val decide : list int -> b;
+        val report : list int -> bool; end )
+  ->m ( sig val input : list int; val result : bool; end )
+  = functor (proc) ->
+      struct
+        let input  : list int = List[3, 1, 2];
+        let result : bool      = proc.report(input);
+      end;
+
+let previewResult : bool = executeQuery(previewProcessor).result;   -- true  (2 items after take(2), 0 < 2)
+let mockResult    : bool = executeQuery(mockProcessor).result;      -- false (mockAudit.decide = false)
+    `},
   {id: "e0", label: "Policies as first-class modules",
     code: `module type ACCESS_POLICY = 
   forall t. sig 
