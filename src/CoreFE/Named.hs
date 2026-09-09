@@ -27,7 +27,6 @@ data Exp
   | RProj Exp String
   | FEnv  Env
   | Anno  Exp Typ
-  | Concat Exp Exp      -- e1 ++ e2  (environment concatenation)
   | BinOp BinOp         -- e1 op e2
   -- List primitives
   | EList  [Exp]        -- [e1, e2, e3]
@@ -145,9 +144,6 @@ prettyExp (EList []) = "List[]"
 prettyExp (EList es) = "List[" ++ intercalate ", " (map prettyExp es) ++ "]"
 prettyExp (ETake n ls) = "take(" ++ show n ++ ", " ++ prettyExp ls ++ ")"
 prettyExp (ELength ls) = "length(" ++ prettyExp ls ++ ")"
-prettyExp (Concat e1 e2) =
-    parenIf (needsParenExp e1) (prettyExp e1) ++ " ++ "
-    ++ parenIf (needsParenExp e2) (prettyExp e2)
 prettyExp (BinOp (Add e1 e2))      = prettyExp e1 ++ " + "  ++ prettyExp e2
 prettyExp (BinOp (Sub e1 e2))      = prettyExp e1 ++ " - "  ++ prettyExp e2
 prettyExp (BinOp (Mul e1 e2))      = prettyExp e1 ++ " * "  ++ prettyExp e2

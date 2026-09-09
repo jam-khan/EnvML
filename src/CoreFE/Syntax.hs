@@ -47,7 +47,6 @@ data Exp
   | FEnv  Env
   | Anno  Exp Typ
   | BinOp BinOp
-  | Concat Exp Exp      -- e1 ++ e2  (environment concatenation)
   -- List primitives
   | EList  [Exp]        -- [e1, e2, e3]
   | ETake  Int Exp      -- take(n, ls)
@@ -203,11 +202,6 @@ stringOfExpI lvl op@(App e1 e2) =
         s2 = parensIf (expPrec e2 <= expPrec op) (stringOfExpI lvl e2)
      in s1 ++ " " ++ s2
 
-stringOfExpI lvl op@(Concat e1 e2) =
-    let s1 = parensIf (expPrec e1 <  expPrec op) (stringOfExpI lvl e1)
-        s2 = parensIf (expPrec e2 <= expPrec op) (stringOfExpI lvl e2)
-     in s1 ++ " ++ " ++ s2
-
 stringOfExpI lvl (BinOp binOp) = stringOfBinOpI lvl binOp
 
 stringOfExpI lvl (Clos env e) =
@@ -309,7 +303,6 @@ expPrec (ELength _) = 10
 expPrec (RProj _ _) = 9
 expPrec (App _ _)   = 8
 expPrec (TApp _ _)  = 8
-expPrec (Concat _ _)= 7
 expPrec (BinOp _)   = 6
 expPrec (Anno _ _)  = 4
 expPrec (Box _ _)   = 3

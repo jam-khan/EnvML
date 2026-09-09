@@ -40,8 +40,14 @@ setup = return ()
 parseModule :: String -> AST.Module
 parseModule input = Parser.parseModule (Lexer.lexer input)
 
+-- Elaboration is type-directed and can fail (an operand of a merge whose
+-- signature is not determined, say). Surface the message through 'safeRun',
+-- which is how the other pipeline errors already reach the playground.
 elaborate :: AST.Module -> CoreNamed.Exp
-elaborate = Elab.elabModule
+elaborate ast =
+  case Elab.elabModule ast of
+    Right e  -> e
+    Left err -> error ("Elaboration error: " ++ err)
 
 toDeBruijn :: CoreNamed.Exp -> CoreFE.Exp
 toDeBruijn = DeBruijn.toDeBruijn

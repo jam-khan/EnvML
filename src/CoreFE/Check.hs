@@ -223,14 +223,6 @@ infer g (ELength e) = do
   TyList _ <- infer g e
   return (TyLit TyInt)
 
--- Module/environment concatenation: flat append of two environment types.
--- e2 (the right operand) goes on the head side to match the source ordering
--- (m1 ++ m2 ~> e2's entries then e1's), and the evaluator's v2 ++ v1.
-infer g (Concat e1 e2) = do
-  TyEnvt g1 <- unbox <$> infer g e1
-  TyEnvt g2 <- unbox <$> infer g e2
-  return (TyEnvt (g2 ++ g1))
-
 infer _ _ = Nothing
 
 -- | Check an expression against a type

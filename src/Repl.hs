@@ -125,11 +125,18 @@ runPipeline path action = do
     Left err  -> putStrLn $ "Error: " ++ err
     Right ast -> action ast
 
-elaborate :: AST.Module -> CoreNamed.Exp
+elaborate :: AST.Module -> Either Elab.ElabError CoreNamed.Exp
 elaborate = Elab.elabModule
 
 toDeBruijn :: CoreNamed.Exp -> CoreFE.Exp
 toDeBruijn = DeBruijn.toDeBruijn
+
+-- | Parse and elaborate, reporting elaboration errors rather than proceeding.
+runElab :: FilePath -> (CoreNamed.Exp -> IO ()) -> IO ()
+runElab path action = runPipeline path $ \ast ->
+  case elaborate ast of
+    Left err -> putStrLn $ "Elaboration error: " ++ err
+    Right coreNamed -> action coreNamed
 
 cmdParse :: FilePath -> IO ()
 cmdParse path = runPipeline path $ \ast -> do
@@ -137,21 +144,18 @@ cmdParse path = runPipeline path $ \ast -> do
   putStrLn $ AST.pretty ast
 
 cmdElaborate :: FilePath -> IO ()
-cmdElaborate path = runPipeline path $ \ast -> do
-  let coreNamed = elaborate ast
+cmdElaborate path = runElab path $ \coreNamed -> do
   putStrLn "=== Elaborated CoreFE (Named) ==="
   print coreNamed
 
 cmdDeBruijn :: FilePath -> IO ()
-cmdDeBruijn path = runPipeline path $ \ast -> do
-  let coreNamed = elaborate ast
+cmdDeBruijn path = runElab path $ \coreNamed -> do
   let coreNameless = toDeBruijn coreNamed
   putStrLn "=== De Bruijn Core (Nameless) ==="
   putStrLn $ CoreFE.pretty coreNameless
 
 cmdCheck :: FilePath -> IO ()
-cmdCheck path = runPipeline path $ \ast -> do
-  let coreNamed = elaborate ast
+cmdCheck path = runElab path $ \coreNamed -> do
   let coreNameless = toDeBruijn coreNamed
   putStrLn "=== Type Checking ==="
   case Check.infer [] coreNameless of
@@ -161,15 +165,14 @@ cmdCheck path = runPipeline path $ \ast -> do
       putStrLn $ "  Type: " ++ CoreFE.pretty typ
 
 cmdEval :: FilePath -> IO ()
-cmdEval path = runPipeline path $ \ast -> do
-  let coreNamed = elaborate ast
+cmdEval path = runElab path $ \coreNamed -> do
   let coreNameless = toDeBruijn coreNamed
-  
+
   -- Optionally type check first
   case Check.infer [] coreNameless of
     Nothing -> putStrLn "Warning: Type check failed, attempting evaluation anyway..."
     Just typ -> putStrLn $ "Type: " ++ CoreFE.pretty typ
-  
+
   putStrLn "=== Evaluation ==="
   case Eval.eval [] coreNameless of
     Nothing -> putStrLn "✗ Evaluation failed"
