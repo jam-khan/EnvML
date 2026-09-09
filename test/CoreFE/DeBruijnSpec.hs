@@ -7,12 +7,16 @@ import CoreFE.DeBruijn (toNamelessExp, toNamelessTyp, toDeBruijn, toDeBruijnTyp)
 import CoreFE.Check (check, infer)
 import CoreFE.Eval (eval)
 
+-- A literal environment, newest entry first (a Unit-rooted Merge/TMerge chain)
+env :: [Nameless.Entry] -> Nameless.Exp
+env = Nameless.mkEnv
+
 -- Helper to run full pipeline
 runPipeline :: Named.Exp -> Maybe (Nameless.Exp, Nameless.Typ, Nameless.Exp)
 runPipeline namedExp = do
   let namelessExp = toDeBruijn namedExp
   typ <- infer [] namelessExp
-  result <- eval [] namelessExp
+  result <- eval Nameless.Unit namelessExp
   return (namelessExp, typ, result)
 
 -- ============================================================================
@@ -49,7 +53,7 @@ debruijnTests =
     , Named.Lam "x" (Named.Var "x")
     , Nameless.Lam (Nameless.Var 0)
     , Nothing  -- can't infer without annotation
-    , Just (Nameless.Clos [] (Nameless.Var 0))
+    , Just (Nameless.Clos Nameless.Unit (Nameless.Var 0))
     )
   , ( "5. annotated identity lambda"
     , Named.Anno 
@@ -59,19 +63,19 @@ debruijnTests =
         (Nameless.Lam (Nameless.Var 0)) 
         (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) (Nameless.TyLit Nameless.TyInt))
     , Just (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) (Nameless.TyLit Nameless.TyInt))
-    , Just (Nameless.Clos [] (Nameless.Var 0))
+    , Just (Nameless.Clos Nameless.Unit (Nameless.Var 0))
     )
   , ( "6. nested lambda - uses outer variable"
     , Named.Lam "x" (Named.Lam "y" (Named.Var "x"))
     , Nameless.Lam (Nameless.Lam (Nameless.Var 1))
     , Nothing
-    , Just (Nameless.Clos [] (Nameless.Lam (Nameless.Var 1)))
+    , Just (Nameless.Clos Nameless.Unit (Nameless.Lam (Nameless.Var 1)))
     )
   , ( "7. nested lambda - uses inner variable"
     , Named.Lam "x" (Named.Lam "y" (Named.Var "y"))
     , Nameless.Lam (Nameless.Lam (Nameless.Var 0))
     , Nothing
-    , Just (Nameless.Clos [] (Nameless.Lam (Nameless.Var 0)))
+    , Just (Nameless.Clos Nameless.Unit (Nameless.Lam (Nameless.Var 0)))
     )
   , ( "8. nested lambda - uses both variables"
     , Named.Anno
@@ -87,7 +91,7 @@ debruijnTests =
     , Just (Nameless.TyArr 
           (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) (Nameless.TyLit Nameless.TyInt))
           (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) (Nameless.TyLit Nameless.TyInt)))
-    , Just (Nameless.Clos [] (Nameless.Lam (Nameless.App (Nameless.Var 1) (Nameless.Var 0))))
+    , Just (Nameless.Clos Nameless.Unit (Nameless.Lam (Nameless.App (Nameless.Var 1) (Nameless.Var 0))))
     )
 
     -- ==========================================================================
@@ -160,7 +164,7 @@ debruijnTests =
         (Nameless.TLam (Nameless.Lam (Nameless.Var 0)))
         (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0)))
     , Just (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0)))
-    , Just (Nameless.TClos [] (Nameless.Lam (Nameless.Var 0)))
+    , Just (Nameless.TClos Nameless.Unit (Nameless.Lam (Nameless.Var 0)))
     )
   , ( "13. type application of polymorphic identity (annotated)"
     , Named.TApp 
@@ -175,7 +179,7 @@ debruijnTests =
         (Nameless.TyLit Nameless.TyInt)
     , Just (Nameless.TySubstT (Nameless.TyLit Nameless.TyInt) 
             (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0)))
-    , Just (Nameless.Clos [Nameless.TypE (Nameless.TyBoxT [] (Nameless.TyLit Nameless.TyInt))] 
+    , Just (Nameless.Clos (env [Nameless.EntT (Nameless.TyBoxT [] (Nameless.TyLit Nameless.TyInt))]) 
             (Nameless.Var 0))
     )
   , ( "14. nested type abstraction (annotated)"
@@ -186,7 +190,7 @@ debruijnTests =
         (Nameless.TLam (Nameless.TLam (Nameless.Lam (Nameless.Var 0))))
         (Nameless.TyAll (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0))))
     , Just (Nameless.TyAll (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0))))
-    , Just (Nameless.TClos [] (Nameless.TLam (Nameless.Lam (Nameless.Var 0))))
+    , Just (Nameless.TClos Nameless.Unit (Nameless.TLam (Nameless.Lam (Nameless.Var 0))))
     )
   , ( "15. type variable in type annotation"
     , Named.TLam "a" 
@@ -198,7 +202,7 @@ debruijnTests =
           (Nameless.Lam (Nameless.Var 0))
           (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0)))
     , Just (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0)))
-    , Just (Nameless.TClos [] 
+    , Just (Nameless.TClos Nameless.Unit 
         (Nameless.Anno 
           (Nameless.Lam (Nameless.Var 0))
           (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0))))
@@ -218,7 +222,7 @@ debruijnTests =
         (Named.FEnv [Named.ExpE "x" (Named.Rec "val" (Named.Lit (Nameless.LitInt 42)))])
         "val"
     , Nameless.RProj 
-        (Nameless.FEnv [Nameless.ExpE (Nameless.Rec "val" (Nameless.Lit (Nameless.LitInt 42)))])
+        (env [Nameless.EntE (Nameless.Rec "val" (Nameless.Lit (Nameless.LitInt 42)))])
         "val"
     , Just (Nameless.TyLit Nameless.TyInt)
     , Just (Nameless.Lit (Nameless.LitInt 42))
@@ -234,7 +238,7 @@ debruijnTests =
           (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) (Nameless.TyLit Nameless.TyInt)))
     , Just (Nameless.TyRcd "f" 
         (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) (Nameless.TyLit Nameless.TyInt)))
-    , Just (Nameless.Rec "f" (Nameless.Clos [] (Nameless.Var 0)))
+    , Just (Nameless.Rec "f" (Nameless.Clos Nameless.Unit (Nameless.Var 0)))
     )
 
     -- ==========================================================================
@@ -242,39 +246,39 @@ debruijnTests =
     -- ==========================================================================
   , ( "19. empty environment"
     , Named.FEnv []
-    , Nameless.FEnv []
+    , env []
     , Just (Nameless.TyEnvt [])
-    , Just (Nameless.FEnv [])
+    , Just (env [])
     )
   , ( "20. environment with single ExpE"
     , Named.FEnv [Named.ExpE "x" (Named.Lit (Nameless.LitInt 42))]
-    , Nameless.FEnv [Nameless.ExpE (Nameless.Lit (Nameless.LitInt 42))]
+    , env [Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))]
     , Just (Nameless.TyEnvt [Nameless.Type (Nameless.TyLit Nameless.TyInt)])
-    , Just (Nameless.FEnv [Nameless.ExpE (Nameless.Lit (Nameless.LitInt 42))])
+    , Just (env [Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))])
     )
   , ( "21. environment with multiple ExpE"
     , Named.FEnv 
         [ Named.ExpE "x" (Named.Lit (Nameless.LitInt 1))
         , Named.ExpE "y" (Named.Lit (Nameless.LitInt 2))
         ]
-    , Nameless.FEnv 
-        [ Nameless.ExpE (Nameless.Lit (Nameless.LitInt 1))
-        , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 2))
+    , env
+        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 1))
+        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 2))
         ]
     , Just (Nameless.TyEnvt 
         [ Nameless.Type (Nameless.TyLit Nameless.TyInt)
         , Nameless.Type (Nameless.TyLit Nameless.TyInt)
         ])
-    , Just (Nameless.FEnv 
-        [ Nameless.ExpE (Nameless.Lit (Nameless.LitInt 1))
-        , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 2))
+    , Just (env
+        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 1))
+        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 2))
         ])
     )
   , ( "22. environment with TypE"
     , Named.FEnv [Named.TypE "t" (Named.TyLit Nameless.TyInt)]
-    , Nameless.FEnv [Nameless.TypE (Nameless.TyLit Nameless.TyInt)]
+    , env [Nameless.EntT (Nameless.TyLit Nameless.TyInt)]
     , Just (Nameless.TyEnvt [Nameless.TypeEq (Nameless.TyLit Nameless.TyInt)])
-    , Just (Nameless.FEnv [Nameless.TypE (Nameless.TyBoxT [] (Nameless.TyLit Nameless.TyInt))])
+    , Just (env [Nameless.EntT (Nameless.TyBoxT [] (Nameless.TyLit Nameless.TyInt))])
     )
 
     -- ==========================================================================
@@ -285,17 +289,17 @@ debruijnTests =
         [ Named.ExpE "x" (Named.Var "y")
         , Named.ExpE "y" (Named.Lit (Nameless.LitInt 42))
         ]
-    , Nameless.FEnv 
-        [ Nameless.ExpE (Nameless.Var 0)  -- x sees y at index 0
-        , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 42))
+    , env
+        [ Nameless.EntE (Nameless.Var 0)  -- x sees y at index 0
+        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))
         ]
     , Just (Nameless.TyEnvt 
         [ Nameless.Type (Nameless.TyLit Nameless.TyInt)
         , Nameless.Type (Nameless.TyLit Nameless.TyInt)
         ])
-    , Just (Nameless.FEnv 
-        [ Nameless.ExpE (Nameless.Lit (Nameless.LitInt 42))
-        , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 42))
+    , Just (env
+        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))
+        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))
         ])
     )
   , ( "24. environment with three entries, first references third"
@@ -304,20 +308,20 @@ debruijnTests =
         , Named.ExpE "y" (Named.Lit (Nameless.LitInt 1))
         , Named.ExpE "z" (Named.Lit (Nameless.LitInt 2))
         ]
-    , Nameless.FEnv 
-        [ Nameless.ExpE (Nameless.Var 1)  -- x sees z at index 1 (y=0, z=1)
-        , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 1))
-        , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 2))
+    , env
+        [ Nameless.EntE (Nameless.Var 1)  -- x sees z at index 1 (y=0, z=1)
+        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 1))
+        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 2))
         ]
     , Just (Nameless.TyEnvt 
         [ Nameless.Type (Nameless.TyLit Nameless.TyInt)
         , Nameless.Type (Nameless.TyLit Nameless.TyInt)
         , Nameless.Type (Nameless.TyLit Nameless.TyInt)
         ])
-    , Just (Nameless.FEnv 
-        [ Nameless.ExpE (Nameless.Lit (Nameless.LitInt 2))
-        , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 1))
-        , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 2))
+    , Just (env
+        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 2))
+        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 1))
+        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 2))
         ])
     )
   , ( "25. environment with second references third"
@@ -326,20 +330,20 @@ debruijnTests =
         , Named.ExpE "y" (Named.Var "z")
         , Named.ExpE "z" (Named.Lit (Nameless.LitInt 99))
         ]
-    , Nameless.FEnv 
-        [ Nameless.ExpE (Nameless.Lit (Nameless.LitInt 0))
-        , Nameless.ExpE (Nameless.Var 0)  -- y sees z at index 0
-        , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 99))
+    , env
+        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 0))
+        , Nameless.EntE (Nameless.Var 0)  -- y sees z at index 0
+        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 99))
         ]
     , Just (Nameless.TyEnvt 
         [ Nameless.Type (Nameless.TyLit Nameless.TyInt)
         , Nameless.Type (Nameless.TyLit Nameless.TyInt)
         , Nameless.Type (Nameless.TyLit Nameless.TyInt)
         ])
-    , Just (Nameless.FEnv 
-        [ Nameless.ExpE (Nameless.Lit (Nameless.LitInt 0))
-        , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 99))
-        , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 99))
+    , Just (env
+        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 0))
+        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 99))
+        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 99))
         ])
     )
   , ( "26. environment with mixed ExpE and TypE"
@@ -348,10 +352,10 @@ debruijnTests =
         , Named.TypE "t" (Named.TyLit Nameless.TyBool)
         , Named.ExpE "y" (Named.Lit (Nameless.LitInt 2))
         ]
-    , Nameless.FEnv 
-        [ Nameless.ExpE (Nameless.Lit (Nameless.LitInt 1))
-        , Nameless.TypE (Nameless.TyLit Nameless.TyBool)
-        , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 2))
+    , env
+        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 1))
+        , Nameless.EntT (Nameless.TyLit Nameless.TyBool)
+        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 2))
         ]
     , Just (Nameless.TyEnvt 
         [ Nameless.Type (Nameless.TyLit Nameless.TyInt)
@@ -360,10 +364,10 @@ debruijnTests =
         ])
     -- Eval result: TypE gets wrapped in TyBoxT with c2g of (rest ++ env)
     -- For the TypE at position 1, c2g of [ExpE (Lit 2)] ++ [] = []
-    , Just (Nameless.FEnv 
-        [ Nameless.ExpE (Nameless.Lit (Nameless.LitInt 1))
-        , Nameless.TypE (Nameless.TyBoxT [] (Nameless.TyLit Nameless.TyBool))
-        , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 2))
+    , Just (env
+        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 1))
+        , Nameless.EntT (Nameless.TyBoxT [] (Nameless.TyLit Nameless.TyBool))
+        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 2))
         ])
     )
 
@@ -372,9 +376,9 @@ debruijnTests =
     -- ==========================================================================
   , ( "27. ModE wraps in FEnv containing record"
     , Named.FEnv [Named.ModE "m" (Named.Lit (Nameless.LitInt 42))]
-    , Nameless.FEnv [Nameless.ExpE (Nameless.Rec "m" (Nameless.Lit (Nameless.LitInt 42)))]
+    , env [Nameless.EntE (Nameless.Rec "m" (Nameless.Lit (Nameless.LitInt 42)))]
     , Just (Nameless.TyEnvt [Nameless.Type (Nameless.TyRcd "m" (Nameless.TyLit Nameless.TyInt))])
-    , Just (Nameless.FEnv [Nameless.ExpE (Nameless.Rec "m" (Nameless.Lit (Nameless.LitInt 42)))])
+    , Just (env [Nameless.EntE (Nameless.Rec "m" (Nameless.Lit (Nameless.LitInt 42)))])
     )
   , ( "28. ModE projection via RProj on FEnv"
     -- To project from ModE, we need to go through FEnv and RProj
@@ -382,7 +386,7 @@ debruijnTests =
         (Named.FEnv [Named.ModE "m" (Named.Lit (Nameless.LitInt 42))])
         "m"
     , Nameless.RProj 
-        (Nameless.FEnv [Nameless.ExpE (Nameless.Rec "m" (Nameless.Lit (Nameless.LitInt 42)))])
+        (env [Nameless.EntE (Nameless.Rec "m" (Nameless.Lit (Nameless.LitInt 42)))])
         "m"
     , Just (Nameless.TyLit Nameless.TyInt)
     , Just (Nameless.Lit (Nameless.LitInt 42))
@@ -392,17 +396,17 @@ debruijnTests =
         [ Named.ExpE "result" (Named.Var "x")  -- x is ExpE, stays as Var
         , Named.ExpE "x" (Named.Lit (Nameless.LitInt 42))
         ]
-    , Nameless.FEnv 
-        [ Nameless.ExpE (Nameless.Var 0)
-        , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 42))
+    , env
+        [ Nameless.EntE (Nameless.Var 0)
+        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))
         ]
     , Just (Nameless.TyEnvt 
         [ Nameless.Type (Nameless.TyLit Nameless.TyInt)
         , Nameless.Type (Nameless.TyLit Nameless.TyInt)
         ])
-    , Just (Nameless.FEnv 
-        [ Nameless.ExpE (Nameless.Lit (Nameless.LitInt 42))
-        , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 42))
+    , Just (env
+        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))
+        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))
         ])
     )
 
@@ -413,8 +417,8 @@ debruijnTests =
     , Named.Box 
         [Named.ExpE "x" (Named.Lit (Nameless.LitInt 42))]
         (Named.Var "x")
-    , Nameless.Box 
-        [Nameless.ExpE (Nameless.Lit (Nameless.LitInt 42))]
+    , Nameless.Box
+        (env [Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))])
         (Nameless.Var 0)
     , Just (Nameless.TyBoxT 
         [Nameless.Type (Nameless.TyLit Nameless.TyInt)]
@@ -425,24 +429,24 @@ debruijnTests =
     , Named.Clos 
         [Named.ExpE "captured" (Named.Lit (Nameless.LitInt 10))]
         (Named.Var "captured")
-    , Nameless.Clos 
-        [Nameless.ExpE (Nameless.Lit (Nameless.LitInt 10))]
+    , Nameless.Clos
+        (env [Nameless.EntE (Nameless.Lit (Nameless.LitInt 10))])
         (Nameless.Var 0)
     , Nothing  -- closures need checking, not inference
-    , Just (Nameless.Clos 
-        [Nameless.ExpE (Nameless.Lit (Nameless.LitInt 10))]
+    , Just (Nameless.Clos
+        (env [Nameless.EntE (Nameless.Lit (Nameless.LitInt 10))])
         (Nameless.Var 0))
     )
   , ( "32. tclos with type environment"
     , Named.TClos 
         [Named.TypE "t" (Named.TyLit Nameless.TyInt)]
         (Named.Lam "x" (Named.Var "x"))
-    , Nameless.TClos 
-        [Nameless.TypE (Nameless.TyLit Nameless.TyInt)]
+    , Nameless.TClos
+        (env [Nameless.EntT (Nameless.TyLit Nameless.TyInt)])
         (Nameless.Lam (Nameless.Var 0))
     , Nothing  -- closures need checking
-    , Just (Nameless.TClos 
-        [Nameless.TypE (Nameless.TyLit Nameless.TyInt)]
+    , Just (Nameless.TClos
+        (env [Nameless.EntT (Nameless.TyLit Nameless.TyInt)])
         (Nameless.Lam (Nameless.Var 0)))
     )
 
@@ -457,7 +461,7 @@ debruijnTests =
         (Nameless.TLam (Nameless.Lam (Nameless.Var 0)))
         (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0)))
     , Just (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0)))
-    , Just (Nameless.TClos [] (Nameless.Lam (Nameless.Var 0)))
+    , Just (Nameless.TClos Nameless.Unit (Nameless.Lam (Nameless.Var 0)))
     )
   , ( "34. nested forall types"
     , Named.Anno 
@@ -467,7 +471,7 @@ debruijnTests =
         (Nameless.TLam (Nameless.TLam (Nameless.Lam (Nameless.Var 0))))
         (Nameless.TyAll (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0))))
     , Just (Nameless.TyAll (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0))))
-    , Just (Nameless.TClos [] (Nameless.TLam (Nameless.Lam (Nameless.Var 0))))
+    , Just (Nameless.TClos Nameless.Unit (Nameless.TLam (Nameless.Lam (Nameless.Var 0))))
     )
   , ( "35. forall referencing outer type variable"
     , Named.Anno 
@@ -477,7 +481,7 @@ debruijnTests =
         (Nameless.TLam (Nameless.TLam (Nameless.Lam (Nameless.Var 0))))
         (Nameless.TyAll (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 1) (Nameless.TyVar 1))))
     , Just (Nameless.TyAll (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 1) (Nameless.TyVar 1))))
-    , Just (Nameless.TClos [] (Nameless.TLam (Nameless.Lam (Nameless.Var 0))))
+    , Just (Nameless.TClos Nameless.Unit (Nameless.TLam (Nameless.Lam (Nameless.Var 0))))
     )
   ]
 
@@ -538,7 +542,7 @@ spec = do
         case expectedResult of
           Just result ->
             it "evaluates correctly" $
-              eval [] (toDeBruijn namedExp) `shouldBe` Just result
+              eval Nameless.Unit (toDeBruijn namedExp) `shouldBe` Just result
           Nothing ->
             it "evaluation not expected (skipped)" $
               True `shouldBe` True  -- trivial assertion

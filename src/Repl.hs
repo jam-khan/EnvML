@@ -174,7 +174,7 @@ cmdEval path = runElab path $ \coreNamed -> do
     Just typ -> putStrLn $ "Type: " ++ CoreFE.pretty typ
 
   putStrLn "=== Evaluation ==="
-  case Eval.eval [] coreNameless of
+  case Eval.eval CoreFE.Unit coreNameless of
     Nothing -> putStrLn "✗ Evaluation failed"
     Just result -> do
       putStrLn "✓ Result:"

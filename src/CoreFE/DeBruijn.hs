@@ -1,3 +1,7 @@
+-- | Name resolution: from the named intermediate ('CoreFE.Named') to the nameless
+--   core ('CoreFE.Syntax'). Term and type variables are resolved to separate de
+--   Bruijn indices; a literal environment's entries telescope (each entry sees the
+--   entries after it) and become a @Unit@-rooted @Merge@ / @TMerge@ chain.
 module CoreFE.DeBruijn where
 
 import qualified CoreFE.Syntax    as Nameless
@@ -25,11 +29,13 @@ toNamelessExp ::
 toNamelessExp eNames tNames e =
   case e of
     (Named.Lit i)    -> Nameless.Lit i
+    -- A module binding is stored as a labelled entry {m = e}; the variable
+    -- projects it back out of a singleton environment (Typ-sel with Lookup-rcd).
     (Named.Var n)    ->
       let (i, b) = indexE n eNames
       in  case b of
             TermBinding -> Nameless.Var i
-            ModBinding  -> Nameless.RProj (Nameless.FEnv [Nameless.ExpE (Nameless.Var i)]) n
+            ModBinding  -> Nameless.RProj (Nameless.Merge Nameless.Unit (Nameless.Var i)) n
     (Named.Lam x e1) ->
       Nameless.Lam (toNamelessExp ((x, TermBinding):eNames) tNames e1)
     (Named.Clos env e1)  ->
@@ -59,7 +65,7 @@ toNamelessExp eNames tNames e =
     (Named.RProj e1 l)   ->
       Nameless.RProj (toNamelessExp eNames tNames e1) l
     (Named.FEnv env)     ->
-      Nameless.FEnv (toNamelessEnv eNames tNames env)
+      toNamelessEnv eNames tNames env
     (Named.Anno e1 ty)   ->
       Nameless.Anno
         (toNamelessExp eNames tNames e1)
@@ -103,29 +109,23 @@ envToTypNames (Named.TypE n _: rest)
                        = n:envToTypNames rest
 envToTypNames (_:rest) = envToTypNames rest
 
+-- | A literal environment (newest entry first) becomes a @Unit@-rooted chain.
+--   Each entry is resolved in the scope of the entries after it plus the outer
+--   scope; a module entry becomes a labelled record entry.
 toNamelessEnv ::
   ExpNames
   -> TypNames
   -> Named.Env
-  -> Nameless.Env
-toNamelessEnv _ _ [] = []
-toNamelessEnv eNames tNames (e:env)=
+  -> Nameless.Exp
+toNamelessEnv _ _ [] = Nameless.Unit
+toNamelessEnv eNames tNames (e:env) =
   let restExpNames = envToExpNames env ++ eNames
       restTypNames = envToTypNames env ++ tNames
-      e'   = toNamelessEnvE restExpNames restTypNames e
       env' = toNamelessEnv eNames tNames env
-  in  e':env'
-
-toNamelessEnvE ::
-  ExpNames
-  -> TypNames
-  -> Named.EnvE
-  -> Nameless.EnvE
-toNamelessEnvE eNames tNames entry =
-  case entry of
-    Named.ExpE _n e -> Nameless.ExpE $ toNamelessExp eNames tNames e
-    Named.ModE n e  -> Nameless.ExpE (Nameless.Rec n (toNamelessExp eNames tNames e))
-    Named.TypE _n t -> Nameless.TypE $ toNamelessTyp eNames tNames t
+  in  case e of
+        Named.ExpE _ x -> Nameless.Merge env' (toNamelessExp restExpNames restTypNames x)
+        Named.ModE n x -> Nameless.Merge env' (Nameless.Rec n (toNamelessExp restExpNames restTypNames x))
+        Named.TypE _ t -> Nameless.TMerge env' (toNamelessTyp restExpNames restTypNames t)
 
 getEntryName :: Named.EnvE -> Name
 getEntryName (Named.ExpE n _e) = n

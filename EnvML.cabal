@@ -64,7 +64,9 @@ test-suite tests
         base >= 4.7 && <5,
         hspec,
         EnvML,
-        QuickCheck
+        QuickCheck,
+        directory,
+        filepath
 
     build-tool-depends:
         hspec-discover:hspec-discover

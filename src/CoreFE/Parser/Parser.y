@@ -84,24 +84,24 @@ AtomExp :: { Exp }
   | string                              { Lit (LitStr $1) }
   | var                                 { Var $1 }
   | '[' RuntimeEnvList ']' '|>' AtomExp { Box $2 $5 }
-  | '[' RuntimeEnvList ']'              { FEnv $2 }
+  | '[' RuntimeEnvList ']'              { $2 }
   | '<' '[' RuntimeEnvList ']' '|' lam '.' Exp '>'    { Clos $3 $8 }
   | '<' '[' RuntimeEnvList ']' '|' TLam '.' Exp '>'   { TClos $3 $8 }
   | '{' ident '=' Exp '}'               { Rec $2 $4 }
   | '(' Exp ')'                         { $2 }
 
--- Runtime environment entries (Env: [EnvE]) - reversed for right-to-left
-RuntimeEnvList :: { Env }
-  : {- empty -}                         { [] }
-  | RuntimeEntries                      { reverse $1 }
+-- A literal environment [e1, e2, tdef A] is the chain ((·, e1), e2), [A]
+RuntimeEnvList :: { Exp }
+  : {- empty -}                         { Unit }
+  | RuntimeEntries                      { foldl entryOn Unit $1 }
 
-RuntimeEntries :: { [EnvE] }
+RuntimeEntries :: { [Either Exp Typ] }
   : RuntimeEntry                        { [$1] }
   | RuntimeEntry ',' RuntimeEntries      { $1 : $3 }
 
-RuntimeEntry :: { EnvE }
-  : tdef Typ                            { TypE $2 }
-  | Exp                                 { ExpE $1 }
+RuntimeEntry :: { Either Exp Typ }
+  : tdef Typ                            { Right $2 }
+  | Exp                                 { Left $1 }
 
 -- Types
 Typ :: { Typ }
@@ -143,4 +143,8 @@ TyEnvEntry :: { TyEnvE }
 {
 parseError :: [Token] -> a
 parseError tokens = error $ "Parse error: " ++ show tokens
+
+entryOn :: Exp -> Either Exp Typ -> Exp
+entryOn d (Left e)  = Merge d e
+entryOn d (Right t) = TMerge d t
 }

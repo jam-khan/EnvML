@@ -7,10 +7,10 @@ import qualified CoreFE.Syntax as CoreFE
 
 --------------------------------------------------------------------------------
 -- User-Friendly Pretty Printing for the Playground
--- 
+--
 -- This module provides clean, readable output for all three AST levels:
 -- 1. EnvML Source AST
--- 2. CoreFE Named AST  
+-- 2. CoreFE Named AST
 -- 3. CoreFE Nameless (De Bruijn) AST
 --------------------------------------------------------------------------------
 
@@ -31,26 +31,26 @@ indent n = replicate (n * 2) ' '
 --------------------------------------------------------------------------------
 
 prettyEnvMLModule :: EnvML.Module -> String
-prettyEnvMLModule (EnvML.Struct structs) = 
+prettyEnvMLModule (EnvML.Struct structs) =
     unlines $ map prettyEnvMLStructure structs
 prettyEnvMLModule m = EnvML.pretty m
 
 prettyEnvMLStructure :: EnvML.Structure -> String
-prettyEnvMLStructure (EnvML.Let n Nothing e) = 
+prettyEnvMLStructure (EnvML.Let n Nothing e) =
     "let " ++ n ++ " = " ++ prettyEnvMLExpShort e
-prettyEnvMLStructure (EnvML.Let n (Just t) e) = 
+prettyEnvMLStructure (EnvML.Let n (Just t) e) =
     "let " ++ n ++ " : " ++ EnvML.prettyTyp t ++ " = " ++ prettyEnvMLExpShort e
-prettyEnvMLStructure (EnvML.TypDecl n t) = 
+prettyEnvMLStructure (EnvML.TypDecl n t) =
     "type " ++ n ++ " = " ++ EnvML.prettyTyp t
-prettyEnvMLStructure (EnvML.ModTypDecl n mt) = 
+prettyEnvMLStructure (EnvML.ModTypDecl n mt) =
     "module type " ++ n ++ " = " ++ EnvML.prettyModuleTyp mt
-prettyEnvMLStructure (EnvML.ModStruct n Nothing m) = 
+prettyEnvMLStructure (EnvML.ModStruct n Nothing m) =
     "module " ++ n ++ " = " ++ prettyEnvMLModuleShort m
-prettyEnvMLStructure (EnvML.ModStruct n (Just mt) m) = 
+prettyEnvMLStructure (EnvML.ModStruct n (Just mt) m) =
     "module " ++ n ++ " : " ++ EnvML.prettyModuleTyp mt ++ " =\n  " ++ prettyEnvMLModuleShort m
-prettyEnvMLStructure (EnvML.FunctStruct n args Nothing m) = 
+prettyEnvMLStructure (EnvML.FunctStruct n args Nothing m) =
     "module " ++ n ++ " " ++ EnvML.prettyFunArgs args ++ " = " ++ prettyEnvMLModuleShort m
-prettyEnvMLStructure (EnvML.FunctStruct n args (Just mt) m) = 
+prettyEnvMLStructure (EnvML.FunctStruct n args (Just mt) m) =
     "module " ++ n ++ " " ++ EnvML.prettyFunArgs args ++ " : " ++ EnvML.prettyModuleTyp mt ++ " =\n  " ++ prettyEnvMLModuleShort m
 
 prettyEnvMLModuleShort :: EnvML.Module -> String
@@ -82,20 +82,22 @@ prettyEnvMLExpShort _ = "..."
 --------------------------------------------------------------------------------
 
 prettyNamedModule :: Named.Exp -> String
-prettyNamedModule (Named.FEnv env) = 
+prettyNamedModule (Named.FEnv env) =
     unlines $ map prettyNamedBinding (reverse env)
+prettyNamedModule (Named.Box [] (Named.Anno e _)) = prettyNamedModule e
+prettyNamedModule (Named.Box [] e) = prettyNamedModule e
 prettyNamedModule e = Named.pretty e
 
 prettyNamedBinding :: Named.EnvE -> String
-prettyNamedBinding (Named.TypE n t) = 
+prettyNamedBinding (Named.TypE n t) =
     "type " ++ n ++ " = " ++ Named.prettyTyp t
 prettyNamedBinding (Named.ModE n e) = prettyNamedBindingExp n e
 prettyNamedBinding (Named.ExpE n e) = prettyNamedBindingExp n e
 
 prettyNamedBindingExp :: Named.Name -> Named.Exp -> String
-prettyNamedBindingExp name (Named.Anno e t) = 
+prettyNamedBindingExp name (Named.Anno e t) =
     name ++ " : " ++ Named.prettyTyp t ++ " =\n  " ++ prettyNamedExpShort e
-prettyNamedBindingExp name e = 
+prettyNamedBindingExp name e =
     name ++ " = " ++ prettyNamedExpShort e
 
 prettyNamedExpShort :: Named.Exp -> String
@@ -124,7 +126,7 @@ prettyNamedExpShort (Named.BinOp (Named.LessThan e1 e2)) = prettyNamedExpShort e
 
 prettyNamedEnvShort :: Named.Env -> String
 prettyNamedEnvShort [] = "[]"
-prettyNamedEnvShort env 
+prettyNamedEnvShort env
     | length env <= 2 = "[" ++ intercalate ", " (map shortEntry env) ++ "]"
     | otherwise = "[" ++ intercalate ", " (map shortEntry (take 2 env)) ++ ", ...]"
   where
@@ -136,15 +138,19 @@ prettyNamedEnvShort env
 -- CoreFE Nameless (De Bruijn) AST - User Display
 --------------------------------------------------------------------------------
 
+-- | A top-level program is a sandboxed environment; show its entries one per line.
 prettyDeBruijnModule :: CoreFE.Exp -> String
-prettyDeBruijnModule (CoreFE.FEnv env) = 
-    unlines $ map prettyDeBruijnBinding (reverse env)
-prettyDeBruijnModule e = prettyDeBruijnExp e
+prettyDeBruijnModule (CoreFE.Box CoreFE.Unit (CoreFE.Anno e _)) = prettyDeBruijnModule e
+prettyDeBruijnModule (CoreFE.Box CoreFE.Unit e) = prettyDeBruijnModule e
+prettyDeBruijnModule e
+  | Just entries <- CoreFE.envEntries e =
+      unlines $ map prettyDeBruijnBinding (reverse entries)
+  | otherwise = prettyDeBruijnExp e
 
-prettyDeBruijnBinding :: CoreFE.EnvE -> String
-prettyDeBruijnBinding (CoreFE.TypE t) = 
+prettyDeBruijnBinding :: CoreFE.Entry -> String
+prettyDeBruijnBinding (CoreFE.EntT t) =
     "type " ++ prettyDeBruijnTyp t
-prettyDeBruijnBinding (CoreFE.ExpE e) = prettyDeBruijnBindingExp e
+prettyDeBruijnBinding (CoreFE.EntE e) = prettyDeBruijnBindingExp e
 
 prettyDeBruijnBindingExp :: CoreFE.Exp -> String
 prettyDeBruijnBindingExp (CoreFE.Rec label (CoreFE.Anno e t)) =
@@ -167,7 +173,9 @@ prettyDeBruijnExpShort (CoreFE.TApp e t) = prettyDeBruijnExpShort e ++ " @" ++ p
 prettyDeBruijnExpShort (CoreFE.Box _ _) = "[...] => ..."
 prettyDeBruijnExpShort (CoreFE.Rec l e) = "{" ++ l ++ " = " ++ prettyDeBruijnExpShort e ++ "}"
 prettyDeBruijnExpShort (CoreFE.RProj e l) = prettyDeBruijnExpShort e ++ "." ++ l
-prettyDeBruijnExpShort (CoreFE.FEnv env) = prettyDeBruijnEnvShort env
+prettyDeBruijnExpShort e@CoreFE.Unit = prettyDeBruijnEnvShort e
+prettyDeBruijnExpShort e@(CoreFE.Merge _ _) = prettyDeBruijnEnvShort e
+prettyDeBruijnExpShort e@(CoreFE.TMerge _ _) = prettyDeBruijnEnvShort e
 prettyDeBruijnExpShort (CoreFE.Anno e _) = prettyDeBruijnExpShort e
 prettyDeBruijnExpShort (CoreFE.BinOp op) = prettyDeBruijnBinOpShort op
 prettyDeBruijnExpShort (CoreFE.EList es) = foldr (\e acc -> acc ++ prettyDeBruijnExpShort e ++ ",") "" es
@@ -182,15 +190,19 @@ prettyDeBruijnBinOpShort (CoreFE.Mul e1 e2) = prettyDeBruijnExpShort e1 ++ " * "
 prettyDeBruijnBinOpShort (CoreFE.EqEq e1 e2) = prettyDeBruijnExpShort e1 ++ " == " ++ prettyDeBruijnExpShort e2
 prettyDeBruijnBinOpShort (CoreFE.LessThan e1 e2) = prettyDeBruijnExpShort e1 ++ " < " ++ prettyDeBruijnExpShort e2
 
-prettyDeBruijnEnvShort :: CoreFE.Env -> String
-prettyDeBruijnEnvShort [] = "[]"
-prettyDeBruijnEnvShort env 
-    | length env <= 2 = "[" ++ intercalate ", " (map shortEntry (reverse env)) ++ "]"
-    | otherwise = "[" ++ intercalate ", " (map shortEntry (take 2 (reverse env))) ++ ", ...]"
+-- | An environment chain, abbreviated. Entries are shown oldest first.
+prettyDeBruijnEnvShort :: CoreFE.Exp -> String
+prettyDeBruijnEnvShort e =
+  case CoreFE.envEntries e of
+    Just [] -> "[]"
+    Just entries
+      | length entries <= 2 -> "[" ++ intercalate ", " (map shortEntry (reverse entries)) ++ "]"
+      | otherwise -> "[" ++ intercalate ", " (map shortEntry (take 2 (reverse entries))) ++ ", ...]"
+    Nothing -> "(... ,, ...)"
   where
-    shortEntry (CoreFE.ExpE (CoreFE.Rec l _)) = l
-    shortEntry (CoreFE.ExpE _) = "_"
-    shortEntry (CoreFE.TypE _) = "type"
+    shortEntry (CoreFE.EntE (CoreFE.Rec l _)) = l
+    shortEntry (CoreFE.EntE _) = "_"
+    shortEntry (CoreFE.EntT _) = "type"
 
 needsParenCore :: CoreFE.Exp -> Bool
 needsParenCore (CoreFE.App _ _) = True
@@ -204,14 +216,16 @@ prettyDeBruijnExp (CoreFE.Lit l) = prettyLiteral l
 prettyDeBruijnExp (CoreFE.Var n) = "x" ++ show n
 prettyDeBruijnExp (CoreFE.Lam e) = "λ. " ++ prettyDeBruijnExp e
 prettyDeBruijnExp (CoreFE.TLam e) = "Λ. " ++ prettyDeBruijnExp e
-prettyDeBruijnExp (CoreFE.Clos env e) = "⟨[" ++ prettyDeBruijnEnv env ++ "] | " ++ prettyDeBruijnExp e ++ "⟩"
-prettyDeBruijnExp (CoreFE.TClos env e) = "⟨[" ++ prettyDeBruijnEnv env ++ "] | " ++ prettyDeBruijnExp e ++ "⟩"
+prettyDeBruijnExp (CoreFE.Clos env e) = "⟨" ++ prettyDeBruijnEnvLike env ++ " | " ++ prettyDeBruijnExp e ++ "⟩"
+prettyDeBruijnExp (CoreFE.TClos env e) = "⟨" ++ prettyDeBruijnEnvLike env ++ " | " ++ prettyDeBruijnExp e ++ "⟩"
 prettyDeBruijnExp (CoreFE.App e1 e2) = prettyDeBruijnExp e1 ++ " " ++ parenIf (needsParenCore e2) (prettyDeBruijnExp e2)
 prettyDeBruijnExp (CoreFE.TApp e t) = prettyDeBruijnExp e ++ " @" ++ prettyDeBruijnTyp t
-prettyDeBruijnExp (CoreFE.Box env e) = "[" ++ prettyDeBruijnEnv env ++ "] => " ++ prettyDeBruijnExp e
+prettyDeBruijnExp (CoreFE.Box env e) = prettyDeBruijnEnvLike env ++ " => " ++ prettyDeBruijnExp e
 prettyDeBruijnExp (CoreFE.Rec l e) = "{" ++ l ++ " = " ++ prettyDeBruijnExp e ++ "}"
 prettyDeBruijnExp (CoreFE.RProj e l) = parenIf (needsParenCore e) (prettyDeBruijnExp e) ++ "." ++ l
-prettyDeBruijnExp (CoreFE.FEnv env) = "[" ++ prettyDeBruijnEnv env ++ "]"
+prettyDeBruijnExp e@CoreFE.Unit = prettyDeBruijnEnvLike e
+prettyDeBruijnExp e@(CoreFE.Merge _ _) = prettyDeBruijnEnvLike e
+prettyDeBruijnExp e@(CoreFE.TMerge _ _) = prettyDeBruijnEnvLike e
 prettyDeBruijnExp (CoreFE.Anno e t) = parenIf (needsParenCore e) (prettyDeBruijnExp e) ++ " : " ++ prettyDeBruijnTyp t
 prettyDeBruijnExp (CoreFE.BinOp op) = prettyDeBruijnBinOp op
 prettyDeBruijnExp (CoreFE.EList es) = foldr (\e acc -> acc ++ prettyDeBruijnExpShort e ++ ",") "" es
@@ -226,14 +240,21 @@ prettyDeBruijnBinOp (CoreFE.Mul e1 e2) = prettyDeBruijnExp e1 ++ " * " ++ pretty
 prettyDeBruijnBinOp (CoreFE.EqEq e1 e2) = prettyDeBruijnExp e1 ++ " == " ++ prettyDeBruijnExp e2
 prettyDeBruijnBinOp (CoreFE.LessThan e1 e2) = prettyDeBruijnExp e1 ++ " < " ++ prettyDeBruijnExp e2
 
-prettyDeBruijnEnv :: CoreFE.Env -> String
-prettyDeBruijnEnv [] = ""
-prettyDeBruijnEnv es = intercalate ", " $ map prettyDeBruijnEnvE (reverse es)
+-- | An environment: bracketed entries when literal, the calculus' comma otherwise.
+prettyDeBruijnEnvLike :: CoreFE.Exp -> String
+prettyDeBruijnEnvLike e =
+  case CoreFE.envEntries e of
+    Just entries -> "[" ++ intercalate ", " (map prettyDeBruijnEnvE (reverse entries)) ++ "]"
+    Nothing ->
+      case e of
+        CoreFE.Merge d x  -> prettyDeBruijnExp d ++ " ,, " ++ prettyDeBruijnExp x
+        CoreFE.TMerge d t -> prettyDeBruijnExp d ++ " ,, type " ++ prettyDeBruijnTyp t
+        _                 -> prettyDeBruijnExp e
 
-prettyDeBruijnEnvE :: CoreFE.EnvE -> String
-prettyDeBruijnEnvE (CoreFE.ExpE (CoreFE.Rec l e)) = l ++ " = " ++ prettyDeBruijnExp e
-prettyDeBruijnEnvE (CoreFE.ExpE e) = prettyDeBruijnExp e
-prettyDeBruijnEnvE (CoreFE.TypE t) = "type " ++ prettyDeBruijnTyp t
+prettyDeBruijnEnvE :: CoreFE.Entry -> String
+prettyDeBruijnEnvE (CoreFE.EntE (CoreFE.Rec l e)) = l ++ " = " ++ prettyDeBruijnExp e
+prettyDeBruijnEnvE (CoreFE.EntE e) = prettyDeBruijnExp e
+prettyDeBruijnEnvE (CoreFE.EntT t) = "type " ++ prettyDeBruijnTyp t
 
 prettyDeBruijnTyp :: CoreFE.Typ -> String
 prettyDeBruijnTyp (CoreFE.TyLit l) = prettyTyLit l
@@ -263,43 +284,47 @@ isArrowCore (CoreFE.TyArr _ _) = True
 isArrowCore _ = False
 
 prettyCheckResult :: CoreFE.Typ -> String
-prettyCheckResult (CoreFE.TyEnvt env) = 
+prettyCheckResult (CoreFE.TyBoxT [] t) = prettyCheckResult t
+prettyCheckResult (CoreFE.TyEnvt env) =
     unlines $ map prettyTypeBinding (reverse env)
   where
     prettyTypeBinding :: CoreFE.TyEnvE -> String
     prettyTypeBinding (CoreFE.Type t) = formatTypeEntry t
     prettyTypeBinding CoreFE.Kind = "  * (kind)"
     prettyTypeBinding (CoreFE.TypeEq t) = "  type = " ++ prettyDeBruijnTyp t
-    
+
     formatTypeEntry :: CoreFE.Typ -> String
     formatTypeEntry (CoreFE.TyRcd label t) = "  " ++ label ++ " : " ++ prettyDeBruijnTyp t
     formatTypeEntry t = "  " ++ prettyDeBruijnTyp t
 prettyCheckResult t = "  " ++ prettyDeBruijnTyp t
 
 prettyEvalResult :: CoreFE.Exp -> String
-prettyEvalResult (CoreFE.FEnv env) = 
-    unlines $ map formatBinding (reverse env)
+prettyEvalResult e
+  | Just entries <- CoreFE.envEntries e =
+      unlines $ map formatBinding (reverse entries)
+  | otherwise = "  " ++ prettyValueShort e
   where
-    formatBinding :: CoreFE.EnvE -> String
-    formatBinding (CoreFE.TypE t) = "  type " ++ prettyDeBruijnTyp t
-    formatBinding (CoreFE.ExpE e) = formatExpBinding e
-    
+    formatBinding :: CoreFE.Entry -> String
+    formatBinding (CoreFE.EntT t) = "  type " ++ prettyDeBruijnTyp t
+    formatBinding (CoreFE.EntE x) = formatExpBinding x
+
     formatExpBinding :: CoreFE.Exp -> String
-    formatExpBinding (CoreFE.Rec label val) = 
+    formatExpBinding (CoreFE.Rec label val) =
         "  " ++ label ++ " = " ++ prettyValueShort val
-    formatExpBinding (CoreFE.Anno (CoreFE.Rec label val) _) = 
+    formatExpBinding (CoreFE.Anno (CoreFE.Rec label val) _) =
         "  " ++ label ++ " = " ++ prettyValueShort val
-    formatExpBinding (CoreFE.Anno e _) = 
-        "  " ++ prettyValueShort e
-    formatExpBinding e = "  " ++ prettyValueShort e
-prettyEvalResult e = "  " ++ prettyValueShort e
+    formatExpBinding (CoreFE.Anno x _) =
+        "  " ++ prettyValueShort x
+    formatExpBinding x = "  " ++ prettyValueShort x
 
 prettyValueShort :: CoreFE.Exp -> String
 prettyValueShort (CoreFE.Lit l) = prettyLiteral l
 prettyValueShort (CoreFE.Var n) = "x" ++ show n
 prettyValueShort (CoreFE.Clos _ _) = "<closure>"
 prettyValueShort (CoreFE.TClos _ _) = "<type-closure>"
-prettyValueShort (CoreFE.FEnv env) = prettyDeBruijnEnvShort env
+prettyValueShort e@CoreFE.Unit = prettyDeBruijnEnvShort e
+prettyValueShort e@(CoreFE.Merge _ _) = prettyDeBruijnEnvShort e
+prettyValueShort e@(CoreFE.TMerge _ _) = prettyDeBruijnEnvShort e
 prettyValueShort (CoreFE.Rec label e) = "{" ++ label ++ " = " ++ prettyValueShort e ++ "}"
 prettyValueShort (CoreFE.RProj e l) = prettyValueShort e ++ "." ++ l
 prettyValueShort (CoreFE.Anno e _) = prettyValueShort e

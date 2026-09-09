@@ -1,7 +1,7 @@
 module CoreFE.CoreFESpec (spec) where
 
 import CoreFE.Eval (eval)
-import CoreFE.Check (infer, check, teq)
+import CoreFE.Check (infer, check, teq, wft, rigid, checkAbs)
 import CoreFE.Syntax
 import CoreFE.Parser.Lexer (lexer)
 import CoreFE.Parser.Parser (parseExp, parseTyp, parseEnv)
@@ -18,7 +18,7 @@ pEnv :: String -> TyEnv
 pEnv = parseEnv . lexer
 
 eval0 :: Exp -> Maybe Exp
-eval0 = eval []
+eval0 = eval Unit
 
 evalP :: String -> Maybe Exp
 evalP = eval0 . pExp
@@ -151,11 +151,25 @@ evalTests =
   -- ── Environments ──────────────────────────────────────────
   , ( "empty env"
     , "[]"
-    , Just (FEnv [])
+    , Just Unit
     )
   , ( "single-element env"
     , "[5]"
-    , Just (FEnv [ExpE (Lit (LitInt 5))])
+    , Just (Merge Unit (Lit (LitInt 5)))
+    )
+
+  , ( "type entry is closed over the context"
+    , "[tdef Int]"
+    , Just (TMerge Unit (TyBoxT [] (TyLit TyInt)))
+    )
+  , ( "an already boxed type entry is kept (Step-tdef requires not box(A))"
+    , "[tdef ([] |> Int)]"
+    , Just (TMerge Unit (TyBoxT [] (TyLit TyInt)))
+    )
+  , ( "a later type entry is closed over the earlier ones"
+    , "[tdef Int, tdef 0]"
+    , Just (TMerge (TMerge Unit (TyBoxT [] (TyLit TyInt)))
+                   (TyBoxT [TypeEq (TyBoxT [] (TyLit TyInt))] (TyVar 0)))
     )
 
   -- ── Box ───────────────────────────────────────────────────
@@ -563,13 +577,13 @@ typEqTests =
     , "[]", "[*] |> 0", "0", "[*]"
     , False
     )
-  , ( "box with Kind after Eteq fails"
+  , ( "box body may leave an abstract entry unused (rigid, Wft-box)"
     , "[]", "[*, eq Int] |> 0", "Int", "[]"
-    , False
+    , True
     )
-  , ( "box with Kind before Eteq fails"
+  , ( "box body may skip over an abstract entry (rigid, Wft-box)"
     , "[]", "[eq Int, *] |> 1", "Int", "[]"
-    , False
+    , True
     )
 
     -- ═══════════════════════════════════════════════════════════
@@ -611,9 +625,13 @@ typEqTests =
     , "[]", "Env[Int]", "Env[Int]", "[]"
     , True
     )
-  , ( "env with Kind and Type"
-    , "[]", "Env[0, *]", "Env[0, *]", "[]"
+  , ( "env with Kind and Type (the entry sees the earlier binder)"
+    , "[]", "Env[*, 0]", "Env[*, 0]", "[]"
     , True
+    )
+  , ( "env entry cannot refer to a later binder"
+    , "[]", "Env[0, *]", "Env[0, *]", "[]"
+    , False
     )
   , ( "env with multiple entries"
     , "[]", "Env[Int, Bool]", "Env[Int, Bool]", "[]"
@@ -645,14 +663,105 @@ typEqTests =
     , "[]"
     , True
     )
-  , ( "asymmetric contexts with same inner index"
+  , ( "positional Teq-tvar: same index, abstract on both sides"
     , "[*, eq Int]", "1", "1", "[*, *]"
-    , False
+    , True
     )
   , ( "box in subst"
     , "[]", "[eq ([] |> Int)] |> 0", "Int", "[]"
     , True
     )
+  ]
+
+-- ═══════════════════════════════════════════════════════════════════
+-- Type equivalence: positional variables, padded manifest rules, rigid boxes
+-- (Teq.v: eq_tvar, eq_manil/eq_manir, eq_boxl/eq_boxr)
+-- ═══════════════════════════════════════════════════════════════════
+teqRuleTests :: [(String, String, String, String, String, Bool)]
+teqRuleTests =
+  [ ( "different indices are different abstract variables"
+    , "[*, *]", "0", "1", "[*, *]", False )
+  , ( "abstract vs manifest at the same index"
+    , "[*]", "0", "0", "[eq Int]", False )
+  , ( "abstract variable vs manifest type on the right (Teq-manir pads with *)"
+    , "[*]", "0", "#[Int]1", "[*]", True )
+  , ( "manifest type vs abstract variable on the left (Teq-manil pads with *)"
+    , "[*]", "#[Int]1", "0", "[*]", True )
+  , ( "manifest types on both sides"
+    , "[]", "#[Int]0", "#[Bool]Int", "[]", True )
+  , ( "shifted variable under the padding resolves through the context"
+    , "[eq Bool]", "#[Int]1", "0", "[eq Bool]", True )
+  , ( "manifest binding does not leak: #[Int]1 is not 0"
+    , "[eq Bool]", "#[Int]1", "Int", "[eq Bool]", False )
+  , ( "box body using its abstract entry is rejected"
+    , "[]", "[*] |> 0", "Int", "[]", False )
+  , ( "box with a closed forall body"
+    , "[]", "[eq Int] |> forall. 0", "forall. 0", "[]", True )
+  , ( "out-of-scope variables are not equivalent"
+    , "[]", "3", "3", "[]", False )
+  ]
+
+-- ═══════════════════════════════════════════════════════════════════
+-- Well-formedness (Teq.v: wft / rigid / check)
+-- ═══════════════════════════════════════════════════════════════════
+wftTests :: [(String, String, String, Bool)]
+wftTests =
+  [ ("Int is well-formed", "[]", "Int", True)
+  , ("unbound type variable is not", "[]", "0", False)
+  , ("abstract variable in scope", "[*]", "0", True)
+  , ("manifest variable in scope", "[eq Int]", "0", True)
+  , ("type variables skip term entries", "[*, Int]", "0", True)
+  , ("index past the context", "[*]", "1", False)
+  , ("forall binds index 0", "[]", "forall. 0", True)
+  , ("manifest type binds index 0 in its body", "[]", "#[Int]0", True)
+  , ("box over a manifest entry", "[]", "[eq Int] |> 0", True)
+  , ("box body must not use an abstract entry (rigidity)", "[]", "[*] |> 0", False)
+  , ("box body may leave an abstract entry unused", "[]", "[*, eq Int] |> 0", True)
+  , ("env type: a later entry sees an earlier entry", "[]", "Env[eq Int, 0]", True)
+  , ("env type: an earlier entry cannot see a later entry", "[]", "Env[0, eq Int]", False)
+  , ("box environment must itself be well-formed", "[]", "[eq 3] |> Int", False)
+  ]
+
+rigidTests :: [(String, Int, String, String, Bool)]
+rigidTests =
+  [ ("manifest variable is rigid", 0, "[eq Int]", "0", True)
+  , ("abstract variable is not rigid at depth 0", 0, "[*]", "0", False)
+  , ("forall-bound variable is rigid", 0, "[]", "forall. 0", True)
+  , ("abstract variable below the depth is rigid", 1, "[*]", "0", True)
+  , ("abstract variable at the depth is not", 1, "[*, *]", "1", False)
+  ]
+
+checkAbsTests :: [(String, String, Int, Bool)]
+checkAbsTests =
+  [ ("abstract at index 0", "[*]", 0, True)
+  , ("manifest entry is not abstract", "[eq Int]", 0, False)
+  , ("term entries are skipped", "[*, Int, Bool]", 0, True)
+  , ("manifest entries count", "[*, eq Int]", 1, True)
+  , ("out of range", "[*]", 1, False)
+  ]
+
+-- ═══════════════════════════════════════════════════════════════════
+-- Typing premises added with the mechanization (wft in t_tapp / lt_const)
+-- ═══════════════════════════════════════════════════════════════════
+inferFailTests :: [(String, String)]
+inferFailTests =
+  [ ("type application at an ill-formed type", "((Lam. lam. x0) : forall. 0 -> 0) @ 5")
+  , ("annotation with an unbound type variable", "42 : 0")
+  , ("type entry naming an unbound variable", "[tdef 3]")
+  , ("type entry may only see earlier entries", "[tdef 0, tdef Int]")
+  ]
+
+inferOkTests :: [(String, String, Typ)]
+inferOkTests =
+  [ ("type application at a well-formed type"
+    , "((Lam. lam. x0) : forall. 0 -> 0) @ Int"
+    , TySubstT (TyLit TyInt) (TyArr (TyVar 0) (TyVar 0)))
+  , ("type entry sees the earlier entries"
+    , "[tdef Int, tdef 0]"
+    , TyEnvt [TypeEq (TyVar 0), TypeEq (TyLit TyInt)])
+  , ("box over a type entry"
+    , "[tdef Int] |> 5"
+    , TyBoxT [TypeEq (TyLit TyInt)] (TyLit TyInt))
   ]
 
 
@@ -674,6 +783,32 @@ spec = do
   
   describe "CoreFE Type Equality checking" $ do
     mapM_ mkTypEqTest typEqTests
+
+  describe "CoreFE Type Equality: positional variables, padding, rigid boxes" $ do
+    mapM_ mkTypEqTest teqRuleTests
+
+  describe "CoreFE well-formedness" $ do
+    describe "wft" $ mapM_ mkWftTest wftTests
+    describe "rigid" $ mapM_ mkRigidTest rigidTests
+    describe "check (abstract positions)" $ mapM_ mkCheckAbsTest checkAbsTests
+
+  describe "CoreFE typing premises" $ do
+    describe "rejected" $ mapM_ mkInferFailTest inferFailTests
+    describe "accepted" $ mapM_ mkInferTest inferOkTests
+
+  describe "environments over a computed prefix (Rocq: merge e1 e2)" $ do
+    it "extending a variable of environment type types flat (lt_conse)" $
+      infer [Type (TyEnvt [Type (TyLit TyInt)])] (Merge (Var 0) (Lit (LitBool True)))
+        `shouldBe` Just (TyEnvt [Type (TyLit TyBool), Type (TyLit TyInt)])
+    it "the extension sees the prefix's entries" $
+      infer [Type (TyEnvt [Type (TyLit TyInt)])] (Merge (Var 0) (Var 0))
+        `shouldBe` Just (TyEnvt [Type (TyLit TyInt), Type (TyLit TyInt)])
+    it "evaluates by concatenating the prefix's value (b_edef)" $
+      eval (Merge Unit (Merge Unit (Lit (LitInt 7)))) (Merge (Var 0) (Var 0))
+        `shouldBe` Just (Merge (Merge Unit (Lit (LitInt 7))) (Lit (LitInt 7)))
+    it "a box over a computed environment (t_box)" $
+      infer [Type (TyEnvt [Type (TyLit TyInt)])] (Box (Var 0) (Var 0))
+        `shouldBe` Just (TyBoxT [Type (TyLit TyInt)] (TyLit TyInt))
 
   where
     mkEvalTest (name, src, expected) =
@@ -699,3 +834,19 @@ spec = do
     mkTypEqTest (name, g1Str, aStr, bStr, g2Str, expected) =
       it name $
         isTypEq g1Str aStr bStr g2Str `shouldBe` expected
+
+    mkWftTest (name, env, typ, expected) =
+      it name $
+        wft (pEnv env) (pTyp typ) `shouldBe` expected
+
+    mkRigidTest (name, d, env, typ, expected) =
+      it name $
+        rigid d (pEnv env) (pTyp typ) `shouldBe` expected
+
+    mkCheckAbsTest (name, env, i, expected) =
+      it name $
+        checkAbs (pEnv env) i `shouldBe` expected
+
+    mkInferFailTest (name, src) =
+      it name $
+        inferP src `shouldBe` Nothing

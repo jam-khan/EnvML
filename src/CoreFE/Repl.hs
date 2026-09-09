@@ -4,7 +4,7 @@ import Control.Exception (try, SomeException)
 import Control.Monad.IO.Class (liftIO) -- Necessary to run IO inside Haskeline
 
 -- Your Project Modules
-import CoreFE.Syntax ( Exp, stringOfTyp, stringOfExp )
+import CoreFE.Syntax ( Exp(Unit), stringOfTyp, stringOfExp )
 import CoreFE.Parser.Lexer (lexer)
 import CoreFE.Parser.Parser (parseExp)
 import CoreFE.Eval (eval)
@@ -48,6 +48,6 @@ handleInput str = do
         Just t  -> do
           putStrLn $ "Type   : " ++ stringOfTyp t
           -- 3. Evaluate
-          case eval [] e of
+          case eval Unit e of
             Nothing -> putStrLn "Eval Error: Evaluation failed"
             Just v  -> putStrLn $ "Result : " ++ stringOfExp v

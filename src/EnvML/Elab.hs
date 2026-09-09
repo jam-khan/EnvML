@@ -1,23 +1,33 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
--- | Type-directed elaboration from EnvML (source) to CoreFE.
+-- | Type-directed elaboration from EnvML (source) to CoreFE (named intermediate).
 --
 -- The judgment implemented here is
 --
 --     Γ ⊢ M ⇝ e : τ
 --
 -- Elaboration carries a typing context and, where the source provides enough
--- information, the core type of the elaborated term. The types are what make
--- module composition compilable: at a merge site @m1 ++ m2@ / @m1 + m2@ we know
--- both operands' signatures, so the merge is expanded into an environment
--- literal built from projections out of the operands. No concatenation
--- primitive is emitted, and CoreFE needs no @++@ term former.
+-- information, the core type of the elaborated term. Signatures elaborate to core
+-- types and expressions to core expressions, so only the module forms need work:
 --
--- The expansion is only possible when the operand signatures are *manifest*:
--- every component is either a labelled value/module component (projectable) or
--- a transparent type component (writable). An abstract component -- what
--- sealing would introduce -- cannot be reconstructed, and elaboration reports
--- that explicitly rather than falling back on a primitive.
+--   * A standalone struct or functor is /sandboxed/: it elaborates to a box over
+--     the empty environment, @[] ▷ e@. An annotation on a sandboxed module is placed
+--     inside the box and closed over the ambient type abbreviations ('closeTyp'),
+--     because the box body cannot see the ambient context.
+--
+--   * Module composition @m1 ++ m2@ / @m1 + m2@ is a /derived form/: neither the
+--     core nor the mechanization has a concatenation primitive. A merge is expanded
+--     into an environment literal that rebuilds every component by projection out
+--     of the two operands, which are bound outside every new binder:
+--
+--         ((λ#l. λ#r. [ ..projections.. ]) : τ1 → τ2 → τ) e1 e2
+--
+--     The expansion is possible only when both operand signatures are known,
+--     closed and /manifest/ (every component is a labelled value or module
+--     component, or a transparent type component) and their components are
+--     disjoint. An abstract component, a duplicate, or a free type name of the right
+--     operand that a type component of the left operand would capture is reported
+--     as an error rather than compiled to something else.
 module EnvML.Elab where
 
 import qualified CoreFE.Named  as CoreFE
@@ -66,7 +76,7 @@ lookupTy (_ : rest) x = lookupTy rest x
 --------------------------------------------------------------------------------
 
 -- | @[] ▷ A ≡ A@: an empty-environment box is transparent, mirroring
---   'CoreFE.Check.unbox'.
+--   'CoreFE.Check.whnf'.
 unboxT :: CoreFE.Typ -> CoreFE.Typ
 unboxT (CoreFE.TyBoxT [] a) = unboxT a
 unboxT a                    = a
@@ -113,17 +123,86 @@ substTyp x s = go
     -- refers to that binding, not to the one being substituted.
     goEnv [] = []
     goEnv (e : rest)
-      | any binds rest = e     : goEnv rest
-      | otherwise      = goE e : goEnv rest
+      | x `elem` tyEnvNames rest = e     : goEnv rest
+      | otherwise                = goE e : goEnv rest
 
     goE e = case e of
       CoreFE.Type   n a -> CoreFE.Type   n (go a)
       CoreFE.Kind   n   -> CoreFE.Kind   n
       CoreFE.TypeEq n a -> CoreFE.TypeEq n (go a)
 
-    binds (CoreFE.TypeEq n _) = n == x
-    binds (CoreFE.Kind n)     = n == x
-    binds _                   = False
+-- | The names bound by the type entries of a type environment.
+tyEnvNames :: CoreFE.TyEnv -> [EnvML.Name]
+tyEnvNames = concatMap f
+  where
+    f (CoreFE.TypeEq n _) = [n]
+    f (CoreFE.Kind n)     = [n]
+    f (CoreFE.Type _ _)   = []
+
+-- | The free type names of a type. An environment entry sees the entries after
+--   it (as in 'CoreFE.DeBruijn.toNamelessTyEnv'); a box body sees only the box's
+--   own entries.
+freeTyNames :: CoreFE.Typ -> [EnvML.Name]
+freeTyNames t = case t of
+  CoreFE.TyLit _        -> []
+  CoreFE.TyVar x        -> [x]
+  CoreFE.TyArr a b      -> freeTyNames a ++ freeTyNames b
+  CoreFE.TyAll y a      -> filter (/= y) (freeTyNames a)
+  CoreFE.TyBoxT g _     -> freeTyNamesEnv g
+  CoreFE.TySubstT y a b -> freeTyNames a ++ filter (/= y) (freeTyNames b)
+  CoreFE.TyRcd _ a      -> freeTyNames a
+  CoreFE.TyEnvt g       -> freeTyNamesEnv g
+  CoreFE.TyList a       -> freeTyNames a
+
+freeTyNamesEnv :: CoreFE.TyEnv -> [EnvML.Name]
+freeTyNamesEnv [] = []
+freeTyNamesEnv (e : rest) =
+  filter (`notElem` tyEnvNames rest) (entryNames e) ++ freeTyNamesEnv rest
+  where
+    entryNames (CoreFE.Type _ a)   = freeTyNames a
+    entryNames (CoreFE.TypeEq _ a) = freeTyNames a
+    entryNames (CoreFE.Kind _)     = []
+
+-- | Close a type over the ambient context by expanding its transparent
+--   abbreviations, so that the result mentions no ambient type name. Used for an
+--   annotation placed inside a sandbox box, whose body cannot see the ambient
+--   context. An abstract ambient type (a functor's type parameter) cannot be
+--   expanded, so mentioning one is an error.
+closeTyp :: Ctx -> CoreFE.Typ -> Either ElabError CoreFE.Typ
+closeTyp ctx = go (0 :: Int) []
+  where
+    go depth bound t
+      | depth > 100 = Left "cyclic type abbreviation"
+      | otherwise =
+          case t of
+            CoreFE.TyLit l -> Right (CoreFE.TyLit l)
+            CoreFE.TyVar x
+              | x `elem` bound -> Right (CoreFE.TyVar x)
+              | Just t' <- lookupTy ctx x -> go (depth + 1) bound t'
+              | otherwise ->
+                  Left $
+                    "the annotation of a sandboxed module mentions the type '" ++ x
+                      ++ "', which is not visible inside the sandbox.\n"
+                      ++ "  A sandboxed module sees only its own components; only a\n"
+                      ++ "  transparent type abbreviation can be expanded into its annotation."
+            CoreFE.TyArr a b      -> CoreFE.TyArr <$> go depth bound a <*> go depth bound b
+            CoreFE.TyAll y a      -> CoreFE.TyAll y <$> go depth (y : bound) a
+            CoreFE.TyBoxT g a     -> (\g' -> CoreFE.TyBoxT g' a) <$> goEnv depth bound g
+            CoreFE.TySubstT y a b ->
+              CoreFE.TySubstT y <$> go depth bound a <*> go depth (y : bound) b
+            CoreFE.TyRcd l a      -> CoreFE.TyRcd l <$> go depth bound a
+            CoreFE.TyEnvt g       -> CoreFE.TyEnvt <$> goEnv depth bound g
+            CoreFE.TyList a       -> CoreFE.TyList <$> go depth bound a
+
+    goEnv _ _ [] = Right []
+    goEnv depth bound (e : rest) = do
+      rest' <- goEnv depth bound rest
+      let bound' = tyEnvNames rest ++ bound
+      e' <- case e of
+              CoreFE.Type n a   -> CoreFE.Type n <$> go depth bound' a
+              CoreFE.Kind n     -> Right (CoreFE.Kind n)
+              CoreFE.TypeEq n a -> CoreFE.TypeEq n <$> go depth bound' a
+      return (e' : rest')
 
 --------------------------------------------------------------------------------
 -- Signatures
@@ -226,52 +305,31 @@ data Operand = Operand
   , opSig :: CoreFE.TyEnv
   }
 
--- | Expand a merge of two operands whose signatures are known.
+-- | Expand a merge of two operands whose signatures are known:
+--
+--   > ((λ#l. λ#r. [ ..projections.. ]) : τ1 → τ2 → τ) e1 e2
+--
+--   Both operands are bound outside every new binder and evaluated exactly once,
+--   the left one first, however many components are projected from them. The
+--   fresh names are not valid source identifiers, so they can neither clash with
+--   a component name nor shadow anything an operand mentions.
 --
 --   The result matches the environment ordering used throughout: the right
 --   operand's components sit at the head, so @m1 ++ m2@ has signature
---   @g2 ++ g1@ and the same evaluation behaviour as a primitive concatenation
---   would have had.
+--   @g2 ++ g1@.
 expandMerge :: String -> Operand -> Operand -> Either ElabError (CoreFE.Exp, Maybe CoreFE.Typ)
 expandMerge opName o1 o2 = do
   let g1 = opSig o1
       g2 = opSig o2
   checkComposable opName g1 g2
-  let resT       = CoreFE.TyEnvt (g2 ++ g1)
-      introduced = sigLabels g1 ++ sigLabels g2
-      (w1, s1)   = bindOperand "#l" introduced o1 resT
-      (w2, s2)   = bindOperand "#r" introduced o2 resT
-  env1 <- realize ("left operand of " ++ opName) s1 g1
-  env2 <- realize ("right operand of " ++ opName) s2 g2
+  let resT = CoreFE.TyEnvt (g2 ++ g1)
+  env1 <- realize ("left operand of " ++ opName) (CoreFE.Var "#l") g1
+  env2 <- realize ("right operand of " ++ opName) (CoreFE.Var "#r") g2
   let body = CoreFE.FEnv (env2 ++ env1)
-  return (w1 (w2 body), Just resT)
-
--- | Bind an operand to a fresh variable so that its body is evaluated outside
---   the merged environment, and so that it is evaluated exactly once however
---   many components are projected from it. The binding is an annotated redex so
---   the result stays inferable.
---
---   A variable operand is already atomic and needs no binding -- unless the
---   merge introduces a component of the same name, which would shadow it.
---   The fresh names are not valid source identifiers, so they cannot clash.
-bindOperand ::
-  EnvML.Name
-  -> [String]
-  -> Operand
-  -> CoreFE.Typ
-  -> (CoreFE.Exp -> CoreFE.Exp, CoreFE.Exp)
-bindOperand x introduced o resT =
-  case opExp o of
-    CoreFE.Var n | n `notElem` introduced -> (id, CoreFE.Var n)
-    e ->
-      ( \body ->
-          CoreFE.App
-            (CoreFE.Anno
-               (CoreFE.Lam x body)
-               (CoreFE.TyArr (opTyp o) resT))
-            e
-      , CoreFE.Var x
-      )
+      fun  = CoreFE.Anno
+               (CoreFE.Lam "#l" (CoreFE.Lam "#r" body))
+               (CoreFE.TyArr (opTyp o1) (CoreFE.TyArr (opTyp o2) resT))
+  return (CoreFE.App (CoreFE.App fun (opExp o1)) (opExp o2), Just resT)
 
 -- | The side conditions that make a merge expandable. These are exactly the
 --   conditions under which @++@ is derivable rather than primitive.
@@ -292,6 +350,17 @@ checkComposable opName g1 g2 = do
           ++ "  Composition is expanded into projections, so the operands'\n"
           ++ "  components must be disjoint -- a repeated name would be\n"
           ++ "  unreachable in the result."
+  -- The left operand's components come first in the merged environment, so a
+  -- type name that the right operand's signature refers to from the outside
+  -- would be captured by a type component of the left operand.
+  case overlap (freeTyNamesEnv g2) t1 of
+    [] -> Right ()
+    cs ->
+      Left $
+        "cannot compose with " ++ opName ++ ": the right operand's signature refers to "
+          ++ commaSep cs ++ ", which the left operand also defines as a type component.\n"
+          ++ "  The left operand's components come first in the result, so the\n"
+          ++ "  name would be captured."
   where
     reportDup _    [] = Right ()
     reportDup side cs =
@@ -344,16 +413,16 @@ elabModuleExp ctx modl =
 
     EnvML.MAppt m1 a -> do
       (e1, mt1) <- elabModuleExp ctx m1
-      let ta = elabTyp a
-          mres = case whnfT ctx <$> mt1 of
+      ta <- elabTyp a
+      let mres = case whnfT ctx <$> mt1 of
                    Just (CoreFE.TyAll v b) -> Just (substTyp v ta b)
                    _                       -> Nothing
       return (CoreFE.TApp e1 ta, mres)
 
     EnvML.MAnno m mty -> do
-      let t = elabModTyp mty
+      t <- elabModTyp mty
       e <- elabCheck ctx m t
-      return (CoreFE.Anno e t, Just t)
+      return (e, Just t)
 
     -- Independent merge: both operands are closed, so both are projected.
     EnvML.MConcat m1 m2 -> do
@@ -381,13 +450,25 @@ elabModuleExp ctx modl =
       o2 <- operandOf ctx "right operand of +" e2 mt2
       expandMerge "+" o1 o2
 
--- | Elaborate a module against a known type, pushing the type into functor
---   parameters (which the source leaves unannotated).
+-- | Elaborate a module against a known type, producing a term whose type the
+--   checker can recover. A sandboxed form (a functor or a struct) carries the
+--   annotation inside its box, closed over the ambient abbreviations; for a
+--   functor the annotation also supplies the parameter types the source leaves
+--   out. Any other form is annotated as it stands.
 elabCheck :: Ctx -> EnvML.Module -> CoreFE.Typ -> Either ElabError CoreFE.Exp
 elabCheck ctx m t =
   case m of
-    EnvML.Functor args body -> box0 . fst <$> elabFunctor ctx args body (Just t)
-    _                       -> fst <$> elabModuleExp ctx m
+    EnvML.Functor args body -> do
+      (e, _) <- elabFunctor ctx args body (Just t)
+      tc <- closeTyp ctx t
+      return (box0 (CoreFE.Anno e tc))
+    EnvML.Struct structs -> do
+      (env, _) <- elabStructures ctx structs
+      tc <- closeTyp ctx t
+      return (box0 (CoreFE.Anno (CoreFE.FEnv env) tc))
+    _ -> do
+      (e, _) <- elabModuleExp ctx m
+      return (CoreFE.Anno e t)
 
 -- | Wrap a core term in an empty-environment box (the sandbox wrapper).
 box0 :: CoreFE.Exp -> CoreFE.Exp
@@ -420,7 +501,7 @@ elabFunctor ctx ((name, arg) : rest) body mt =
       return (CoreFE.Lam name e, CoreFE.TyArr a <$> mt')
 
     (EnvML.TmArgType ty, _) -> do
-      let a = elabTyp ty
+      a <- elabTyp ty
       (e, mt') <- elabFunctor (CTm name a : ctx) rest body Nothing
       return (CoreFE.Lam name e, CoreFE.TyArr a <$> mt')
 
@@ -485,20 +566,20 @@ elabStructure ctx struct =
           e' <- elabExp ctx e
           return (CoreFE.ModE name e', Nothing)
         Just ty -> do
-          let t = elabTyp ty
+          t  <- elabTyp ty
           e' <- elabExp ctx e
           return
             ( CoreFE.ModE name (CoreFE.Anno e' t)
             , Just (CoreFE.Type name (CoreFE.TyRcd name t))
             )
 
-    EnvML.TypDecl name ty ->
-      let t = elabTyp ty
-      in return (CoreFE.TypE name t, Just (CoreFE.TypeEq name t))
+    EnvML.TypDecl name ty -> do
+      t <- elabTyp ty
+      return (CoreFE.TypE name t, Just (CoreFE.TypeEq name t))
 
-    EnvML.ModTypDecl name mty ->
-      let t = elabModTyp mty
-      in return (CoreFE.TypE name t, Just (CoreFE.TypeEq name t))
+    EnvML.ModTypDecl name mty -> do
+      t <- elabModTyp mty
+      return (CoreFE.TypE name t, Just (CoreFE.TypeEq name t))
 
     EnvML.ModStruct name maybeTyp mod1 ->
       case maybeTyp of
@@ -509,10 +590,10 @@ elabStructure ctx struct =
             , (\t -> CoreFE.Type name (CoreFE.TyRcd name t)) <$> mt
             )
         Just mty -> do
-          let t = elabModTyp mty
+          t <- elabModTyp mty
           e <- elabCheck ctx mod1 t
           return
-            ( CoreFE.ModE name (CoreFE.Anno e t)
+            ( CoreFE.ModE name e
             , Just (CoreFE.Type name (CoreFE.TyRcd name t))
             )
 
@@ -525,10 +606,11 @@ elabStructure ctx struct =
             , (\t -> CoreFE.Type name (CoreFE.TyRcd name (CoreFE.TyBoxT [] t))) <$> mt
             )
         Just mty -> do
-          let t = elabModTyp mty
+          t <- elabModTyp mty
           (e, _) <- elabFunctor ctx args mod1 (Just t)
+          tc <- closeTyp ctx t
           return
-            ( CoreFE.ModE name (CoreFE.Anno (box0 e) t)
+            ( CoreFE.ModE name (box0 (CoreFE.Anno e tc))
             , Just (CoreFE.Type name (CoreFE.TyRcd name t))
             )
 
@@ -549,7 +631,7 @@ elabExp ctx e =
       return (CoreFE.Clos env' body')
     EnvML.App e1 e2 -> CoreFE.App <$> elabExp ctx e1 <*> elabExp ctx e2
     EnvML.TClos {}  -> Left "Typed closures don't exist at source separately."
-    EnvML.TApp e1 t -> (\x -> CoreFE.TApp x (elabTyp t)) <$> elabExp ctx e1
+    EnvML.TApp e1 t -> CoreFE.TApp <$> elabExp ctx e1 <*> elabTyp t
     EnvML.Box env e1 -> do
       env' <- elabEnv ctx env
       CoreFE.Box env' <$> elabExp ctx e1
@@ -557,7 +639,7 @@ elabExp ctx e =
       CoreFE.FEnv . map (CoreFE.ExpE "_") <$> elabRecords ctx records
     EnvML.RProj e1 n -> (\x -> CoreFE.RProj x n) <$> elabExp ctx e1
     EnvML.FEnv env   -> CoreFE.FEnv <$> elabEnv ctx env
-    EnvML.Anno e1 ty -> (\x -> CoreFE.Anno x (elabTyp ty)) <$> elabExp ctx e1
+    EnvML.Anno e1 ty -> CoreFE.Anno <$> elabExp ctx e1 <*> elabTyp ty
     EnvML.Mod m      -> fst <$> elabModuleExp ctx m
     EnvML.BinOp op   -> elabBinOp ctx op
     EnvML.EList es   -> CoreFE.EList <$> mapM (elabExp ctx) es
@@ -579,16 +661,16 @@ elabBinOp ctx op =
 elabLambda :: Ctx -> EnvML.FunArgs -> EnvML.Exp -> Either ElabError CoreFE.Exp
 elabLambda ctx [] body = elabExp ctx body
 elabLambda ctx ((name, arg) : rest) body = do
-  restExp <- elabLambda (bindArg arg) rest body
+  ctx' <- case arg of
+    EnvML.TyArg        -> Right (CTyA name : ctx)
+    EnvML.TmArg        -> Right (CTmU name : ctx)
+    EnvML.TmArgType ty -> (\a -> CTm name a : ctx) <$> elabTyp ty
+  restExp <- elabLambda ctx' rest body
   return $ case arg of
-    EnvML.TyArg       -> CoreFE.TLam name restExp
-    EnvML.TmArg       -> CoreFE.Lam  name restExp
-    -- NOTE: We ignore type annotations on parameters for now
-    EnvML.TmArgType _ -> CoreFE.Lam  name restExp
-  where
-    bindArg EnvML.TyArg           = CTyA name : ctx
-    bindArg EnvML.TmArg           = CTmU name : ctx
-    bindArg (EnvML.TmArgType ty)  = CTm name (elabTyp ty) : ctx
+    EnvML.TyArg -> CoreFE.TLam name restExp
+    -- NOTE: parameter annotations are not emitted; a lambda is checked against
+    -- the annotation of the declaration that contains it.
+    _           -> CoreFE.Lam name restExp
 
 elabRecords :: Ctx -> [(EnvML.Name, EnvML.Exp)] -> Either ElabError [CoreFE.Exp]
 elabRecords _ [] = return []
@@ -603,56 +685,60 @@ elabEnvE ctx envE =
   case envE of
     EnvML.ExpEN name e  -> CoreFE.ExpE name <$> elabExp ctx e
     EnvML.ExpE e        -> CoreFE.ExpE "_"  <$> elabExp ctx e
-    EnvML.TypEN name ty -> return (CoreFE.TypE name (elabTyp ty))
-    EnvML.TypE ty       -> return (CoreFE.TypE "_" (elabTyp ty))
+    EnvML.TypEN name ty -> CoreFE.TypE name <$> elabTyp ty
+    EnvML.TypE ty       -> CoreFE.TypE "_" <$> elabTyp ty
     EnvML.ModE name m   -> CoreFE.ModE name . fst <$> elabModuleExp ctx m
-    EnvML.ModTypE name mty -> return (CoreFE.TypE name (elabModTyp mty))
+    EnvML.ModTypE name mty -> CoreFE.TypE name <$> elabModTyp mty
 
 --------------------------------------------------------------------------------
--- Types (pure syntactic translation)
+-- Types (syntactic translation; signatures are core types)
 --------------------------------------------------------------------------------
 
-elabTyp :: EnvML.Typ -> CoreFE.Typ
+elabTyp :: EnvML.Typ -> Either ElabError CoreFE.Typ
 elabTyp ty =
   case ty of
-    EnvML.TyLit lit      -> CoreFE.TyLit lit
-    EnvML.TyVar n        -> CoreFE.TyVar n
-    EnvML.TyArr ta tb    -> CoreFE.TyArr (elabTyp ta) (elabTyp tb)
-    EnvML.TyAll n ty1    -> CoreFE.TyAll n (elabTyp ty1)
-    EnvML.TyBoxT ctx ty1 -> CoreFE.TyBoxT (elabTyCtx ctx) (elabTyp ty1)
-    EnvML.TyRcd fields   -> CoreFE.TyEnvt $ map (CoreFE.Type "_") $ elabRcdFieldsTy fields
-    EnvML.TyCtx ctx      -> CoreFE.TyEnvt (elabTyCtx ctx)
+    EnvML.TyLit lit      -> Right (CoreFE.TyLit lit)
+    EnvML.TyVar n        -> Right (CoreFE.TyVar n)
+    EnvML.TyArr ta tb    -> CoreFE.TyArr <$> elabTyp ta <*> elabTyp tb
+    EnvML.TyAll n ty1    -> CoreFE.TyAll n <$> elabTyp ty1
+    EnvML.TyBoxT ctx ty1 -> CoreFE.TyBoxT <$> elabTyCtx ctx <*> elabTyp ty1
+    EnvML.TyRcd fields   -> CoreFE.TyEnvt . map (CoreFE.Type "_") <$> elabRcdFieldsTy fields
+    EnvML.TyCtx ctx      -> CoreFE.TyEnvt <$> elabTyCtx ctx
     EnvML.TyModule mty   -> elabModTyp mty
-    EnvML.TyList ty1     -> CoreFE.TyList (elabTyp ty1)
+    EnvML.TyList ty1     -> CoreFE.TyList <$> elabTyp ty1
 
-elabTyCtx :: EnvML.TyCtx -> CoreFE.TyEnv
-elabTyCtx = reverse . map elabTyCtxE
+elabTyCtx :: EnvML.TyCtx -> Either ElabError CoreFE.TyEnv
+elabTyCtx = fmap reverse . mapM elabTyCtxE
 
-elabTyCtxE :: EnvML.TyCtxE -> CoreFE.TyEnvE
+elabTyCtxE :: EnvML.TyCtxE -> Either ElabError CoreFE.TyEnvE
 elabTyCtxE ctxE =
   case ctxE of
-    EnvML.TypeN name ty   -> CoreFE.Type name (elabTyp ty)
-    EnvML.Type ty         -> CoreFE.Type "_" (elabTyp ty)
-    EnvML.KindN name      -> CoreFE.Kind name
-    EnvML.Kind            -> CoreFE.Kind "_"
-    EnvML.TypeEqN name ty -> CoreFE.TypeEq name (elabTyp ty)
-    EnvML.TyMod name mty  -> CoreFE.Type name (elabModTyp mty)
-    EnvML.TypeEqM name mty -> CoreFE.TypeEq name (elabModTyp mty)
+    EnvML.TypeN name ty   -> CoreFE.Type name <$> elabTyp ty
+    EnvML.Type ty         -> CoreFE.Type "_" <$> elabTyp ty
+    EnvML.KindN name      -> Right (CoreFE.Kind name)
+    EnvML.Kind            -> Right (CoreFE.Kind "_")
+    EnvML.TypeEqN name ty -> CoreFE.TypeEq name <$> elabTyp ty
+    -- A module entry of an environment is a labelled record entry, so a module
+    -- declared in a type context is a labelled record type (as in 'elabIntfE').
+    EnvML.TyMod name mty  -> (\t -> CoreFE.Type name (CoreFE.TyRcd name t)) <$> elabModTyp mty
+    EnvML.TypeEqM name mty -> CoreFE.TypeEq name <$> elabModTyp mty
 
-elabRcdFieldsTy :: [(EnvML.Name, EnvML.Typ)] -> [CoreFE.Typ]
-elabRcdFieldsTy = map (\(n, ty) -> CoreFE.TyRcd n (elabTyp ty))
+elabRcdFieldsTy :: [(EnvML.Name, EnvML.Typ)] -> Either ElabError [CoreFE.Typ]
+elabRcdFieldsTy = mapM (\(n, ty) -> CoreFE.TyRcd n <$> elabTyp ty)
 
-elabModTyp :: EnvML.ModuleTyp -> CoreFE.Typ
+elabModTyp :: EnvML.ModuleTyp -> Either ElabError CoreFE.Typ
 elabModTyp mty =
   case mty of
-    EnvML.TyArrowM ty mty1 -> CoreFE.TyArr (elabTyp ty) (elabModTyp mty1)
-    EnvML.ForallM n mty1   -> CoreFE.TyAll n (elabModTyp mty1)
-    EnvML.TySig intf       -> CoreFE.TyEnvt (elabIntf intf)
-    EnvML.TyVarM name      -> CoreFE.TyVar name
+    EnvML.TyArrowM ty mty1 -> CoreFE.TyArr <$> elabTyp ty <*> elabModTyp mty1
+    EnvML.ForallM n mty1   -> CoreFE.TyAll n <$> elabModTyp mty1
+    EnvML.TySig intf       -> CoreFE.TyEnvt <$> elabIntf intf
+    EnvML.TyVarM name      -> Right (CoreFE.TyVar name)
     -- Flat signature concatenation: append the two type environments, with Y on
     -- the head side to match the term-level merge ordering.
-    EnvML.MConcatT x y     ->
-      CoreFE.TyEnvt (tyEnvOf (elabModTyp y) ++ tyEnvOf (elabModTyp x))
+    EnvML.MConcatT x y     -> do
+      tx <- elabModTyp x
+      ty <- elabModTyp y
+      return (CoreFE.TyEnvt (tyEnvOf ty ++ tyEnvOf tx))
 
 -- | View a (module) type as a type environment. Signatures are TyEnvt;
 --   anything else is treated as a single anonymous entry.
@@ -660,26 +746,29 @@ tyEnvOf :: CoreFE.Typ -> CoreFE.TyEnv
 tyEnvOf (CoreFE.TyEnvt g) = g
 tyEnvOf t                 = [CoreFE.Type "_" t]
 
-elabIntf :: EnvML.Intf -> CoreFE.TyEnv
-elabIntf = reverse . map elabIntfE
+elabIntf :: EnvML.Intf -> Either ElabError CoreFE.TyEnv
+elabIntf = fmap reverse . mapM elabIntfE
 
-elabIntfE :: EnvML.IntfE -> CoreFE.TyEnvE
+elabIntfE :: EnvML.IntfE -> Either ElabError CoreFE.TyEnvE
 elabIntfE intfE =
   case intfE of
-    EnvML.TyDef name ty    -> CoreFE.TypeEq name (elabTyp ty)
-    EnvML.ValDecl name ty  -> CoreFE.Type name (CoreFE.TyRcd name (elabTyp ty))
-    EnvML.ModDecl name ty  -> CoreFE.Type name (CoreFE.TyRcd name (elabTyp ty))
+    EnvML.TyDef name ty    -> CoreFE.TypeEq name <$> elabTyp ty
+    EnvML.ValDecl name ty  -> (\t -> CoreFE.Type name (CoreFE.TyRcd name t)) <$> elabTyp ty
+    EnvML.ModDecl name ty  -> (\t -> CoreFE.Type name (CoreFE.TyRcd name t)) <$> elabTyp ty
+    -- A functor member is a term component, like a value or module member: the
+    -- struct that provides it declares a labelled entry, so its signature entry
+    -- is a labelled record type as well.
     EnvML.FunctorDecl name args retTyp ->
-      CoreFE.TypeEq name (elabFunctorDeclToType args retTyp)
+      (\t -> CoreFE.Type name (CoreFE.TyRcd name t)) <$> elabFunctorDeclToType args retTyp
     EnvML.SigDecl name intf ->
-      CoreFE.TypeEq name (CoreFE.TyEnvt (elabIntf intf))
+      CoreFE.TypeEq name . CoreFE.TyEnvt <$> elabIntf intf
 
-elabFunctorDeclToType :: EnvML.FunArgs -> EnvML.Typ -> CoreFE.Typ
+elabFunctorDeclToType :: EnvML.FunArgs -> EnvML.Typ -> Either ElabError CoreFE.Typ
 elabFunctorDeclToType [] retTyp = elabTyp retTyp
-elabFunctorDeclToType ((name, arg) : rest) retTyp =
-  let restType = elabFunctorDeclToType rest retTyp
-  in case arg of
-       EnvML.TyArg        -> CoreFE.TyAll name restType
-       EnvML.TmArg        ->
-         error $ "Functor argument '" ++ name ++ "' must have type annotation"
-       EnvML.TmArgType ty -> CoreFE.TyArr (elabTyp ty) restType
+elabFunctorDeclToType ((name, arg) : rest) retTyp = do
+  restType <- elabFunctorDeclToType rest retTyp
+  case arg of
+    EnvML.TyArg        -> Right (CoreFE.TyAll name restType)
+    EnvML.TmArg        ->
+      Left ("functor argument '" ++ name ++ "' in a signature must have a type annotation")
+    EnvML.TmArgType ty -> (\a -> CoreFE.TyArr a restType) <$> elabTyp ty

@@ -1,25 +1,38 @@
+-- | Type checking for the nameless core: a transcription of the Rocq mechanization
+--   (FirstForall/Rocq/exists). Each definition names the Rocq definition it
+--   transcribes; contexts are lists with the newest entry at the head, so Rocq's
+--   @T +++ T1@ is @t1 ++ t@.
+--
+--   Only the definitions a checker needs are transcribed: @check@, @lookt@,
+--   @tshift@, @keyLen@, @rigid@, @wfe@/@wft@, @teq@, @get_var@, @lb_in@/@mopen@/@rlk@
+--   and @has_type@ (as the bidirectional 'infer' / 'check'). Contexts are
+--   well-formed by construction, since they are only ever extended with
+--   @wft@-checked types, so the @wfe@ premises of the leaf rules are not re-checked.
 module CoreFE.Check where
 
 import Control.Monad (guard)
+import Data.Maybe (isJust)
 import CoreFE.Syntax
     ( TyEnvE(Kind, TypeEq, Type),
-      EnvE(TypE, ExpE),
       Exp(..),
       Typ(..),
       TyLit(TyBool, TyStr, TyInt),
       Literal(LitStr, LitInt, LitBool),
       BinOp(EqEq, Add, Sub, Mul, LessThan),
-      TyEnv,
-      Env )
+      TyEnv )
 
--- | Count type variable bindings (Etvar and Eteq) in an environment
+--------------------------------------------------------------------------------
+-- Contexts (Teq.v)
+--------------------------------------------------------------------------------
+
+-- | @keyLen@: the number of type bindings in a context.
 keyLen :: TyEnv -> Int
 keyLen [] = 0
 keyLen (Type _ : bs) = keyLen bs
 keyLen (Kind : bs) = 1 + keyLen bs
 keyLen (TypeEq _ : bs) = 1 + keyLen bs
 
--- | Type shifting
+-- | @tshift@: shift the type variables at or above @x@ by one.
 tshift :: Int -> Typ -> Typ
 tshift _ (TyLit i) = TyLit i
 tshift x (TyVar y) = if x <= y then TyVar (1 + y) else TyVar y
@@ -29,7 +42,7 @@ tshift _ (TyBoxT t a) = TyBoxT t a
 tshift x (TySubstT a1 a2) = TySubstT (tshift x a1) (tshift (1 + x) a2)
 tshift x (TyRcd l a) = TyRcd l (tshift x a)
 tshift x (TyEnvt bs) = TyEnvt (tshiftBinds x bs)
-tshift x (TyList a) = TyList (tshift x a)  -- ADD THIS
+tshift x (TyList a) = TyList (tshift x a)
 
 tshiftBinds :: Int -> TyEnv -> TyEnv
 tshiftBinds _ [] = []
@@ -39,14 +52,16 @@ tshiftBinds x (Type a : bs) =
 tshiftBinds x (TypeEq a : bs) =
   TypeEq (tshift (keyLen bs + x) a) : tshiftBinds x bs
 
-inner :: TyEnv -> Int -> Maybe Int
-inner [] _ = Nothing
-inner (Type _ : g) x = inner g x
-inner (TypeEq _ : _g) 0 = Nothing
-inner (TypeEq _ : g) x = inner g (x - 1)
-inner (Kind : _g) 0 = pure 0
-inner (Kind : g) x = (+ 1) <$> inner g (x - 1)
+-- | @check@: the @x@-th type binding is abstract (@⋆@). Positional: term entries
+--   are skipped, every type entry counts.
+checkAbs :: TyEnv -> Int -> Bool
+checkAbs [] _ = False
+checkAbs (Type _ : g) x = checkAbs g x
+checkAbs (TypeEq _ : g) x = x > 0 && checkAbs g (x - 1)
+checkAbs (Kind : g) x = x == 0 || checkAbs g (x - 1)
 
+-- | @lookt@: the definition of the @x@-th type binding when it is manifest,
+--   shifted past every type binding crossed on the way.
 lookt :: TyEnv -> Int -> Maybe Typ
 lookt [] _ = Nothing
 lookt (Type _ : t) x = lookt t x
@@ -55,49 +70,110 @@ lookt (TypeEq _a : t) x = tshift 0 <$> lookt t (x - 1)
 lookt (Kind : _t) 0 = Nothing
 lookt (Kind : t) x = tshift 0 <$> lookt t (x - 1)
 
-concrete :: TyEnv -> Bool
-concrete g = all (/= Kind) g
+--------------------------------------------------------------------------------
+-- Well-formedness and rigidity (Teq.v: rigid, wfe, wft)
+--------------------------------------------------------------------------------
 
--- | An empty-environment box is transparent: [] ▷ A ≡ A.
---   Sandboxed modules elaborate to [] ▷ e, so their types are []-boxed; a
---   sandboxed module's type is necessarily closed, hence peeling is sound.
---   Used at elimination sites so boxed modules stay directly usable.
-unbox :: Typ -> Typ
-unbox (TyBoxT [] a) = unbox a
-unbox a             = a
+-- | @rigid d T A@: every free type variable of @A@ is either bound by one of the
+--   innermost @d@ binders or manifest with a rigid definition.
+rigid :: Int -> TyEnv -> Typ -> Bool
+rigid _ _ (TyLit _) = True
+rigid d g (TyVar x) =
+  (checkAbs g x && x < d) || maybe False (rigid d g) (lookt g x)
+rigid d g (TyArr a b) = rigid d g a && rigid d g b
+rigid d g (TyRcd _ a) = rigid d g a
+rigid d g (TyList a) = rigid d g a
+rigid d g (TySubstT a b) = rigid (d + 1) (TypeEq a : g) b
+rigid d g (TyAll a) = rigid (d + 1) (Kind : g) a
+rigid _ _ (TyBoxT g3 a) = rigid 0 g3 a
+rigid _ _ (TyEnvt []) = True
+rigid d g (TyEnvt (Kind : r)) = rigid d g (TyEnvt r)
+rigid d g (TyEnvt (Type a : r)) =
+  rigid d g (TyEnvt r) && rigid (d + keyLen r) (r ++ g) a
+rigid d g (TyEnvt (TypeEq a : r)) =
+  rigid d g (TyEnvt r) && rigid (d + keyLen r) (r ++ g) a
 
+-- | @wfe@: a well-formed context.
+wfe :: TyEnv -> Bool
+wfe [] = True
+wfe (Kind : g) = wfe g
+wfe (Type a : g) = wfe g && wftIn g a
+wfe (TypeEq a : g) = wfe g && wftIn g a
+
+-- | @wft T A@ (= @wfe (T &= A)@): a well-formed type in a well-formed context.
+wft :: TyEnv -> Typ -> Bool
+wft g a = wfe g && wftIn g a
+
+-- | The structural part of @wft@ (the @we_*@ clauses), assuming @wfe g@.
+wftIn :: TyEnv -> Typ -> Bool
+wftIn _ (TyLit _) = True                                         -- we_int
+wftIn g (TyVar i) = checkAbs g i || isJust (lookt g i)            -- we_check / we_get
+wftIn g (TyArr a b) = wftIn g a && wftIn g b                      -- we_arr
+wftIn g (TyAll a) = wftIn (Kind : g) a                            -- we_all
+wftIn _ (TyBoxT g3 a) = wfe g3 && wftIn g3 a && rigid 0 g3 a      -- we_box
+wftIn g (TySubstT a b) = wftIn g a && wftIn (TypeEq a : g) b      -- we_mani
+wftIn _ (TyEnvt []) = True                                        -- we_top
+wftIn g (TyEnvt (Kind : r)) = wftIn g (TyEnvt r)                  -- we_ands
+wftIn g (TyEnvt (Type a : r)) =                                   -- we_and
+  wftIn g (TyEnvt r) && wftIn (r ++ g) a
+wftIn g (TyEnvt (TypeEq a : r)) =
+  wftIn g (TyEnvt r) && wftIn (r ++ g) a
+wftIn g (TyRcd _ a) = wftIn g a                                   -- we_rcd
+wftIn g (TyList a) = wftIn g a
+
+--------------------------------------------------------------------------------
+-- Type equivalence (Teq.v: teq)
+--------------------------------------------------------------------------------
+
+-- | @teq T1 A B T2@. The relation is not syntax-directed: for a given pair of
+--   types several rules may apply (a manifest type on either side, a box on either
+--   side, a concrete variable on either side), so every applicable rule is tried.
+--   Plain recursion terminates because every premise is smaller under the
+--   @bindings@ measure of Decide.v.
 teq :: TyEnv -> Typ -> Typ -> TyEnv -> Bool
-teq _ (TyLit a) (TyLit b) _ = a == b
-teq g1 (TyVar x) b g2 =
-  maybe
-    ( case b of
-        TyVar y -> inner g1 x == inner g2 y
-        _ -> False
-    )
-    (\a -> teq g1 a b g2)
-    (lookt g1 x)
-teq g1 a (TyVar y) g2 =
-  maybe False (\b -> teq g1 a b g2) (lookt g2 y)
-teq _g1 (TyBoxT g3 a) b g2 =
-  concrete g3 && teq g3 a b g2
-teq g1 a (TyBoxT g3 b) _ =
-  concrete g3 && teq g1 a b g3
-teq g1 (TyArr a b) (TyArr c d) g2 =
-  teq g1 a c g2 && teq g1 b d g2
-teq g1 (TyAll a) (TyAll b) g2 =
-  teq (Kind : g1) a b (Kind : g2)
-teq g1 (TySubstT a b) c g2 =
-  teq (TypeEq a : g1) b c g2
-teq g1 b (TySubstT a c) g2 =
-  teq g1 b c (TypeEq a : g2)
-teq g1 (TyEnvt e1) (TyEnvt e2) g2 =
-  teqEnv g1 e1 e2 g2
-teq g1 (TyRcd l1 a) (TyRcd l2 b) g2 =
-  l1 == l2 && teq g1 a b g2
-teq g1 (TyList a) (TyList b) g2 =  -- ADD THIS
-  teq g1 a b g2
-teq _ _ _ _ = False
+teq g1 a b g2 =
+  or [eql, eqr, tvar, manil, manir, boxl, boxr, structural]
+  where
+    -- eq_eql: a concrete variable on the left is replaced by its definition
+    eql = case a of
+      TyVar x | Just a' <- lookt g1 x -> teq g1 a' b g2
+      _ -> False
+    -- eq_eqr
+    eqr = case b of
+      TyVar y | Just b' <- lookt g2 y -> teq g1 a b' g2
+      _ -> False
+    -- eq_tvar: the same abstract position on both sides
+    tvar = case (a, b) of
+      (TyVar x, TyVar y) -> x == y && checkAbs g1 x && checkAbs g2 y
+      _ -> False
+    -- eq_manil: discharge [A]B into the left context, pad the right with ⋆
+    manil = case a of
+      TySubstT a1 a2 -> teq (TypeEq a1 : g1) a2 (tshift 0 b) (Kind : g2)
+      _ -> False
+    -- eq_manir
+    manir = case b of
+      TySubstT b1 b2 -> teq (Kind : g1) (tshift 0 a) b2 (TypeEq b1 : g2)
+      _ -> False
+    -- eq_boxl: switch to the box's own context on the left
+    boxl = case a of
+      TyBoxT g3 a' -> wft g1 a && teq g3 a' b g2
+      _ -> False
+    -- eq_boxr
+    boxr = case b of
+      TyBoxT g4 b' -> wft g2 b && teq g1 a b' g4
+      _ -> False
+    -- eq_int / eq_top / eq_arr / eq_all / eq_and / eq_ands / eq_rcd
+    structural = case (a, b) of
+      (TyLit l1, TyLit l2) -> l1 == l2
+      (TyArr a1 a2, TyArr b1 b2) -> teq g1 a1 b1 g2 && teq g1 a2 b2 g2
+      (TyAll a', TyAll b') -> teq (Kind : g1) a' b' (Kind : g2)
+      (TyEnvt e1, TyEnvt e2) -> teqEnv g1 e1 e2 g2
+      (TyRcd l1 a', TyRcd l2 b') -> l1 == l2 && teq g1 a' b' g2
+      (TyList a', TyList b') -> teq g1 a' b' g2
+      _ -> False
 
+-- | @eq_and@ / @eq_ands@: environment types entry by entry, each entry under the
+--   context extended with the older entries.
 teqEnv :: TyEnv -> TyEnv -> TyEnv -> TyEnv -> Bool
 teqEnv _ [] [] _ = True
 teqEnv g1 (Kind : e1) (Kind : e2) g2 =
@@ -108,45 +184,54 @@ teqEnv g1 (TypeEq a : e1) (TypeEq b : e2) g2 =
   teqEnv g1 e1 e2 g2 && teq (e1 ++ g1) a b (e2 ++ g2)
 teqEnv _ _ _ _ = False
 
+--------------------------------------------------------------------------------
+-- Values (ExpSyntax.v: value)
+--------------------------------------------------------------------------------
+
 value :: Exp -> Bool
 value (Lit _) = True
-value (Clos e _) = lvalue e
-value (TClos e _) = lvalue e
-value (FEnv e) = lvalue e
+value (Clos d _) = value d
+value (TClos d _) = value d
 value (Rec _ v) = value v
-value (EList es) = all value es  -- ADD THIS
+value Unit = True
+value (Merge d v) = value d && value v
+value (TMerge d (TyBoxT _ _)) = value d
+value (EList es) = all value es
 value _ = False
 
-lvalue :: Env -> Bool
-lvalue [] = True
-lvalue (ExpE v : e) = lvalue e && value v
-lvalue (TypE (TyBoxT _ _) : e) = lvalue e
-lvalue (TypE _ : _) = False
+--------------------------------------------------------------------------------
+-- Lookups (Safety.v: lb_in, mopen, rlk, get_var)
+--------------------------------------------------------------------------------
 
-lbIn :: String -> Typ -> Bool
-lbIn l (TyEnvt (Type (TyRcd l' _) : _)) = l == l'
-lbIn l (TyEnvt (Type _ : g)) = lbIn l (TyEnvt g)
-lbIn l (TyEnvt (TypeEq _ : g)) = lbIn l (TyEnvt g)
+-- | @lb_in@: the label is bound by a record entry of the environment type.
+lbIn :: String -> TyEnv -> Bool
+lbIn l (Type (TyRcd l' _) : g) = l == l' || lbIn l g
+lbIn l (Type _ : g) = lbIn l g
+lbIn l (TypeEq _ : g) = lbIn l g
 lbIn _ _ = False
 
+-- | @mopen@: wrap a type with the manifest bindings of the entries before it.
 wrapping :: TyEnv -> Typ -> Maybe Typ
 wrapping [] a = Just a
 wrapping (Type _ : g) a = wrapping g a
 wrapping (TypeEq c : g) a = wrapping g (TySubstT c a)
 wrapping (Kind : _) _ = Nothing
 
+-- | @rlk@: label lookup on an environment type.
 rlk :: TyEnv -> String -> Maybe Typ
 rlk [] _ = Nothing
 rlk (Type (TyRcd l1 a) : g1) l
-  | l == l1 && not (lbIn l (TyEnvt g1)) = wrapping g1 a
-  | l /= l1 = rlk g1 l
+  | l == l1 && not (lbIn l g1) = wrapping g1 a                 -- rlk_hit
+  | l /= l1 = rlk g1 l                                          -- rlk_left
   | otherwise = Nothing
 rlk (Type (TyEnvt t2) : g1) l
-  | not (lbIn l (TyEnvt g1)) = wrapping g1 =<< rlk t2 l
+  | not (lbIn l g1) = wrapping g1 =<< rlk t2 l                   -- rlk_right
   | otherwise = Nothing
-rlk (TypeEq _ : g1) l = rlk g1 l
+rlk (TypeEq _ : g1) l = rlk g1 l                                 -- rlk_left_t
 rlk _ _ = Nothing
 
+-- | @get_var@: the type of the @x@-th term binding, shifted past the type
+--   bindings crossed on the way.
 getVar :: TyEnv -> Int -> Maybe Typ
 getVar [] _ = Nothing
 getVar (Kind : g) x = tshift 0 <$> getVar g x
@@ -154,39 +239,76 @@ getVar (TypeEq _ : g) x = tshift 0 <$> getVar g x
 getVar (Type a : _) 0 = Just a
 getVar (Type _ : g) x = getVar g (x - 1)
 
--- | Infer the type of an expression
+--------------------------------------------------------------------------------
+-- Typing (Safety.v: has_type), bidirectionally
+--------------------------------------------------------------------------------
+
+-- | Expose the head constructor of a type at an elimination site, using the
+--   equivalences that @t_eq@ admits: a manifest variable is replaced by its
+--   definition (@eq_eql@), and a box over the empty context is replaced by its
+--   body (@eq_boxl@; the body of such a box is closed).
+whnf :: TyEnv -> Typ -> Typ
+whnf g = go (0 :: Int)
+  where
+    go n t
+      | n > 200 = t
+      | otherwise =
+          case t of
+            TyBoxT [] a -> go (n + 1) a
+            TyVar x | Just a <- lookt g x -> go (n + 1) a
+            _ -> t
+
+-- | Only the alias part of 'whnf': a closure's type is a box, so the box must
+--   not be peeled when checking one.
+unfoldAlias :: TyEnv -> Typ -> Typ
+unfoldAlias g = go (0 :: Int)
+  where
+    go n t
+      | n > 200 = t
+      | otherwise =
+          case t of
+            TyVar x | Just a <- lookt g x -> go (n + 1) a
+            _ -> t
+
+-- | Infer the type of an expression.
 infer :: TyEnv -> Exp -> Maybe Typ
-infer _ (Lit lit) = pure $ TyLit $ inferLit lit
+infer _ (Lit lit) = pure $ TyLit $ inferLit lit                 -- t_int
   where
     inferLit (LitInt _) = TyInt
     inferLit (LitBool _) = TyBool
     inferLit (LitStr _) = TyStr
-infer g (Var x) = getVar g x
-infer g (App e1 e2) = do
-  TyArr a b <- unbox <$> infer g e1
+infer g (Var x) = getVar g x                                     -- t_var
+infer g (App e1 e2) = do                                         -- t_app
+  TyArr a b <- whnf g <$> infer g e1
   guard (check g e2 a)
   return b
-infer g (TLam e) = TyAll <$> infer (Kind : g) e
-infer g (TApp e t) = do
-  TyAll b <- unbox <$> infer g e
+infer g (TLam e) = TyAll <$> infer (Kind : g) e                  -- t_blam
+infer g (TApp e t) = do                                          -- t_tapp
+  TyAll b <- whnf g <$> infer g e
+  guard (wft g t)
   return (TySubstT t b)
-infer g (Box d e) = do
-  TyEnvt g1 <- infer g (FEnv d)
-  TyBoxT g1 <$> infer g1 e
-infer _ (FEnv []) = pure (TyEnvt [])
-infer g (FEnv (ExpE e : d)) = do
-  TyEnvt g1 <- infer g (FEnv d)
+infer g (Box d e) = do                                           -- t_box
+  TyEnvt g1 <- whnf g <$> infer g d
+  a <- infer g1 e
+  guard (rigid 0 g1 a)
+  return (TyBoxT g1 a)
+infer _ Unit = pure (TyEnvt [])                                  -- lt_nil
+infer g (Merge d e) = do                                         -- lt_conse
+  TyEnvt g1 <- whnf g <$> infer g d
   a <- infer (g1 ++ g) e
   return (TyEnvt (Type a : g1))
-infer g (FEnv (TypE t : d)) = do
-  TyEnvt g1 <- infer g (FEnv d)
+infer g (TMerge d t) = do                                        -- lt_const
+  TyEnvt g1 <- whnf g <$> infer g d
+  guard (wft (g1 ++ g) t)
   return (TyEnvt (TypeEq t : g1))
-infer g (Rec l e) = TyRcd l <$> infer g e
-infer g (RProj e l) = do
-  TyEnvt g1 <- unbox <$> infer g e
+infer g (Rec l e) = TyRcd l <$> infer g e                        -- t_rec
+infer g (RProj e l) = do                                         -- trproj
+  TyEnvt g1 <- whnf g <$> infer g e
   rlk g1 l
-infer g (Anno e t) =
-  if check g e t then Just t else Nothing
+infer g (Anno e t) = do                                          -- t_eq (annotation)
+  guard (wft g t)
+  guard (check g e t)
+  return t
 infer g (BinOp (Add e1 e2)) = do
   guard (check g e1 (TyLit TyInt))
   guard (check g e2 (TyLit TyInt))
@@ -212,10 +334,8 @@ infer g (BinOp (LessThan e1 e2)) = do
 infer _ (EList []) = Nothing -- Cannot infer empty list type
 infer g (EList (e:es)) = do
   t <- infer g e
-  -- Check all remaining elements have the same type
   guard (all (\ei -> check g ei t) es)
   return (TyList t)
-
 infer g (ETake _ e) = do
   TyList t <- infer g e
   return (TyList t)
@@ -225,34 +345,32 @@ infer g (ELength e) = do
 
 infer _ _ = Nothing
 
--- | Check an expression against a type
+-- | Check an expression against a type.
 check :: TyEnv -> Exp -> Typ -> Bool
-check g (Lam e) (TyArr a b) = check (Type a : g) e b
-check g (TLam e) (TyAll a) = check (Kind : g) e a
-check g (Clos d e) (TyBoxT g1 (TyArr a b)) =
-  case infer g (FEnv d) of
-    Just (TyEnvt g2) -> g1 == g2 && lvalue d && check (Type a : g1) e b
-    _ -> False
-check g (TClos d e) (TyBoxT g1 (TyAll a)) =
-  case infer g (FEnv d) of
-    Just (TyEnvt g2) -> g1 == g2 && lvalue d && check (Kind : g1) e a
-    _ -> False
-check g (App e1 e2) tyB   =
+check g (Lam e) t                                                -- t_lam
+  | TyArr a b <- whnf g t = check (Type a : g) e b
+check g (TLam e) t                                               -- t_blam
+  | TyAll a <- whnf g t = check (Kind : g) e a
+check g (Clos d e) t                                             -- t_clos
+  | TyBoxT g1 (TyArr a b) <- unfoldAlias g t =
+      case infer [] d of
+        Just (TyEnvt g2) ->
+          g1 == g2 && value d && rigid 0 g1 (TyArr a b) && check (Type a : g1) e b
+        _ -> False
+check g (TClos d e) t                                            -- t_bclos
+  | TyBoxT g1 (TyAll a) <- unfoldAlias g t =
+      case infer [] d of
+        Just (TyEnvt g2) ->
+          g1 == g2 && value d && rigid 0 g1 (TyAll a) && check (Kind : g1) e a
+        _ -> False
+check g (App e1 e2) tyB =                                        -- t_app
   case infer g e2 of
     Just tyA  -> check g e1 (TyArr tyA tyB)
     Nothing   -> False
 -- List checking
-check _ (EList []) (TyList _) = True  -- Empty list checks against any list type
+check _ (EList []) (TyList _) = True
 check g (EList es) (TyList t) = all (\e -> check g e t) es
-
--- Sandboxed module: [] ▷ e is transparent. The body e is closed (De Bruijn
--- converted it under the empty box env), so it ignores g; we keep g only so the
--- expected type t can still resolve ambient type aliases (e.g. module-type
--- names like POLICY). This handles annotated functors ([] ▷ λ…) whose body
--- lambda is checkable but not inferable. Non-empty box expressions don't match.
-check g (Box [] e) t = check g e t
-
-check g e t =
+check g e t =                                                    -- t_eq
   case infer g e of
     Just t' -> teq g t' t g
     _ -> False

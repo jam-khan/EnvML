@@ -28,6 +28,8 @@ rocq/Theories//Makefile.conf
 rocq/Theories//Makefile
 src/EnvML/Parser/Happy.info
 
+mech/
+
 *.vo
 *.vos
 *.vok

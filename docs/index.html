@@ -518,13 +518,8 @@ import ghc_wasm_jsffi from "./ghc_wasm_jsffi.js";
 
 const envmlExamples = [
   {id: "e01", label: "Main example",
-    code: 
-    `
-    -- Section 2.4 (latest): composition via functors + capability sandboxing.
+    code: `module type ACCESS_POLICY = forall t. sig val reshape : list t -> list t; end;
 
-module type ACCESS_POLICY = forall t. sig val reshape : list t -> list t; end;
-
--- makeQuery : policy -> query module.  (domain inlined; param type in the arrow)
 module makeQuery :
   ( forall t. sig val reshape : list t -> list t; end )
   ->m ( sig type a = int; val query : list a -> list a; end )
@@ -543,11 +538,9 @@ module mockPolicy : ACCESS_POLICY =
 module previewQuery = makeQuery(previewPolicy);
 module mockQuery    = makeQuery(mockPolicy);
 
--- audit modules (provide "decide")
 module audit     = struct type b = bool; let decide : list int -> b = fun (xs) -> 0 < length(xs); end;
 module mockAudit = struct type b = bool; let decide : list int -> b = fun (xs) -> false; end;
 
--- assemble : query module + audit module -> composed processor (m1 + m2 + report)
 module assemble :
   ( sig type a = int; val query : list a -> list a; end )
   ->m ( sig type b = bool; val decide : list int -> b; end )
@@ -563,7 +556,6 @@ module assemble :
 module previewProcessor = assemble(previewQuery)(audit);
 module mockProcessor    = assemble(mockQuery)(mockAudit);
 
--- executeQuery : sandboxed functor; its only authority is "proc". Runs report.
 module executeQuery :
   ( sig type a = int; val query : list a -> list a;
         type b = bool; val decide : list int -> b;
@@ -575,32 +567,31 @@ module executeQuery :
         let result : bool      = proc.report(input);
       end;
 
-let previewResult : bool = executeQuery(previewProcessor).result;   -- true  (2 items after take(2), 0 < 2)
-let mockResult    : bool = executeQuery(mockProcessor).result;      -- false (mockAudit.decide = false)
-    `},
+let previewResult : bool = executeQuery(previewProcessor).result;
+let mockResult    : bool = executeQuery(mockProcessor).result;`},
   {id: "e0", label: "Policies as first-class modules",
-    code: `module type ACCESS_POLICY = 
-  forall t. sig 
-    val reshape : list t -> list t; 
+    code: `module type ACCESS_POLICY =
+  forall t. sig
+    val reshape : list t -> list t;
   end;
 
-module previewPolicy : ACCESS_POLICY = 
-  functor (type t) -> 
+module previewPolicy : ACCESS_POLICY =
+  functor (type t) ->
     struct
       let reshape : list t -> list t = fun (ls) -> take(2, ls);
     end;
 
-module mockPolicy : ACCESS_POLICY = 
-  functor (type t) -> 
+module mockPolicy : ACCESS_POLICY =
+  functor (type t) ->
     struct
       let reshape : list t -> list t = fun (ls) -> ls;
     end;
 
-module queryProcessor : 
+module queryProcessor :
   (forall t. sig val reshape : list t -> list t; end)
-  ->m sig 
-        type a = int; 
-        val query : list a -> list a; 
+  ->m sig
+        type a = int;
+        val query : list a -> list a;
       end
   = functor (policy) ->
       struct
@@ -608,23 +599,22 @@ module queryProcessor :
         let query : list a -> list a = ((policy @a) :: sig val reshape : list int -> list int; end).reshape;
       end;
 
-let executeQuery : sig type a = int; val query : list a -> list a; end -> list int = 
-  fun (processor) -> 
+let executeQuery : sig type a = int; val query : list a -> list a; end -> list int =
+  fun (processor) ->
     box [proc = processor] in proc.query(List[3, 1, 2]) :: list int;
 
-let previewResult : list int = 
+let previewResult : list int =
   executeQuery(queryProcessor(previewPolicy));
 
-let mockResult : list int = 
-  executeQuery(queryProcessor(mockPolicy));
-`},
+let mockResult : list int =
+  executeQuery(queryProcessor(mockPolicy));`},
   { id: "e1", label: "Policy Functors",
-    code: `module type POLICY = 
-  forall t. 
+    code: `module type POLICY =
+  forall t.
     sig
-      val trans : t -> t; 
+      val trans : t -> t;
     end;
-module policy1 : POLICY = 
+module policy1 : POLICY =
   functor (type t) ->
     struct
       let trans : t -> t = (fun (x) -> x);
@@ -634,8 +624,8 @@ module policy2 : POLICY =
     struct
       let trans : t -> t = fun (x) -> x;
     end;
-module foo : 
-  (forall t. sig val trans : t -> t; end) 
+module foo :
+  (forall t. sig val trans : t -> t; end)
   ->m ( sig
           type a = int;
           val f : a -> a;
@@ -650,12 +640,12 @@ let result1 : int = box [impl = foo(policy1)] in (impl.f::int -> int)(42);
 let result2 : int = box [impl = foo(policy1)] in (impl.f::int -> int)(42);`
   },
   { id: "e2", label: "Policy Composition",
-    code: `module type POLICY = 
-  forall t. 
+    code: `module type POLICY =
+  forall t.
     sig
-      val trans : t -> t; 
+      val trans : t -> t;
     end;
-module policy1 : POLICY = 
+module policy1 : POLICY =
   functor (type t) ->
     struct
       let trans : t -> t = (fun (x) -> x);
@@ -665,8 +655,8 @@ module policy2 : POLICY =
     struct
       let trans : t -> t = fun (x) -> x;
     end;
-module foo : 
-  (forall t. sig val trans : t -> t; end) 
+module foo :
+  (forall t. sig val trans : t -> t; end)
   ->m ( sig
           type a = int;
           val f : a -> a;
@@ -677,7 +667,7 @@ module foo :
         type a = int;
         let f : a -> a = ((m @ a)::(sig val trans : int -> int; end)).trans;
       end;
-let comp : {f : int -> int, x: int} -> int = 
+let comp : {f : int -> int, x: int} -> int =
     fun (env) -> box [e = env] in e.f(e.x);
 let result1 : int = comp({f = foo(policy1).f, x = 42});
 let result2 : int = comp({f = foo(policy2).f, x = 42});`
@@ -691,19 +681,19 @@ let x : sig val res : int; end = struct let res = 2; end;
 let z : int = x.res;`
   },
   { id: "e4", label: "Polymorphic Composition",
-    code: `let comp : (forall a. {f : a -> a}) -> int -> int = 
+    code: `let comp : (forall a. {f : a -> a}) -> int -> int =
     fun (env) (x) -> box [e = (env @int :: {f : int -> int}), x=42] in e.f(x);
 let f : int -> int  = comp(fun (type t) -> {f = (fun (x) -> x):: t -> t});
 let value : int = f(10);`
   },
   { id: "e5", label: "Box with Record Env",
-    code: `let comp : {f : int -> [int], x : int} -> [int] = 
+    code: `let comp : {f : int -> [int], x : int} -> [int] =
     fun (env) -> box [e = env] in e.f(e.x);`
   },
   { id: "e6", label: "Left/Right with Signatures",
-    code: `let left : forall a. (sig val l : a; val r : a; end -> a) = 
+    code: `let left : forall a. (sig val l : a; val r : a; end -> a) =
   fun (type t) (m) -> m.l;
-let right : forall a. (sig val l : a; val r : a; end -> a) = 
+let right : forall a. (sig val l : a; val r : a; end -> a) =
   fun (type t) (m) -> m.r;
 module FUNC :
   forall t.
@@ -712,24 +702,24 @@ module FUNC :
     ->m (sig val result : t; end)
   = functor (type t) (tag) (env) ->
       struct
-        let result = 
+        let result =
             (tag@t ::
                 (sig val l : t; val r : t; end -> t)
             )(env);
       end;`
   },
   { id: "e7", label: "Left/Right with Records",
-    code: `let left : forall a. ({l : a, r : a} -> a) = 
+    code: `let left : forall a. ({l : a, r : a} -> a) =
   fun (type t) (m) -> m.l;
-let right : forall a. ({l : a, r : a} -> a) = 
+let right : forall a. ({l : a, r : a} -> a) =
   fun (type t) (m) -> m.r;
 let FUNC :
   forall t.
     (forall a. {l : a, r : a} -> a)
     -> {l : t, r : t}
     -> {result : t}
- = fun (type t) (tag) (env) -> 
-        {result = 
+ = fun (type t) (tag) (env) ->
+        {result =
             (tag@t
                 :: ({l : t, r : t} -> t)
             )(env)};`
@@ -740,7 +730,7 @@ let y : int = x;
 let z : bool = true;`
   },
   { id: "e9", label: "Polymorphic Field Access",
-    code: `let f : forall a. {l : a} -> a = 
+    code: `let f : forall a. {l : a} -> a =
   fun (type t) (x) -> x.l;
 let result : ({l : int} -> int) = (f @ int);
 let final  : int = result({l = 1});`
@@ -756,8 +746,8 @@ let result = policy1 @a;
 let final = (result::(sig val id : a -> a; end)).id(1);`
   },
   { id: "e11", label: "Module with Type Decl",
-    code: `module m : 
-  sig 
+    code: `module m :
+  sig
     type t = int;
     val y : t;
   end = struct
