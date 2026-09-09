@@ -28,7 +28,7 @@ rocq/Theories//Makefile.conf
 rocq/Theories//Makefile
 src/EnvML/Parser/Happy.info
 
-mech/
+**/.lia.cache
 
 *.vo
 *.vos
@@ -93,3 +93,5 @@ src/WASM.o
 *.hi
 src/EnvML/Parser/Parser.info
 src/CoreFE/Parser/Parser.info
+
+**/.coq.d
