@@ -1,520 +1,489 @@
 module CoreFE.DeBruijnSpec (spec) where
 
 import Test.Hspec
-import qualified CoreFE.Named as Named
-import qualified CoreFE.Syntax as Nameless
+import qualified CoreFE.Named as N
+import qualified CoreFE.Syntax as C
 import CoreFE.DeBruijn (toNamelessExp, toNamelessTyp, toDeBruijn, toDeBruijnTyp)
 import CoreFE.Check (check, infer)
 import CoreFE.Eval (eval)
 
 -- A literal environment, newest entry first (a Unit-rooted Merge/TMerge chain)
-env :: [Nameless.Entry] -> Nameless.Exp
-env = Nameless.mkEnv
+env :: [C.Entry] -> C.Exp
+env = C.mkEnv
+
+-- Abbreviations for the literal types and terms the tables repeat
+cInt, cBool, cStr :: C.Typ
+cInt = C.TyLit C.TyInt
+cBool = C.TyLit C.TyBool
+cStr = C.TyLit C.TyStr
+
+nInt, nBool :: N.Typ
+nInt = N.TyLit C.TyInt
+nBool = N.TyLit C.TyBool
 
 -- Helper to run full pipeline
-runPipeline :: Named.Exp -> Maybe (Nameless.Exp, Nameless.Typ, Nameless.Exp)
+runPipeline :: N.Exp -> Maybe (C.Exp, C.Typ, C.Exp)
 runPipeline namedExp = do
   let namelessExp = toDeBruijn namedExp
   typ <- infer [] namelessExp
-  result <- eval Nameless.Unit namelessExp
+  result <- eval C.Unit namelessExp
   return (namelessExp, typ, result)
 
--- ============================================================================
--- Test Data
--- ============================================================================
-debruijnTests :: [(String, Named.Exp, Nameless.Exp, Maybe Nameless.Typ, Maybe Nameless.Exp)]
+-- Test data
+debruijnTests :: [(String, N.Exp, C.Exp, Maybe C.Typ, Maybe C.Exp)]
 debruijnTests =
-  [ -- ==========================================================================
-    -- Basic Literals (1-3)
-    -- ==========================================================================
+  [ -- Basic literals (1-3)
     ( "1. int literal"
-    , Named.Lit (Nameless.LitInt 42)
-    , Nameless.Lit (Nameless.LitInt 42)
-    , Just (Nameless.TyLit Nameless.TyInt)
-    , Just (Nameless.Lit (Nameless.LitInt 42))
+    , N.Lit (C.LitInt 42)
+    , C.Lit (C.LitInt 42)
+    , Just (cInt)
+    , Just (C.Lit (C.LitInt 42))
     )
-  , ( "2. bool literal"
-    , Named.Lit (Nameless.LitBool True)
-    , Nameless.Lit (Nameless.LitBool True)
-    , Just (Nameless.TyLit Nameless.TyBool)
-    , Just (Nameless.Lit (Nameless.LitBool True))
-    )
-  , ( "3. string literal"
-    , Named.Lit (Nameless.LitStr "hello")
-    , Nameless.Lit (Nameless.LitStr "hello")
-    , Just (Nameless.TyLit Nameless.TyStr)
-    , Just (Nameless.Lit (Nameless.LitStr "hello"))
-    )
+  , ("2. bool literal", N.Lit (C.LitBool True), C.Lit (C.LitBool True), Just (cBool), Just (C.Lit (C.LitBool True)))
+  , ("3. string literal", N.Lit (C.LitStr "hello"), C.Lit (C.LitStr "hello"), Just (cStr), Just (C.Lit (C.LitStr "hello")))
 
-    -- ==========================================================================
-    -- Simple Lambda and Variables (4-8)
-    -- ==========================================================================
+    -- Simple lambda and variables (4-8)
   , ( "4. identity lambda"
-    , Named.Lam "x" (Named.Var "x")
-    , Nameless.Lam (Nameless.Var 0)
+    , N.Lam "x" (N.Var "x")
+    , C.Lam (C.Var 0)
     , Nothing  -- can't infer without annotation
-    , Just (Nameless.Clos Nameless.Unit (Nameless.Var 0))
+    , Just (C.Clos C.Unit (C.Var 0))
     )
   , ( "5. annotated identity lambda"
-    , Named.Anno 
-        (Named.Lam "x" (Named.Var "x")) 
-        (Named.TyArr (Named.TyLit Nameless.TyInt) (Named.TyLit Nameless.TyInt))
-    , Nameless.Anno 
-        (Nameless.Lam (Nameless.Var 0)) 
-        (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) (Nameless.TyLit Nameless.TyInt))
-    , Just (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) (Nameless.TyLit Nameless.TyInt))
-    , Just (Nameless.Clos Nameless.Unit (Nameless.Var 0))
+    , N.Anno 
+        (N.Lam "x" (N.Var "x")) 
+        (N.TyArr (nInt) (nInt))
+    , C.Anno 
+        (C.Lam (C.Var 0)) 
+        (C.TyArr (cInt) (cInt))
+    , Just (C.TyArr (cInt) (cInt))
+    , Just (C.Clos C.Unit (C.Var 0))
     )
   , ( "6. nested lambda - uses outer variable"
-    , Named.Lam "x" (Named.Lam "y" (Named.Var "x"))
-    , Nameless.Lam (Nameless.Lam (Nameless.Var 1))
+    , N.Lam "x" (N.Lam "y" (N.Var "x"))
+    , C.Lam (C.Lam (C.Var 1))
     , Nothing
-    , Just (Nameless.Clos Nameless.Unit (Nameless.Lam (Nameless.Var 1)))
+    , Just (C.Clos C.Unit (C.Lam (C.Var 1)))
     )
   , ( "7. nested lambda - uses inner variable"
-    , Named.Lam "x" (Named.Lam "y" (Named.Var "y"))
-    , Nameless.Lam (Nameless.Lam (Nameless.Var 0))
+    , N.Lam "x" (N.Lam "y" (N.Var "y"))
+    , C.Lam (C.Lam (C.Var 0))
     , Nothing
-    , Just (Nameless.Clos Nameless.Unit (Nameless.Lam (Nameless.Var 0)))
+    , Just (C.Clos C.Unit (C.Lam (C.Var 0)))
     )
   , ( "8. nested lambda - uses both variables"
-    , Named.Anno
-        (Named.Lam "x" (Named.Lam "y" (Named.App (Named.Var "x") (Named.Var "y"))))
-        (Named.TyArr 
-          (Named.TyArr (Named.TyLit Nameless.TyInt) (Named.TyLit Nameless.TyInt))
-          (Named.TyArr (Named.TyLit Nameless.TyInt) (Named.TyLit Nameless.TyInt)))
-    , Nameless.Anno
-        (Nameless.Lam (Nameless.Lam (Nameless.App (Nameless.Var 1) (Nameless.Var 0))))
-        (Nameless.TyArr 
-          (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) (Nameless.TyLit Nameless.TyInt))
-          (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) (Nameless.TyLit Nameless.TyInt)))
-    , Just (Nameless.TyArr 
-          (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) (Nameless.TyLit Nameless.TyInt))
-          (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) (Nameless.TyLit Nameless.TyInt)))
-    , Just (Nameless.Clos Nameless.Unit (Nameless.Lam (Nameless.App (Nameless.Var 1) (Nameless.Var 0))))
+    , N.Anno
+        (N.Lam "x" (N.Lam "y" (N.App (N.Var "x") (N.Var "y"))))
+        (N.TyArr 
+          (N.TyArr (nInt) (nInt))
+          (N.TyArr (nInt) (nInt)))
+    , C.Anno
+        (C.Lam (C.Lam (C.App (C.Var 1) (C.Var 0))))
+        (C.TyArr 
+          (C.TyArr (cInt) (cInt))
+          (C.TyArr (cInt) (cInt)))
+    , Just (C.TyArr 
+          (C.TyArr (cInt) (cInt))
+          (C.TyArr (cInt) (cInt)))
+    , Just (C.Clos C.Unit (C.Lam (C.App (C.Var 1) (C.Var 0))))
     )
 
-    -- ==========================================================================
     -- Application (9-11)
-    -- ==========================================================================
   , ( "9. simple application"
-    , Named.App 
-        (Named.Anno 
-          (Named.Lam "x" (Named.Var "x"))
-          (Named.TyArr (Named.TyLit Nameless.TyInt) (Named.TyLit Nameless.TyInt)))
-        (Named.Lit (Nameless.LitInt 5))
-    , Nameless.App 
-        (Nameless.Anno 
-          (Nameless.Lam (Nameless.Var 0))
-          (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) (Nameless.TyLit Nameless.TyInt)))
-        (Nameless.Lit (Nameless.LitInt 5))
-    , Just (Nameless.TyLit Nameless.TyInt)
-    , Just (Nameless.Lit (Nameless.LitInt 5))
+    , N.App 
+        (N.Anno 
+          (N.Lam "x" (N.Var "x"))
+          (N.TyArr (nInt) (nInt)))
+        (N.Lit (C.LitInt 5))
+    , C.App 
+        (C.Anno 
+          (C.Lam (C.Var 0))
+          (C.TyArr (cInt) (cInt)))
+        (C.Lit (C.LitInt 5))
+    , Just (cInt)
+    , Just (C.Lit (C.LitInt 5))
     )
   , ( "10. curried application"
-    , Named.App 
-        (Named.App 
-          (Named.Anno 
-            (Named.Lam "x" (Named.Lam "y" (Named.Var "x")))
-            (Named.TyArr (Named.TyLit Nameless.TyInt) 
-              (Named.TyArr (Named.TyLit Nameless.TyBool) (Named.TyLit Nameless.TyInt))))
-          (Named.Lit (Nameless.LitInt 42)))
-        (Named.Lit (Nameless.LitBool True))
-    , Nameless.App 
-        (Nameless.App 
-          (Nameless.Anno 
-            (Nameless.Lam (Nameless.Lam (Nameless.Var 1)))
-            (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) 
-              (Nameless.TyArr (Nameless.TyLit Nameless.TyBool) (Nameless.TyLit Nameless.TyInt))))
-          (Nameless.Lit (Nameless.LitInt 42)))
-        (Nameless.Lit (Nameless.LitBool True))
-    , Just (Nameless.TyLit Nameless.TyInt)
-    , Just (Nameless.Lit (Nameless.LitInt 42))
+    , N.App 
+        (N.App 
+          (N.Anno 
+            (N.Lam "x" (N.Lam "y" (N.Var "x")))
+            (N.TyArr (nInt) 
+              (N.TyArr (nBool) (nInt))))
+          (N.Lit (C.LitInt 42)))
+        (N.Lit (C.LitBool True))
+    , C.App 
+        (C.App 
+          (C.Anno 
+            (C.Lam (C.Lam (C.Var 1)))
+            (C.TyArr (cInt) 
+              (C.TyArr (cBool) (cInt))))
+          (C.Lit (C.LitInt 42)))
+        (C.Lit (C.LitBool True))
+    , Just (cInt)
+    , Just (C.Lit (C.LitInt 42))
     )
   , ( "11. application returning second argument"
-    , Named.App 
-        (Named.App 
-          (Named.Anno 
-            (Named.Lam "x" (Named.Lam "y" (Named.Var "y")))
-            (Named.TyArr (Named.TyLit Nameless.TyInt) 
-              (Named.TyArr (Named.TyLit Nameless.TyBool) (Named.TyLit Nameless.TyBool))))
-          (Named.Lit (Nameless.LitInt 42)))
-        (Named.Lit (Nameless.LitBool False))
-    , Nameless.App 
-        (Nameless.App 
-          (Nameless.Anno 
-            (Nameless.Lam (Nameless.Lam (Nameless.Var 0)))
-            (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) 
-              (Nameless.TyArr (Nameless.TyLit Nameless.TyBool) (Nameless.TyLit Nameless.TyBool))))
-          (Nameless.Lit (Nameless.LitInt 42)))
-        (Nameless.Lit (Nameless.LitBool False))
-    , Just (Nameless.TyLit Nameless.TyBool)
-    , Just (Nameless.Lit (Nameless.LitBool False))
+    , N.App 
+        (N.App 
+          (N.Anno 
+            (N.Lam "x" (N.Lam "y" (N.Var "y")))
+            (N.TyArr (nInt) 
+              (N.TyArr (nBool) (nBool))))
+          (N.Lit (C.LitInt 42)))
+        (N.Lit (C.LitBool False))
+    , C.App 
+        (C.App 
+          (C.Anno 
+            (C.Lam (C.Lam (C.Var 0)))
+            (C.TyArr (cInt) 
+              (C.TyArr (cBool) (cBool))))
+          (C.Lit (C.LitInt 42)))
+        (C.Lit (C.LitBool False))
+    , Just (cBool)
+    , Just (C.Lit (C.LitBool False))
     )
 
-    -- ==========================================================================
-    -- Type Abstraction and Application (12-15)
-    -- ==========================================================================
+    -- Type abstraction and application (12-15)
     -- Note: TLam containing Lam cannot be inferred, only checked
   , ( "12. polymorphic identity (annotated)"
-    , Named.Anno
-        (Named.TLam "a" (Named.Lam "x" (Named.Var "x")))
-        (Named.TyAll "a" (Named.TyArr (Named.TyVar "a") (Named.TyVar "a")))
-    , Nameless.Anno
-        (Nameless.TLam (Nameless.Lam (Nameless.Var 0)))
-        (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0)))
-    , Just (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0)))
-    , Just (Nameless.TClos Nameless.Unit (Nameless.Lam (Nameless.Var 0)))
+    , N.Anno
+        (N.TLam "a" (N.Lam "x" (N.Var "x")))
+        (N.TyAll "a" (N.TyArr (N.TyVar "a") (N.TyVar "a")))
+    , C.Anno
+        (C.TLam (C.Lam (C.Var 0)))
+        (C.TyAll (C.TyArr (C.TyVar 0) (C.TyVar 0)))
+    , Just (C.TyAll (C.TyArr (C.TyVar 0) (C.TyVar 0)))
+    , Just (C.TClos C.Unit (C.Lam (C.Var 0)))
     )
   , ( "13. type application of polymorphic identity (annotated)"
-    , Named.TApp 
-        (Named.Anno
-          (Named.TLam "a" (Named.Lam "x" (Named.Var "x")))
-          (Named.TyAll "a" (Named.TyArr (Named.TyVar "a") (Named.TyVar "a"))))
-        (Named.TyLit Nameless.TyInt)
-    , Nameless.TApp 
-        (Nameless.Anno
-          (Nameless.TLam (Nameless.Lam (Nameless.Var 0)))
-          (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0))))
-        (Nameless.TyLit Nameless.TyInt)
-    , Just (Nameless.TySubstT (Nameless.TyLit Nameless.TyInt) 
-            (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0)))
-    , Just (Nameless.Clos (env [Nameless.EntT (Nameless.TyBoxT [] (Nameless.TyLit Nameless.TyInt))]) 
-            (Nameless.Var 0))
+    , N.TApp 
+        (N.Anno
+          (N.TLam "a" (N.Lam "x" (N.Var "x")))
+          (N.TyAll "a" (N.TyArr (N.TyVar "a") (N.TyVar "a"))))
+        (nInt)
+    , C.TApp 
+        (C.Anno
+          (C.TLam (C.Lam (C.Var 0)))
+          (C.TyAll (C.TyArr (C.TyVar 0) (C.TyVar 0))))
+        (cInt)
+    , Just (C.TySubstT (cInt) 
+            (C.TyArr (C.TyVar 0) (C.TyVar 0)))
+    , Just (C.Clos (env [C.EntT (C.TyBoxT [] (cInt))]) 
+            (C.Var 0))
     )
   , ( "14. nested type abstraction (annotated)"
-    , Named.Anno
-        (Named.TLam "a" (Named.TLam "b" (Named.Lam "x" (Named.Var "x"))))
-        (Named.TyAll "a" (Named.TyAll "b" (Named.TyArr (Named.TyVar "b") (Named.TyVar "b"))))
-    , Nameless.Anno
-        (Nameless.TLam (Nameless.TLam (Nameless.Lam (Nameless.Var 0))))
-        (Nameless.TyAll (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0))))
-    , Just (Nameless.TyAll (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0))))
-    , Just (Nameless.TClos Nameless.Unit (Nameless.TLam (Nameless.Lam (Nameless.Var 0))))
+    , N.Anno
+        (N.TLam "a" (N.TLam "b" (N.Lam "x" (N.Var "x"))))
+        (N.TyAll "a" (N.TyAll "b" (N.TyArr (N.TyVar "b") (N.TyVar "b"))))
+    , C.Anno
+        (C.TLam (C.TLam (C.Lam (C.Var 0))))
+        (C.TyAll (C.TyAll (C.TyArr (C.TyVar 0) (C.TyVar 0))))
+    , Just (C.TyAll (C.TyAll (C.TyArr (C.TyVar 0) (C.TyVar 0))))
+    , Just (C.TClos C.Unit (C.TLam (C.Lam (C.Var 0))))
     )
   , ( "15. type variable in type annotation"
-    , Named.TLam "a" 
-        (Named.Anno 
-          (Named.Lam "x" (Named.Var "x"))
-          (Named.TyArr (Named.TyVar "a") (Named.TyVar "a")))
-    , Nameless.TLam 
-        (Nameless.Anno 
-          (Nameless.Lam (Nameless.Var 0))
-          (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0)))
-    , Just (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0)))
-    , Just (Nameless.TClos Nameless.Unit 
-        (Nameless.Anno 
-          (Nameless.Lam (Nameless.Var 0))
-          (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0))))
+    , N.TLam "a" 
+        (N.Anno 
+          (N.Lam "x" (N.Var "x"))
+          (N.TyArr (N.TyVar "a") (N.TyVar "a")))
+    , C.TLam 
+        (C.Anno 
+          (C.Lam (C.Var 0))
+          (C.TyArr (C.TyVar 0) (C.TyVar 0)))
+    , Just (C.TyAll (C.TyArr (C.TyVar 0) (C.TyVar 0)))
+    , Just (C.TClos C.Unit 
+        (C.Anno 
+          (C.Lam (C.Var 0))
+          (C.TyArr (C.TyVar 0) (C.TyVar 0))))
     )
 
-    -- ==========================================================================
     -- Records (16-18)
-    -- ==========================================================================
   , ( "16. simple record"
-    , Named.Rec "x" (Named.Lit (Nameless.LitInt 42))
-    , Nameless.Rec "x" (Nameless.Lit (Nameless.LitInt 42))
-    , Just (Nameless.TyRcd "x" (Nameless.TyLit Nameless.TyInt))
-    , Just (Nameless.Rec "x" (Nameless.Lit (Nameless.LitInt 42)))
+    , N.Rec "x" (N.Lit (C.LitInt 42))
+    , C.Rec "x" (C.Lit (C.LitInt 42))
+    , Just (C.TyRcd "x" (cInt))
+    , Just (C.Rec "x" (C.Lit (C.LitInt 42)))
     )
   , ( "17. record projection via FEnv"
-    , Named.RProj 
-        (Named.FEnv [Named.ExpE "x" (Named.Rec "val" (Named.Lit (Nameless.LitInt 42)))])
+    , N.RProj 
+        (N.FEnv [N.ExpE "x" (N.Rec "val" (N.Lit (C.LitInt 42)))])
         "val"
-    , Nameless.RProj 
-        (env [Nameless.EntE (Nameless.Rec "val" (Nameless.Lit (Nameless.LitInt 42)))])
+    , C.RProj 
+        (env [C.EntE (C.Rec "val" (C.Lit (C.LitInt 42)))])
         "val"
-    , Just (Nameless.TyLit Nameless.TyInt)
-    , Just (Nameless.Lit (Nameless.LitInt 42))
+    , Just (cInt)
+    , Just (C.Lit (C.LitInt 42))
     )
   , ( "18. record with lambda"
-    , Named.Rec "f" 
-        (Named.Anno 
-          (Named.Lam "x" (Named.Var "x"))
-          (Named.TyArr (Named.TyLit Nameless.TyInt) (Named.TyLit Nameless.TyInt)))
-    , Nameless.Rec "f" 
-        (Nameless.Anno 
-          (Nameless.Lam (Nameless.Var 0))
-          (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) (Nameless.TyLit Nameless.TyInt)))
-    , Just (Nameless.TyRcd "f" 
-        (Nameless.TyArr (Nameless.TyLit Nameless.TyInt) (Nameless.TyLit Nameless.TyInt)))
-    , Just (Nameless.Rec "f" (Nameless.Clos Nameless.Unit (Nameless.Var 0)))
+    , N.Rec "f" 
+        (N.Anno 
+          (N.Lam "x" (N.Var "x"))
+          (N.TyArr (nInt) (nInt)))
+    , C.Rec "f" 
+        (C.Anno 
+          (C.Lam (C.Var 0))
+          (C.TyArr (cInt) (cInt)))
+    , Just (C.TyRcd "f" 
+        (C.TyArr (cInt) (cInt)))
+    , Just (C.Rec "f" (C.Clos C.Unit (C.Var 0)))
     )
 
-    -- ==========================================================================
-    -- First-Class Environments - Basic (19-22)
-    -- ==========================================================================
-  , ( "19. empty environment"
-    , Named.FEnv []
-    , env []
-    , Just (Nameless.TyEnvt [])
-    , Just (env [])
-    )
+    -- First-class environments - basic (19-22)
+  , ("19. empty environment", N.FEnv [], env [], Just (C.TyEnvt []), Just (env []))
   , ( "20. environment with single ExpE"
-    , Named.FEnv [Named.ExpE "x" (Named.Lit (Nameless.LitInt 42))]
-    , env [Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))]
-    , Just (Nameless.TyEnvt [Nameless.Type (Nameless.TyLit Nameless.TyInt)])
-    , Just (env [Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))])
+    , N.FEnv [N.ExpE "x" (N.Lit (C.LitInt 42))]
+    , env [C.EntE (C.Lit (C.LitInt 42))]
+    , Just (C.TyEnvt [C.Type (cInt)])
+    , Just (env [C.EntE (C.Lit (C.LitInt 42))])
     )
   , ( "21. environment with multiple ExpE"
-    , Named.FEnv 
-        [ Named.ExpE "x" (Named.Lit (Nameless.LitInt 1))
-        , Named.ExpE "y" (Named.Lit (Nameless.LitInt 2))
+    , N.FEnv 
+        [ N.ExpE "x" (N.Lit (C.LitInt 1))
+        , N.ExpE "y" (N.Lit (C.LitInt 2))
         ]
     , env
-        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 1))
-        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 2))
+        [ C.EntE (C.Lit (C.LitInt 1))
+        , C.EntE (C.Lit (C.LitInt 2))
         ]
-    , Just (Nameless.TyEnvt 
-        [ Nameless.Type (Nameless.TyLit Nameless.TyInt)
-        , Nameless.Type (Nameless.TyLit Nameless.TyInt)
+    , Just (C.TyEnvt 
+        [ C.Type (cInt)
+        , C.Type (cInt)
         ])
     , Just (env
-        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 1))
-        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 2))
+        [ C.EntE (C.Lit (C.LitInt 1))
+        , C.EntE (C.Lit (C.LitInt 2))
         ])
     )
   , ( "22. environment with TypE"
-    , Named.FEnv [Named.TypE "t" (Named.TyLit Nameless.TyInt)]
-    , env [Nameless.EntT (Nameless.TyLit Nameless.TyInt)]
-    , Just (Nameless.TyEnvt [Nameless.TypeEq (Nameless.TyLit Nameless.TyInt)])
-    , Just (env [Nameless.EntT (Nameless.TyBoxT [] (Nameless.TyLit Nameless.TyInt))])
+    , N.FEnv [N.TypE "t" (nInt)]
+    , env [C.EntT (cInt)]
+    , Just (C.TyEnvt [C.TypeEq (cInt)])
+    , Just (env [C.EntT (C.TyBoxT [] (cInt))])
     )
 
-    -- ==========================================================================
-    -- First-Class Environments - Scoping (23-26)
-    -- ==========================================================================
+    -- First-class environments - scoping (23-26)
   , ( "23. environment entry references later entry"
-    , Named.FEnv 
-        [ Named.ExpE "x" (Named.Var "y")
-        , Named.ExpE "y" (Named.Lit (Nameless.LitInt 42))
+    , N.FEnv 
+        [ N.ExpE "x" (N.Var "y")
+        , N.ExpE "y" (N.Lit (C.LitInt 42))
         ]
     , env
-        [ Nameless.EntE (Nameless.Var 0)  -- x sees y at index 0
-        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))
+        [ C.EntE (C.Var 0)  -- x sees y at index 0
+        , C.EntE (C.Lit (C.LitInt 42))
         ]
-    , Just (Nameless.TyEnvt 
-        [ Nameless.Type (Nameless.TyLit Nameless.TyInt)
-        , Nameless.Type (Nameless.TyLit Nameless.TyInt)
+    , Just (C.TyEnvt 
+        [ C.Type (cInt)
+        , C.Type (cInt)
         ])
     , Just (env
-        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))
-        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))
+        [ C.EntE (C.Lit (C.LitInt 42))
+        , C.EntE (C.Lit (C.LitInt 42))
         ])
     )
   , ( "24. environment with three entries, first references third"
-    , Named.FEnv 
-        [ Named.ExpE "x" (Named.Var "z")
-        , Named.ExpE "y" (Named.Lit (Nameless.LitInt 1))
-        , Named.ExpE "z" (Named.Lit (Nameless.LitInt 2))
+    , N.FEnv 
+        [ N.ExpE "x" (N.Var "z")
+        , N.ExpE "y" (N.Lit (C.LitInt 1))
+        , N.ExpE "z" (N.Lit (C.LitInt 2))
         ]
     , env
-        [ Nameless.EntE (Nameless.Var 1)  -- x sees z at index 1 (y=0, z=1)
-        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 1))
-        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 2))
+        [ C.EntE (C.Var 1)  -- x sees z at index 1 (y=0, z=1)
+        , C.EntE (C.Lit (C.LitInt 1))
+        , C.EntE (C.Lit (C.LitInt 2))
         ]
-    , Just (Nameless.TyEnvt 
-        [ Nameless.Type (Nameless.TyLit Nameless.TyInt)
-        , Nameless.Type (Nameless.TyLit Nameless.TyInt)
-        , Nameless.Type (Nameless.TyLit Nameless.TyInt)
+    , Just (C.TyEnvt 
+        [ C.Type (cInt)
+        , C.Type (cInt)
+        , C.Type (cInt)
         ])
     , Just (env
-        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 2))
-        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 1))
-        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 2))
+        [ C.EntE (C.Lit (C.LitInt 2))
+        , C.EntE (C.Lit (C.LitInt 1))
+        , C.EntE (C.Lit (C.LitInt 2))
         ])
     )
   , ( "25. environment with second references third"
-    , Named.FEnv 
-        [ Named.ExpE "x" (Named.Lit (Nameless.LitInt 0))
-        , Named.ExpE "y" (Named.Var "z")
-        , Named.ExpE "z" (Named.Lit (Nameless.LitInt 99))
+    , N.FEnv 
+        [ N.ExpE "x" (N.Lit (C.LitInt 0))
+        , N.ExpE "y" (N.Var "z")
+        , N.ExpE "z" (N.Lit (C.LitInt 99))
         ]
     , env
-        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 0))
-        , Nameless.EntE (Nameless.Var 0)  -- y sees z at index 0
-        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 99))
+        [ C.EntE (C.Lit (C.LitInt 0))
+        , C.EntE (C.Var 0)  -- y sees z at index 0
+        , C.EntE (C.Lit (C.LitInt 99))
         ]
-    , Just (Nameless.TyEnvt 
-        [ Nameless.Type (Nameless.TyLit Nameless.TyInt)
-        , Nameless.Type (Nameless.TyLit Nameless.TyInt)
-        , Nameless.Type (Nameless.TyLit Nameless.TyInt)
+    , Just (C.TyEnvt 
+        [ C.Type (cInt)
+        , C.Type (cInt)
+        , C.Type (cInt)
         ])
     , Just (env
-        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 0))
-        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 99))
-        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 99))
+        [ C.EntE (C.Lit (C.LitInt 0))
+        , C.EntE (C.Lit (C.LitInt 99))
+        , C.EntE (C.Lit (C.LitInt 99))
         ])
     )
   , ( "26. environment with mixed ExpE and TypE"
-    , Named.FEnv 
-        [ Named.ExpE "x" (Named.Lit (Nameless.LitInt 1))
-        , Named.TypE "t" (Named.TyLit Nameless.TyBool)
-        , Named.ExpE "y" (Named.Lit (Nameless.LitInt 2))
+    , N.FEnv 
+        [ N.ExpE "x" (N.Lit (C.LitInt 1))
+        , N.TypE "t" (nBool)
+        , N.ExpE "y" (N.Lit (C.LitInt 2))
         ]
     , env
-        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 1))
-        , Nameless.EntT (Nameless.TyLit Nameless.TyBool)
-        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 2))
+        [ C.EntE (C.Lit (C.LitInt 1))
+        , C.EntT (cBool)
+        , C.EntE (C.Lit (C.LitInt 2))
         ]
-    , Just (Nameless.TyEnvt 
-        [ Nameless.Type (Nameless.TyLit Nameless.TyInt)
-        , Nameless.TypeEq (Nameless.TyLit Nameless.TyBool)
-        , Nameless.Type (Nameless.TyLit Nameless.TyInt)
+    , Just (C.TyEnvt 
+        [ C.Type (cInt)
+        , C.TypeEq (cBool)
+        , C.Type (cInt)
         ])
     -- Eval result: TypE gets wrapped in TyBoxT with c2g of (rest ++ env)
     -- For the TypE at position 1, c2g of [ExpE (Lit 2)] ++ [] = []
     , Just (env
-        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 1))
-        , Nameless.EntT (Nameless.TyBoxT [] (Nameless.TyLit Nameless.TyBool))
-        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 2))
+        [ C.EntE (C.Lit (C.LitInt 1))
+        , C.EntT (C.TyBoxT [] (cBool))
+        , C.EntE (C.Lit (C.LitInt 2))
         ])
     )
 
-    -- ==========================================================================
-    -- ModE and MVar (27-29)
-    -- ==========================================================================
+    -- Mode and mvar (27-29)
   , ( "27. ModE wraps in FEnv containing record"
-    , Named.FEnv [Named.ModE "m" (Named.Lit (Nameless.LitInt 42))]
-    , env [Nameless.EntE (Nameless.Rec "m" (Nameless.Lit (Nameless.LitInt 42)))]
-    , Just (Nameless.TyEnvt [Nameless.Type (Nameless.TyRcd "m" (Nameless.TyLit Nameless.TyInt))])
-    , Just (env [Nameless.EntE (Nameless.Rec "m" (Nameless.Lit (Nameless.LitInt 42)))])
+    , N.FEnv [N.ModE "m" (N.Lit (C.LitInt 42))]
+    , env [C.EntE (C.Rec "m" (C.Lit (C.LitInt 42)))]
+    , Just (C.TyEnvt [C.Type (C.TyRcd "m" (cInt))])
+    , Just (env [C.EntE (C.Rec "m" (C.Lit (C.LitInt 42)))])
     )
   , ( "28. ModE projection via RProj on FEnv"
     -- To project from ModE, we need to go through FEnv and RProj
-    , Named.RProj 
-        (Named.FEnv [Named.ModE "m" (Named.Lit (Nameless.LitInt 42))])
+    , N.RProj 
+        (N.FEnv [N.ModE "m" (N.Lit (C.LitInt 42))])
         "m"
-    , Nameless.RProj 
-        (env [Nameless.EntE (Nameless.Rec "m" (Nameless.Lit (Nameless.LitInt 42)))])
+    , C.RProj 
+        (env [C.EntE (C.Rec "m" (C.Lit (C.LitInt 42)))])
         "m"
-    , Just (Nameless.TyLit Nameless.TyInt)
-    , Just (Nameless.Lit (Nameless.LitInt 42))
+    , Just (cInt)
+    , Just (C.Lit (C.LitInt 42))
     )
   , ( "29. Var referencing ExpE stays as Var"
-    , Named.FEnv 
-        [ Named.ExpE "result" (Named.Var "x")  -- x is ExpE, stays as Var
-        , Named.ExpE "x" (Named.Lit (Nameless.LitInt 42))
+    , N.FEnv 
+        [ N.ExpE "result" (N.Var "x")  -- x is ExpE, stays as Var
+        , N.ExpE "x" (N.Lit (C.LitInt 42))
         ]
     , env
-        [ Nameless.EntE (Nameless.Var 0)
-        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))
+        [ C.EntE (C.Var 0)
+        , C.EntE (C.Lit (C.LitInt 42))
         ]
-    , Just (Nameless.TyEnvt 
-        [ Nameless.Type (Nameless.TyLit Nameless.TyInt)
-        , Nameless.Type (Nameless.TyLit Nameless.TyInt)
+    , Just (C.TyEnvt 
+        [ C.Type (cInt)
+        , C.Type (cInt)
         ])
     , Just (env
-        [ Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))
-        , Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))
+        [ C.EntE (C.Lit (C.LitInt 42))
+        , C.EntE (C.Lit (C.LitInt 42))
         ])
     )
 
-    -- ==========================================================================
-    -- Box and Closures (30-32)
-    -- ==========================================================================
+    -- Box and closures (30-32)
   , ( "30. box with simple environment"
-    , Named.Box 
-        [Named.ExpE "x" (Named.Lit (Nameless.LitInt 42))]
-        (Named.Var "x")
-    , Nameless.Box
-        (env [Nameless.EntE (Nameless.Lit (Nameless.LitInt 42))])
-        (Nameless.Var 0)
-    , Just (Nameless.TyBoxT 
-        [Nameless.Type (Nameless.TyLit Nameless.TyInt)]
-        (Nameless.TyLit Nameless.TyInt))
-    , Just (Nameless.Lit (Nameless.LitInt 42))
+    , N.Box 
+        [N.ExpE "x" (N.Lit (C.LitInt 42))]
+        (N.Var "x")
+    , C.Box
+        (env [C.EntE (C.Lit (C.LitInt 42))])
+        (C.Var 0)
+    , Just (C.TyBoxT 
+        [C.Type (cInt)]
+        (cInt))
+    , Just (C.Lit (C.LitInt 42))
     )
   , ( "31. closure with environment"
-    , Named.Clos 
-        [Named.ExpE "captured" (Named.Lit (Nameless.LitInt 10))]
-        (Named.Var "captured")
-    , Nameless.Clos
-        (env [Nameless.EntE (Nameless.Lit (Nameless.LitInt 10))])
-        (Nameless.Var 0)
+    , N.Clos 
+        [N.ExpE "captured" (N.Lit (C.LitInt 10))]
+        (N.Var "captured")
+    , C.Clos
+        (env [C.EntE (C.Lit (C.LitInt 10))])
+        (C.Var 0)
     , Nothing  -- closures need checking, not inference
-    , Just (Nameless.Clos
-        (env [Nameless.EntE (Nameless.Lit (Nameless.LitInt 10))])
-        (Nameless.Var 0))
+    , Just (C.Clos
+        (env [C.EntE (C.Lit (C.LitInt 10))])
+        (C.Var 0))
     )
   , ( "32. tclos with type environment"
-    , Named.TClos 
-        [Named.TypE "t" (Named.TyLit Nameless.TyInt)]
-        (Named.Lam "x" (Named.Var "x"))
-    , Nameless.TClos
-        (env [Nameless.EntT (Nameless.TyLit Nameless.TyInt)])
-        (Nameless.Lam (Nameless.Var 0))
+    , N.TClos 
+        [N.TypE "t" (nInt)]
+        (N.Lam "x" (N.Var "x"))
+    , C.TClos
+        (env [C.EntT (cInt)])
+        (C.Lam (C.Var 0))
     , Nothing  -- closures need checking
-    , Just (Nameless.TClos
-        (env [Nameless.EntT (Nameless.TyLit Nameless.TyInt)])
-        (Nameless.Lam (Nameless.Var 0)))
+    , Just (C.TClos
+        (env [C.EntT (cInt)])
+        (C.Lam (C.Var 0)))
     )
 
-    -- ==========================================================================
-    -- Complex Type Translations (33-35)
-    -- ==========================================================================
+    -- Complex type translations (33-35)
   , ( "33. forall type in annotation"
-    , Named.Anno 
-        (Named.TLam "a" (Named.Lam "x" (Named.Var "x")))
-        (Named.TyAll "a" (Named.TyArr (Named.TyVar "a") (Named.TyVar "a")))
-    , Nameless.Anno 
-        (Nameless.TLam (Nameless.Lam (Nameless.Var 0)))
-        (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0)))
-    , Just (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0)))
-    , Just (Nameless.TClos Nameless.Unit (Nameless.Lam (Nameless.Var 0)))
+    , N.Anno 
+        (N.TLam "a" (N.Lam "x" (N.Var "x")))
+        (N.TyAll "a" (N.TyArr (N.TyVar "a") (N.TyVar "a")))
+    , C.Anno 
+        (C.TLam (C.Lam (C.Var 0)))
+        (C.TyAll (C.TyArr (C.TyVar 0) (C.TyVar 0)))
+    , Just (C.TyAll (C.TyArr (C.TyVar 0) (C.TyVar 0)))
+    , Just (C.TClos C.Unit (C.Lam (C.Var 0)))
     )
   , ( "34. nested forall types"
-    , Named.Anno 
-        (Named.TLam "a" (Named.TLam "b" (Named.Lam "x" (Named.Var "x"))))
-        (Named.TyAll "a" (Named.TyAll "b" (Named.TyArr (Named.TyVar "b") (Named.TyVar "b"))))
-    , Nameless.Anno 
-        (Nameless.TLam (Nameless.TLam (Nameless.Lam (Nameless.Var 0))))
-        (Nameless.TyAll (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0))))
-    , Just (Nameless.TyAll (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 0) (Nameless.TyVar 0))))
-    , Just (Nameless.TClos Nameless.Unit (Nameless.TLam (Nameless.Lam (Nameless.Var 0))))
+    , N.Anno 
+        (N.TLam "a" (N.TLam "b" (N.Lam "x" (N.Var "x"))))
+        (N.TyAll "a" (N.TyAll "b" (N.TyArr (N.TyVar "b") (N.TyVar "b"))))
+    , C.Anno 
+        (C.TLam (C.TLam (C.Lam (C.Var 0))))
+        (C.TyAll (C.TyAll (C.TyArr (C.TyVar 0) (C.TyVar 0))))
+    , Just (C.TyAll (C.TyAll (C.TyArr (C.TyVar 0) (C.TyVar 0))))
+    , Just (C.TClos C.Unit (C.TLam (C.Lam (C.Var 0))))
     )
   , ( "35. forall referencing outer type variable"
-    , Named.Anno 
-        (Named.TLam "a" (Named.TLam "b" (Named.Lam "x" (Named.Var "x"))))
-        (Named.TyAll "a" (Named.TyAll "b" (Named.TyArr (Named.TyVar "a") (Named.TyVar "a"))))
-    , Nameless.Anno 
-        (Nameless.TLam (Nameless.TLam (Nameless.Lam (Nameless.Var 0))))
-        (Nameless.TyAll (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 1) (Nameless.TyVar 1))))
-    , Just (Nameless.TyAll (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 1) (Nameless.TyVar 1))))
-    , Just (Nameless.TClos Nameless.Unit (Nameless.TLam (Nameless.Lam (Nameless.Var 0))))
+    , N.Anno 
+        (N.TLam "a" (N.TLam "b" (N.Lam "x" (N.Var "x"))))
+        (N.TyAll "a" (N.TyAll "b" (N.TyArr (N.TyVar "a") (N.TyVar "a"))))
+    , C.Anno 
+        (C.TLam (C.TLam (C.Lam (C.Var 0))))
+        (C.TyAll (C.TyAll (C.TyArr (C.TyVar 1) (C.TyVar 1))))
+    , Just (C.TyAll (C.TyAll (C.TyArr (C.TyVar 1) (C.TyVar 1))))
+    , Just (C.TClos C.Unit (C.TLam (C.Lam (C.Var 0))))
     )
   ]
 
--- ============================================================================
 -- Type-only tests
--- ============================================================================
 
-typeDebruijnTests :: [(String, Named.Typ, Nameless.Typ)]
+typeDebruijnTests :: [(String, N.Typ, C.Typ)]
 typeDebruijnTests =
   [ ( "type: simple literal"
-    , Named.TyLit Nameless.TyInt
-    , Nameless.TyLit Nameless.TyInt
+    , nInt
+    , cInt
     )
   , ( "type: arrow"
-    , Named.TyArr (Named.TyLit Nameless.TyInt) (Named.TyLit Nameless.TyBool)
-    , Nameless.TyArr (Nameless.TyLit Nameless.TyInt) (Nameless.TyLit Nameless.TyBool)
+    , N.TyArr (nInt) (nBool)
+    , C.TyArr (cInt) (cBool)
     )
   , ( "type: forall with variable"
-    , Named.TyAll "a" (Named.TyVar "a")
-    , Nameless.TyAll (Nameless.TyVar 0)
+    , N.TyAll "a" (N.TyVar "a")
+    , C.TyAll (C.TyVar 0)
     )
   , ( "type: nested forall"
-    , Named.TyAll "a" (Named.TyAll "b" (Named.TyArr (Named.TyVar "a") (Named.TyVar "b")))
-    , Nameless.TyAll (Nameless.TyAll (Nameless.TyArr (Nameless.TyVar 1) (Nameless.TyVar 0)))
+    , N.TyAll "a" (N.TyAll "b" (N.TyArr (N.TyVar "a") (N.TyVar "b")))
+    , C.TyAll (C.TyAll (C.TyArr (C.TyVar 1) (C.TyVar 0)))
     )
   , ( "type: record type"
-    , Named.TyRcd "label" (Named.TyLit Nameless.TyInt)
-    , Nameless.TyRcd "label" (Nameless.TyLit Nameless.TyInt)
+    , N.TyRcd "label" (nInt)
+    , C.TyRcd "label" (cInt)
     )
   ]
--- ============================================================================
 -- Spec
--- ============================================================================
 
 spec :: Spec
 spec = do
@@ -542,7 +511,7 @@ spec = do
         case expectedResult of
           Just result ->
             it "evaluates correctly" $
-              eval Nameless.Unit (toDeBruijn namedExp) `shouldBe` Just result
+              eval C.Unit (toDeBruijn namedExp) `shouldBe` Just result
           Nothing ->
             it "evaluation not expected (skipped)" $
               True `shouldBe` True  -- trivial assertion

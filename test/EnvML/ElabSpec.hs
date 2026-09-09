@@ -5,9 +5,9 @@ import EnvML.Syntax as Src
 import EnvML.Parser.Lexer (lexer)
 import EnvML.Parser.Parser (parseExp, parseModule, parseTyp)
 import EnvML.Elab
-import qualified CoreFE.Named as Named
+import qualified CoreFE.Named as N
 import qualified CoreFE.DeBruijn as DB
-import qualified CoreFE.Syntax as CoreFE
+import qualified CoreFE.Syntax as C
 import qualified CoreFE.Check as Check
 import qualified CoreFE.Eval as Eval
 import Control.Exception (SomeException, evaluate, try)
@@ -16,6 +16,16 @@ import Data.List (isSuffixOf, sort)
 import System.Directory (listDirectory)
 import System.FilePath ((</>))
 import Test.Hspec
+
+-- Parse and elaborate in one step
+elabE :: String -> Either ElabError N.Exp
+elabE = elabExp [] . parseExp . lexer
+
+elabT :: String -> Either ElabError N.Typ
+elabT = elabTyp . parseTyp . lexer
+
+elabM :: String -> Either ElabError N.Exp
+elabM = elabModule . parseModule . lexer
 
 spec :: Spec
 spec = do
@@ -26,114 +36,72 @@ spec = do
       let parsed = parseExp (lexer input)
       let named = elabExp [] parsed
       -- Variable "x" at index 0 (assumes context [x])
-      named `shouldBe` Right (Named.Var "x")
+      named `shouldBe` Right (N.Var "x")
 
-    it "elaborates integer literal" $ do
-      let input = "42"
-      let parsed = parseExp (lexer input)
-      let named = elabExp [] parsed
-      named `shouldBe` Right (Named.Lit (CoreFE.LitInt 42))
+    it "elaborates integer literal" $
+      elabE "42" `shouldBe` Right (N.Lit (C.LitInt 42))
 
-    it "elaborates boolean literal" $ do
-      let input = "true"
-      let parsed = parseExp (lexer input)
-      let named = elabExp [] parsed
-      named `shouldBe` Right (Named.Lit (CoreFE.LitBool True))
+    it "elaborates boolean literal" $
+      elabE "true" `shouldBe` Right (N.Lit (C.LitBool True))
 
   describe "Elaborate Lambda Expressions" $ do
 
-    it "elaborates single-arg lambda" $ do
-      let input = "fun (x : int) -> x"
-      let parsed = parseExp (lexer input)
-      let named = elabExp [] parsed
-      named `shouldBe` Right (Named.Lam "x" (Named.Var "x"))
+    it "elaborates single-arg lambda" $
+      elabE "fun (x : int) -> x" `shouldBe` Right (N.Lam "x" (N.Var "x"))
 
-    it "elaborates multi-arg lambda to nested lambdas" $ do
-      let input = "fun (x : int) (y : int) -> x"
-      let parsed = parseExp (lexer input)
-      let named = elabExp [] parsed
-      named `shouldBe` Right (Named.Lam "x" (Named.Lam "y" (Named.Var "x")))
+    it "elaborates multi-arg lambda to nested lambdas" $
+      elabE "fun (x : int) (y : int) -> x" `shouldBe` Right (N.Lam "x" (N.Lam "y" (N.Var "x")))
 
-    it "elaborates type lambda" $ do
-      let input = "fun (type a) -> x"
-      let parsed = parseExp (lexer input)
-      let named = elabExp [] parsed
-      named `shouldBe` Right (Named.TLam "a" (Named.Var "x"))
+    it "elaborates type lambda" $
+      elabE "fun (type a) -> x" `shouldBe` Right (N.TLam "a" (N.Var "x"))
 
-    it "elaborates type arg followed by term arg" $ do
-      let input = "fun (type a) (x : int) -> x"
-      let parsed = parseExp (lexer input)
-      let named = elabExp [] parsed
-      named `shouldBe` Right (Named.TLam "a" (Named.Lam "x" (Named.Var "x")))
+    it "elaborates type arg followed by term arg" $
+      elabE "fun (type a) (x : int) -> x" `shouldBe` Right (N.TLam "a" (N.Lam "x" (N.Var "x")))
 
-    it "elaborates term arg followed by type arg" $ do
-      let input = "fun (x : int) (type a) -> x"
-      let parsed = parseExp (lexer input)
-      let named = elabExp [] parsed
-      named `shouldBe` Right (Named.Lam "x" (Named.TLam "a" (Named.Var "x")))
+    it "elaborates term arg followed by type arg" $
+      elabE "fun (x : int) (type a) -> x" `shouldBe` Right (N.Lam "x" (N.TLam "a" (N.Var "x")))
 
-    it "elaborates complex mixed args" $ do
-      let input = "fun (type a) (x : a) (type b) (y : b) -> x"
-      let parsed = parseExp (lexer input)
-      let named = elabExp [] parsed
-      named `shouldBe` Right (Named.TLam "a"
-                               (Named.Lam "x"
-                                 (Named.TLam "b"
-                                   (Named.Lam "y" (Named.Var "x")))))
+    it "elaborates complex mixed args" $
+      elabE "fun (type a) (x : a) (type b) (y : b) -> x" `shouldBe` Right (N.TLam "a"
+                               (N.Lam "x"
+                                 (N.TLam "b"
+                                   (N.Lam "y" (N.Var "x")))))
 
   describe "Elaborate Applications" $ do
 
-    it "elaborates function application" $ do
-      let input = "f(x)"
-      let parsed = parseExp (lexer input)
-      let named = elabExp [] parsed
-      named `shouldBe` Right (Named.App (Named.Var "f") (Named.Var "x"))
+    it "elaborates function application" $
+      elabE "f(x)" `shouldBe` Right (N.App (N.Var "f") (N.Var "x"))
 
-    it "elaborates type application" $ do
-      let input = "f @ int"
-      let parsed = parseExp (lexer input)
-      let named = elabExp [] parsed
-      named `shouldBe` Right (Named.TApp (Named.Var "f") (Named.TyLit CoreFE.TyInt))
+    it "elaborates type application" $
+      elabE "f @ int" `shouldBe` Right (N.TApp (N.Var "f") (N.TyLit C.TyInt))
 
   describe "Elaborate Types" $ do
 
-    it "elaborates type literals" $ do
-      let input = "int"
-      let parsed = parseTyp (lexer input)
-      let named = elabTyp parsed
-      named `shouldBe` Right (Named.TyLit CoreFE.TyInt)
+    it "elaborates type literals" $
+      elabT "int" `shouldBe` Right (N.TyLit C.TyInt)
 
-    it "elaborates arrow types" $ do
-      let input = "int -> bool"
-      let parsed = parseTyp (lexer input)
-      let named = elabTyp parsed
-      named `shouldBe` Right (Named.TyArr (Named.TyLit CoreFE.TyInt) (Named.TyLit CoreFE.TyBool))
+    it "elaborates arrow types" $
+      elabT "int -> bool" `shouldBe` Right (N.TyArr (N.TyLit C.TyInt) (N.TyLit C.TyBool))
 
-    it "elaborates forall types" $ do
-      let input = "forall a. (a -> a)"
-      let parsed = parseTyp (lexer input)
-      let named = elabTyp parsed
-      named `shouldBe` Right (Named.TyAll "a" (Named.TyArr (Named.TyVar "a") (Named.TyVar "a")))
+    it "elaborates forall types" $
+      elabT "forall a. (a -> a)" `shouldBe` Right (N.TyAll "a" (N.TyArr (N.TyVar "a") (N.TyVar "a")))
 
-    it "elaborates nested forall" $ do
-      let input = "forall a. forall b. (a -> b)"
-      let parsed = parseTyp (lexer input)
-      let named = elabTyp parsed
-      named `shouldBe` Right (Named.TyAll "a"
-                         (Named.TyAll "b"
-                           (Named.TyArr (Named.TyVar "a") (Named.TyVar "b"))))
+    it "elaborates nested forall" $
+      elabT "forall a. forall b. (a -> b)" `shouldBe` Right (N.TyAll "a"
+                         (N.TyAll "b"
+                           (N.TyArr (N.TyVar "a") (N.TyVar "b"))))
 
     -- A functor member of a signature is a term component, like a value or a
     -- module member: a labelled record type, not a manifest type binding.
     it "elaborates a functor declaration as a labelled term component" $ do
       let parsed = parseModuleTyp' "sig functor f (type t) (x : t) : sig val v : t; end; end"
       elabModTyp parsed `shouldBe`
-        Right (Named.TyEnvt
-                 [ Named.Type "f"
-                     (Named.TyRcd "f"
-                        (Named.TyAll "t"
-                           (Named.TyArr (Named.TyVar "t")
-                              (Named.TyEnvt [Named.Type "v" (Named.TyRcd "v" (Named.TyVar "t"))]))))
+        Right (N.TyEnvt
+                 [ N.Type "f"
+                     (N.TyRcd "f"
+                        (N.TyAll "t"
+                           (N.TyArr (N.TyVar "t")
+                              (N.TyEnvt [N.Type "v" (N.TyRcd "v" (N.TyVar "t"))]))))
                  ])
 
     -- A module entry of an environment is a labelled record entry, so a module
@@ -141,10 +109,10 @@ spec = do
     it "elaborates a module declaration in a type context as a labelled entry" $ do
       let parsed = parseTyp (lexer "[module m : sig val x : int; end]")
       elabTyp parsed `shouldBe`
-        Right (Named.TyEnvt
-                 [ Named.Type "m"
-                     (Named.TyRcd "m"
-                        (Named.TyEnvt [Named.Type "x" (Named.TyRcd "x" (Named.TyLit CoreFE.TyInt))]))
+        Right (N.TyEnvt
+                 [ N.Type "m"
+                     (N.TyRcd "m"
+                        (N.TyEnvt [N.Type "x" (N.TyRcd "x" (N.TyLit C.TyInt))]))
                  ])
 
   describe "Elaborate Modules" $ do
@@ -152,7 +120,7 @@ spec = do
     it "elaborates module variable" $ do
       let m = Src.VarM "M"
       let named = elabModule m
-      named `shouldBe` Right (Named.Var "M")
+      named `shouldBe` Right (N.Var "M")
 
     -- Modules are sandboxed: every standalone struct / whole functor elaborates
     -- to an empty-environment box ([] ▷ e). A functor's body struct stays unboxed
@@ -162,25 +130,25 @@ spec = do
       let parsed = parseModule (lexer input)
       let named = elabModule parsed
       named `shouldBe`
-        Right (Named.Box [] (Named.FEnv [Named.ModE "x" (Named.Lit (CoreFE.LitInt 1))]))
+        Right (N.Box [] (N.FEnv [N.ModE "x" (N.Lit (C.LitInt 1))]))
 
     it "elaborates functor with term argument" $ do
-      let m = Src.Functor [("x", Src.TmArgType (Src.TyLit CoreFE.TyInt))]
+      let m = Src.Functor [("x", Src.TmArgType (Src.TyLit C.TyInt))]
                           (Src.Struct [])
       let named = elabModule m
-      named `shouldBe` Right (Named.Box [] (Named.Lam "x" (Named.FEnv [])))
+      named `shouldBe` Right (N.Box [] (N.Lam "x" (N.FEnv [])))
 
     it "elaborates functor with type argument" $ do
       let m = Src.Functor [("t", Src.TyArg)] (Src.Struct [])
       let named = elabModule m
-      named `shouldBe` Right (Named.Box [] (Named.TLam "t" (Named.FEnv [])))
+      named `shouldBe` Right (N.Box [] (N.TLam "t" (N.FEnv [])))
 
     it "elaborates multi-arg functor to nested" $ do
       let m = Src.Functor [("t", Src.TyArg), ("x", Src.TmArgType (Src.TyVar "t"))]
                           (Src.Struct [])
       let named = elabModule m
       named `shouldBe`
-        Right (Named.Box [] (Named.TLam "t" (Named.Lam "x" (Named.FEnv []))))
+        Right (N.Box [] (N.TLam "t" (N.Lam "x" (N.FEnv []))))
 
     -- The annotation of a sandboxed module goes inside its box, closed over the
     -- ambient abbreviations: the box body cannot see the ambient context.
@@ -190,10 +158,10 @@ spec = do
       let parsed = parseModule (lexer input)
       case elabModule parsed of
         Left err -> expectationFailure ("elaboration failed: " ++ err)
-        Right (Named.Box [] (Named.FEnv [Named.ModE "m" e, _])) ->
+        Right (N.Box [] (N.FEnv [N.ModE "m" e, _])) ->
           case e of
-            Named.Box [] (Named.Anno _ t) ->
-              t `shouldBe` Named.TyEnvt [Named.Type "x" (Named.TyRcd "x" (Named.TyLit CoreFE.TyInt))]
+            N.Box [] (N.Anno _ t) ->
+              t `shouldBe` N.TyEnvt [N.Type "x" (N.TyRcd "x" (N.TyLit C.TyInt))]
             other -> expectationFailure ("unexpected shape: " ++ show other)
         Right other -> expectationFailure ("unexpected shape: " ++ show other)
 
@@ -209,7 +177,7 @@ spec = do
   describe "Merge elaboration (no core concatenation primitive)" $ do
 
     -- Composition is expanded at elaboration time into an environment literal
-    -- built from projections, so no concatenation node reaches CoreFE.
+    -- built from projections, so no concatenation node reaches C.
     it "expands ++ into projections out of both operands" $ do
       let input = "module a : sig val f : int; end = struct let f : int = 1; end; \
                   \module b : sig val g : int; end = struct let g : int = 2; end; \
@@ -325,45 +293,42 @@ spec = do
   describe "Documented results of the paper examples" $ do
     it "section24_latest.eml: previewResult = true, mockResult = false" $ do
       src <- readFile ("examples" </> "section24_latest.eml")
-      evalLabel "previewResult" src `shouldReturn` Just (CoreFE.Lit (CoreFE.LitBool True))
-      evalLabel "mockResult" src `shouldReturn` Just (CoreFE.Lit (CoreFE.LitBool False))
+      evalLabel "previewResult" src `shouldReturn` Just (C.Lit (C.LitBool True))
+      evalLabel "mockResult" src `shouldReturn` Just (C.Lit (C.LitBool False))
     it "section24_dep.eml: previewResult = true, mockResult = false" $ do
       src <- readFile ("examples" </> "section24_dep.eml")
-      evalLabel "previewResult" src `shouldReturn` Just (CoreFE.Lit (CoreFE.LitBool True))
-      evalLabel "mockResult" src `shouldReturn` Just (CoreFE.Lit (CoreFE.LitBool False))
+      evalLabel "previewResult" src `shouldReturn` Just (C.Lit (C.LitBool True))
+      evalLabel "mockResult" src `shouldReturn` Just (C.Lit (C.LitBool False))
     it "test15.eml: result = List[3, 1]" $ do
       src <- readFile ("examples" </> "test15.eml")
       evalLabel "result" src `shouldReturn`
-        Just (CoreFE.EList [CoreFE.Lit (CoreFE.LitInt 3), CoreFE.Lit (CoreFE.LitInt 1)])
+        Just (C.EList [C.Lit (C.LitInt 3), C.Lit (C.LitInt 1)])
     it "typedep.eml: useY = 7" $ do
       src <- readFile ("examples" </> "typedep.eml")
-      evalLabel "useY" src `shouldReturn` Just (CoreFE.Lit (CoreFE.LitInt 7))
+      evalLabel "useY" src `shouldReturn` Just (C.Lit (C.LitInt 7))
 
   describe "De Bruijn Conversion" $ do
 
     it "converts simple lambda" $ do
-      let named = Named.Lam "x" (Named.Var "x")
+      let named = N.Lam "x" (N.Var "x")
       let nameless = DB.toDeBruijn named
-      nameless `shouldBe` CoreFE.Lam (CoreFE.Var 0)
+      nameless `shouldBe` C.Lam (C.Var 0)
 
     it "converts nested lambda with outer reference" $ do
-      let named = Named.Lam "x" (Named.Lam "y" (Named.Var "x"))
+      let named = N.Lam "x" (N.Lam "y" (N.Var "x"))
       let nameless = DB.toDeBruijn named
-      nameless `shouldBe` CoreFE.Lam (CoreFE.Lam (CoreFE.Var 1))
+      nameless `shouldBe` C.Lam (C.Lam (C.Var 1))
 
     it "converts type lambda" $ do
-      let named = Named.TLam "a" (Named.Var "x")
+      let named = N.TLam "a" (N.Var "x")
       -- Assumes "x" is in context at index 0
       let nameless = DB.toDeBruijn named
       case nameless of
-        CoreFE.TLam _ -> return ()
+        C.TLam _ -> return ()
         _ -> expectationFailure "Expected TLam"
-
---------------------------------------------------------------------------------
 -- Type preservation: the type claimed by elaboration must be the type the core
 -- checker gives the elaborated term (up to type equivalence), and the term must
 -- evaluate.
---------------------------------------------------------------------------------
 
 parseModuleTyp' :: String -> Src.ModuleTyp
 parseModuleTyp' s =
@@ -382,7 +347,7 @@ isInfix needle hay = any (needle `isPrefixOf'`) (suffixes hay)
 
 -- | Parse, elaborate, resolve names, type-check and evaluate a program; report
 --   the first stage that fails. Returns the elaborated program and its value.
-runProgram :: String -> IO (Either String (Named.Exp, Maybe Named.Typ, CoreFE.Typ, CoreFE.Exp))
+runProgram :: String -> IO (Either String (N.Exp, Maybe N.Typ, C.Typ, C.Exp))
 runProgram src = do
   parsedOrErr <- try (evaluate (parseModule (lexer src)))
   case parsedOrErr of
@@ -398,7 +363,7 @@ runProgram src = do
               case Check.infer [] core of
                 Nothing -> return (Left "the elaborated core does not type-check")
                 Just t' ->
-                  case Eval.eval CoreFE.Unit core of
+                  case Eval.eval C.Unit core of
                     Nothing -> return (Left "the elaborated core does not evaluate")
                     Just v  -> return (Right (e, mt, t', v))
   where
@@ -416,10 +381,10 @@ preserves src = do
            then return ()
            else expectationFailure $
                   "claimed type is not equivalent to the checked type\n  claimed: "
-                    ++ CoreFE.pretty claimed ++ "\n  checked: " ++ CoreFE.pretty t'
+                    ++ C.pretty claimed ++ "\n  checked: " ++ C.pretty t'
 
 -- | The value bound to a label of the program's top-level environment.
-evalLabel :: String -> String -> IO (Maybe CoreFE.Exp)
+evalLabel :: String -> String -> IO (Maybe C.Exp)
 evalLabel label src = do
   r <- runProgram src
   case r of
@@ -430,63 +395,63 @@ evalTop :: String -> IO (Maybe Int)
 evalTop src = do
   mv <- evalLabel "out" src
   return $ case mv of
-    Just (CoreFE.Lit (CoreFE.LitInt n)) -> Just n
+    Just (C.Lit (C.LitInt n)) -> Just n
     _ -> Nothing
 
-lookupLabel :: String -> CoreFE.Exp -> Maybe CoreFE.Exp
+lookupLabel :: String -> C.Exp -> Maybe C.Exp
 lookupLabel label = go
   where
-    go (CoreFE.Rec l e) | l == label = Just e
+    go (C.Rec l e) | l == label = Just e
                         | otherwise  = Nothing
-    go (CoreFE.Anno e _) = go e
-    go e | Just entries <- CoreFE.envEntries e = firstJust (map goE entries)
+    go (C.Anno e _) = go e
+    go e | Just entries <- C.envEntries e = firstJust (map goE entries)
     go _ = Nothing
 
-    goE (CoreFE.EntE e) = go e
-    goE (CoreFE.EntT _) = Nothing
+    goE (C.EntE e) = go e
+    goE (C.EntT _) = Nothing
 
     firstJust = foldr (\x acc -> maybe acc Just x) Nothing
 
 -- | Does the elaborated program contain an environment literal that merges
 --   projections out of two different sources? (A stand-in for "the merge was
 --   expanded", since CoreFE has no node to look for.)
-hasConcatShape :: Named.Exp -> Bool
+hasConcatShape :: N.Exp -> Bool
 hasConcatShape = go
   where
-    go (Named.Box env e)  = any goE env || go e
-    go (Named.FEnv env)   = any isProj env || any goE env
-    go (Named.Lam _ e)    = go e
-    go (Named.TLam _ e)   = go e
-    go (Named.App a b)    = go a || go b
-    go (Named.TApp a _)   = go a
-    go (Named.Anno a _)   = go a
-    go (Named.Rec _ a)    = go a
-    go (Named.RProj a _)  = go a
+    go (N.Box env e)  = any goE env || go e
+    go (N.FEnv env)   = any isProj env || any goE env
+    go (N.Lam _ e)    = go e
+    go (N.TLam _ e)   = go e
+    go (N.App a b)    = go a || go b
+    go (N.TApp a _)   = go a
+    go (N.Anno a _)   = go a
+    go (N.Rec _ a)    = go a
+    go (N.RProj a _)  = go a
     go _                  = False
 
-    goE (Named.ModE _ e) = go e
-    goE (Named.ExpE _ e) = go e
-    goE (Named.TypE _ _) = False
+    goE (N.ModE _ e) = go e
+    goE (N.ExpE _ e) = go e
+    goE (N.TypE _ _) = False
 
-    isProj (Named.ModE _ (Named.RProj _ _)) = True
+    isProj (N.ModE _ (N.RProj _ _)) = True
     isProj _                                = False
 
 -- | Does the elaborated program still reference this source name?
-mentionsVar :: String -> Named.Exp -> Bool
+mentionsVar :: String -> N.Exp -> Bool
 mentionsVar name = go
   where
-    go (Named.Var n)      = n == name
-    go (Named.Box env e)  = any goE env || go e
-    go (Named.FEnv env)   = any goE env
-    go (Named.Lam _ e)    = go e
-    go (Named.TLam _ e)   = go e
-    go (Named.App a b)    = go a || go b
-    go (Named.TApp a _)   = go a
-    go (Named.Anno a _)   = go a
-    go (Named.Rec _ a)    = go a
-    go (Named.RProj a _)  = go a
+    go (N.Var n)      = n == name
+    go (N.Box env e)  = any goE env || go e
+    go (N.FEnv env)   = any goE env
+    go (N.Lam _ e)    = go e
+    go (N.TLam _ e)   = go e
+    go (N.App a b)    = go a || go b
+    go (N.TApp a _)   = go a
+    go (N.Anno a _)   = go a
+    go (N.Rec _ a)    = go a
+    go (N.RProj a _)  = go a
     go _                  = False
 
-    goE (Named.ModE _ e) = go e
-    goE (Named.ExpE _ e) = go e
-    goE (Named.TypE _ _) = False
+    goE (N.ModE _ e) = go e
+    goE (N.ExpE _ e) = go e
+    goE (N.TypE _ _) = False

@@ -54,7 +54,6 @@ data Typ
   | TyList    Typ             -- [A]
   deriving (Show, Eq)
 
-
 data Module
   = VarM    Name
   | Functor FunArgs Module  -- functor (x : A) ->
@@ -150,13 +149,7 @@ expPrec e = case e of
   ETake _ _ -> 5
   ELength _ -> 5
   _ -> 4 -- TODO: Extensions
-
-
-
-----------------------
 -- Pretty Printing ---
-----------------------
-
 class Pretty a where
   pretty :: a -> String
 
@@ -290,22 +283,21 @@ prettyStructures = concatMap (\s -> prettyStructure s ++ "\n")
 
 -- Structures pretty printing
 prettyStructure :: Structure -> String
-prettyStructure (Let n Nothing e) = 
-  "let " ++ n ++ " = " ++ prettyExp e
-prettyStructure (Let n (Just t) e) = 
-  "let " ++ n ++ " : " ++ prettyTyp t ++ " = " ++ prettyExp e
+prettyStructure (Let n mt e) =
+  "let " ++ n ++ ascribe prettyTyp mt ++ " = " ++ prettyExp e
 prettyStructure (TypDecl n t) = 
   "type " ++ n ++ " = " ++ prettyTyp t
 prettyStructure (ModTypDecl n mt) = 
   "module type " ++ n ++ " = " ++ prettyModuleTyp mt
-prettyStructure (ModStruct n Nothing s) = 
-  "module " ++ n ++ " = " ++ prettyModule s
-prettyStructure (ModStruct n (Just mt) s) = 
-  "module " ++ n ++ " : " ++ prettyModuleTyp mt ++ " = " ++ prettyModule s
-prettyStructure (FunctStruct n args Nothing s) = 
-  "functor " ++ n ++ " " ++ prettyFunArgs args ++ " = " ++ prettyModule s
-prettyStructure (FunctStruct n args (Just mt) s) = 
-  "functor " ++ n ++ " " ++ prettyFunArgs args ++ " : " ++ prettyModuleTyp mt ++ " = " ++ prettyModule s
+prettyStructure (ModStruct n mt s) =
+  "module " ++ n ++ ascribe prettyModuleTyp mt ++ " = " ++ prettyModule s
+prettyStructure (FunctStruct n args mt s) =
+  "functor " ++ n ++ " " ++ prettyFunArgs args ++ ascribe prettyModuleTyp mt
+    ++ " = " ++ prettyModule s
+
+-- | @ : T@ when a type is given, nothing otherwise.
+ascribe :: (a -> String) -> Maybe a -> String
+ascribe f = maybe "" ((" : " ++) . f)
 
 -- Module pretty printing
 prettyModule :: Module -> String
@@ -363,9 +355,9 @@ prettyExp (EList []) = "List[]"
 prettyExp (EList es) = "List[" ++ intercalateComma (map prettyExp es) ++ "]"
 prettyExp (ETake n ls) = "take(" ++ show n ++ ", " ++ prettyExp ls ++ ")"
 prettyExp (ELength ls) = "length(" ++ prettyExp ls ++ ")"
-prettyExp (BinOp (Add e1 e2)) = prettyExp e1 ++ " + " ++ prettyExp e2
-prettyExp (BinOp (Sub e1 e2)) = prettyExp e1 ++ " - " ++ prettyExp e2
-prettyExp (BinOp (Mul e1 e2)) = prettyExp e1 ++ " * " ++ prettyExp e2
-prettyExp (BinOp (EqEq e1 e2)) = prettyExp e1 ++ " == " ++ prettyExp e2
-prettyExp (BinOp (LessThan e1 e2)) = prettyExp e1 ++ " < " ++ prettyExp e2
-prettyExp (BinOp (Concat e1 e2)) = prettyExp e1 ++ " ++ " ++ prettyExp e2
+prettyExp (BinOp (Add e1 e2))      = prettyExp e1 ++ " + "  ++ prettyExp e2
+prettyExp (BinOp (Sub e1 e2))      = prettyExp e1 ++ " - "  ++ prettyExp e2
+prettyExp (BinOp (Mul e1 e2))      = prettyExp e1 ++ " * "  ++ prettyExp e2
+prettyExp (BinOp (EqEq e1 e2))     = prettyExp e1 ++ " == " ++ prettyExp e2
+prettyExp (BinOp (LessThan e1 e2)) = prettyExp e1 ++ " < "  ++ prettyExp e2
+prettyExp (BinOp (Concat e1 e2))   = prettyExp e1 ++ " ++ " ++ prettyExp e2

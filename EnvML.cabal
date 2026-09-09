@@ -8,8 +8,7 @@ extra-source-files: CHANGELOG.md
 library
     hs-source-dirs:   src
     
-    exposed-modules:    Utils
-                        Repl
+    exposed-modules:    Repl
                         PrettyWeb
                         EnvML.Elab
                         EnvML.Syntax

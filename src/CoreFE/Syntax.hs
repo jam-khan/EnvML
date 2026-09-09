@@ -1,18 +1,8 @@
 {-# LANGUAGE InstanceSigs #-}
--- | The nameless core: a transcription of the FE calculus as mechanized in Rocq
---   (FirstForall/Rocq/exists: Teq.v @typ@, ExpSyntax.v @exp@).
---
---   * Contexts are lists with the newest entry at the head. @Type A@, @Kind@ and
---     @TypeEq A@ are Rocq's @T & A@, @T &s@ and @T &= A@; @TyEnvt@ is a context used
---     as a type, @TyBoxT@ is @boxt@, @TySubstT@ is the manifest type @mani@.
---   * Environment expressions are Rocq's @unit@ / @merge e1 e2@ / @tmerge e1 A@
---     chains, so a computed environment can be extended, boxed and closed over
---     exactly as in the calculus. 'envEntries' / 'mkEnv' view a @Unit@-rooted chain
---     as a list of entries (newest first) for printing and name resolution.
---
---   Implementation-only conveniences, orthogonal to first-class environments and not
---   part of the formal development: 'Anno' (bidirectional checking), 'BinOp', lists,
---   and the @Bool@ / @String@ literals.
+-- | The nameless core: the FE calculus of mech/fe_calculus. Contexts are lists,
+--   newest first (@Type@/@Kind@/@TypeEq@ are @T & A@/@T &s@/@T &= A@), and
+--   environments are @unit@/@merge@/@tmerge@ chains. @Anno@, @BinOp@, lists and
+--   the @Bool@/@String@ literals are conveniences, not core FE.
 module CoreFE.Syntax where
 
 type TyEnv = [TyEnvE]
@@ -32,13 +22,10 @@ data Typ
   | TySubstT Typ Typ
   | TyRcd String Typ
   | TyEnvt TyEnv
-  | TyList Typ          -- [A]
+  | TyList Typ
   deriving (Eq, Show)
 
-data TyLit
-  = TyInt
-  | TyBool
-  | TyStr
+data TyLit = TyInt | TyBool | TyStr
   deriving (Eq, Show)
 
 data Exp
@@ -58,10 +45,9 @@ data Exp
   | RProj  Exp String
   | Anno   Exp Typ
   | BinOp  BinOp
-  -- List primitives
-  | EList  [Exp]         -- [e1, e2, e3]
-  | ETake  Int Exp       -- take(n, ls)
-  | ELength Exp          -- length(ls)
+  | EList  [Exp]
+  | ETake  Int Exp
+  | ELength Exp
   deriving (Eq, Show)
 
 data BinOp
@@ -78,15 +64,11 @@ data Literal
   | LitStr  String
   deriving (Eq, Show)
 
---------------------------------------------------------------------------------
--- Environment chains viewed as entry lists
---------------------------------------------------------------------------------
-
 -- | One entry of an environment chain.
 data Entry = EntE Exp | EntT Typ
   deriving (Eq, Show)
 
--- | The entries of a @Unit@-rooted chain, newest first; 'Nothing' if the chain is
+-- | Entries of a @Unit@-rooted chain, newest first; 'Nothing' if the chain is
 --   rooted in a computed environment.
 envEntries :: Exp -> Maybe [Entry]
 envEntries Unit         = Just []
@@ -100,10 +82,6 @@ mkEnv = foldr step Unit
   where
     step (EntE e) d = Merge d e
     step (EntT t) d = TMerge d t
-
---------------------------------------------------------------------------------
--- Pretty printing
---------------------------------------------------------------------------------
 
 class Pretty a where
   pretty :: a -> String
@@ -132,12 +110,13 @@ instance Pretty Literal where
 
 instance Pretty BinOp where
   pretty :: BinOp -> String
-  pretty = stringOfBinOp
+  pretty = stringOfBinOpI 0
 
 instance Pretty Entry where
   pretty :: Entry -> String
   pretty = stringOfEntry
 
+-- | A whole program: a literal environment prints one entry per line.
 prettyTop :: Exp -> String
 prettyTop e
   | Just entries <- envEntries e = prettyEnvVertical 0 (reverse entries)
@@ -146,33 +125,31 @@ prettyTop e
 indent :: Int -> String
 indent n = replicate (n * 2) ' '
 
--- | Entries are given oldest first here.
+parensIf :: Bool -> String -> String
+parensIf True  s = "(" ++ s ++ ")"
+parensIf False s = s
+
+stringOfList :: (a -> String) -> [a] -> String
+stringOfList _ [] = ""
+stringOfList f [x] = f x
+stringOfList f (x:xs) = f x ++ ", " ++ stringOfList f xs
+
+-- | Entries oldest first, one per line.
 prettyEnvVertical :: Int -> [Entry] -> String
 prettyEnvVertical _ [] = "[]"
 prettyEnvVertical lvl entries =
   concatMap (\e -> indent lvl ++ stringOfEntryI lvl e ++ "\n\n") entries
 
-parensIf :: Bool -> String -> String
-parensIf True  s = "(" ++ s ++ ")"
-parensIf False s = s
-
 stringOfTyp :: Typ -> String
 stringOfTyp (TyLit l) = pretty l
 stringOfTyp (TyVar n) = "t" ++ show n
-stringOfTyp (TyArr t1 t2) =
-    let s1 = parensIf (typPrec t1 <= typPrec (TyArr t1 t2)) (stringOfTyp t1)
-        s2 = stringOfTyp t2
-     in s1 ++ " → " ++ s2
-stringOfTyp (TyAll t) =
-    "∀. " ++ stringOfTyp t
-stringOfTyp (TyBoxT bs t) =
-    let sBinds = showTyEnv bs
-        sTyp = parensIf (typPrec t < typPrec (TyBoxT bs t)) (stringOfTyp t)
-     in "[" ++ sBinds ++ "] ▷ " ++ sTyp
-stringOfTyp (TySubstT t1 t2) =
-    let s1 = stringOfTyp t1
-        s2 = parensIf (typPrec t2 < typPrec (TySubstT t1 t2)) (stringOfTyp t2)
-     in "#[" ++ s1 ++ "] " ++ s2
+stringOfTyp t@(TyArr t1 t2) =
+    parensIf (typPrec t1 <= typPrec t) (stringOfTyp t1) ++ " → " ++ stringOfTyp t2
+stringOfTyp (TyAll t) = "∀. " ++ stringOfTyp t
+stringOfTyp t@(TyBoxT bs a) =
+    "[" ++ showTyEnv bs ++ "] ▷ " ++ parensIf (typPrec a < typPrec t) (stringOfTyp a)
+stringOfTyp t@(TySubstT t1 t2) =
+    "#[" ++ stringOfTyp t1 ++ "] " ++ parensIf (typPrec t2 < typPrec t) (stringOfTyp t2)
 stringOfTyp (TyEnvt bs) = "Env[" ++ showTyEnv bs ++ "]"
 stringOfTyp (TyRcd label t) = "{" ++ label ++ " : " ++ stringOfTyp t ++ "}"
 stringOfTyp (TyList t) = "[" ++ stringOfTyp t ++ "]"
@@ -200,19 +177,14 @@ stringOfEntry :: Entry -> String
 stringOfEntry = stringOfEntryI 0
 
 stringOfEntryI :: Int -> Entry -> String
-stringOfEntryI lvl (EntE e) = stringOfEnvExpI lvl e
 stringOfEntryI _   (EntT t) = "type " ++ stringOfTyp t
-
-stringOfEnvExpI :: Int -> Exp -> String
-stringOfEnvExpI lvl (Rec label e) =
-    label ++ " = " ++ stringOfExpI lvl e
-stringOfEnvExpI lvl (Anno (Rec label e) t) =
-    label ++ " : " ++ stringOfTyp t ++ " =\n"
-    ++ indent (lvl + 1) ++ stringOfExpI (lvl + 1) e
-stringOfEnvExpI lvl (Anno e t) =
-    stringOfExpI lvl e ++ "\n"
-    ++ indent (lvl + 1) ++ ": " ++ stringOfTyp t
-stringOfEnvExpI lvl e = stringOfExpI lvl e
+stringOfEntryI lvl (EntE e) = case e of
+    Rec label x -> label ++ " = " ++ stringOfExpI lvl x
+    Anno (Rec label x) t ->
+      label ++ " : " ++ stringOfTyp t ++ "\n" ++ indent (lvl + 1) ++ stringOfExpI (lvl + 1) x
+    Anno x t ->
+      stringOfExpI lvl x ++ "\n" ++ indent (lvl + 1) ++ ": " ++ stringOfTyp t
+    _ -> stringOfExpI lvl e
 
 stringOfExp :: Exp -> String
 stringOfExp = stringOfExpI 0
@@ -220,57 +192,33 @@ stringOfExp = stringOfExpI 0
 stringOfExpI :: Int -> Exp -> String
 stringOfExpI _ (Lit l) = stringOfLiteral l
 stringOfExpI _ (Var n) = "x" ++ show n
-stringOfExpI lvl (Lam e) =
-    "λ. " ++ stringOfExpI lvl e
-stringOfExpI lvl (TLam e) =
-    "Λ. " ++ stringOfExpI lvl e
-
-stringOfExpI lvl op@(Box d e) =
-    let sE = parensIf (expPrec e < expPrec op) (stringOfExpI lvl e)
-     in showEnvLike lvl d ++ " ▷ " ++ sE
-
-stringOfExpI lvl op@(App e1 e2) =
-    let s1 = parensIf (expPrec e1 < expPrec op) (stringOfExpI lvl e1)
-        s2 = parensIf (expPrec e2 <= expPrec op) (stringOfExpI lvl e2)
-     in s1 ++ " " ++ s2
-
-stringOfExpI lvl (BinOp binOp) = stringOfBinOpI lvl binOp
-
-stringOfExpI lvl (Clos d e) =
-    "⟨" ++ showEnvLike lvl d ++ " | λ. " ++ stringOfExpI lvl e ++ "⟩"
-
-stringOfExpI lvl (TClos d e) =
-    "⟨" ++ showEnvLike lvl d ++ " | Λ. " ++ stringOfExpI lvl e ++ "⟩"
-
-stringOfExpI lvl op@(TApp e t) =
-    let sE = parensIf (expPrec e < expPrec op) (stringOfExpI lvl e)
-     in sE ++ " @" ++ stringOfTyp t
-
 stringOfExpI _ Unit = "[]"
-stringOfExpI lvl e@(Merge _ _)  = stringOfEnvChain lvl e
+stringOfExpI lvl (Lam e) = "λ. " ++ stringOfExpI lvl e
+stringOfExpI lvl (TLam e) = "Λ. " ++ stringOfExpI lvl e
+stringOfExpI lvl (BinOp op) = stringOfBinOpI lvl op
+stringOfExpI lvl e@(Merge _ _) = stringOfEnvChain lvl e
 stringOfExpI lvl e@(TMerge _ _) = stringOfEnvChain lvl e
-
-stringOfExpI _ (Rec label e) =
-    "{" ++ label ++ " = " ++ stringOfExp e ++ "}"
-
+stringOfExpI lvl (Clos d e) = "⟨" ++ showEnvLike lvl d ++ " | λ. " ++ stringOfExpI lvl e ++ "⟩"
+stringOfExpI lvl (TClos d e) = "⟨" ++ showEnvLike lvl d ++ " | Λ. " ++ stringOfExpI lvl e ++ "⟩"
+stringOfExpI _ (Rec label e) = "{" ++ label ++ " = " ++ stringOfExp e ++ "}"
+stringOfExpI _ (EList []) = "List[]"
+stringOfExpI lvl (EList es) = "List[" ++ stringOfList (stringOfExpI lvl) es ++ "]"
+stringOfExpI lvl (ETake n ls) = "take(" ++ show n ++ ", " ++ stringOfExpI lvl ls ++ ")"
+stringOfExpI lvl (ELength ls) = "length(" ++ stringOfExpI lvl ls ++ ")"
+stringOfExpI lvl op@(Box d e) =
+    showEnvLike lvl d ++ " ▷ " ++ parensIf (expPrec e < expPrec op) (stringOfExpI lvl e)
+stringOfExpI lvl op@(App e1 e2) =
+    parensIf (expPrec e1 < expPrec op) (stringOfExpI lvl e1) ++ " "
+    ++ parensIf (expPrec e2 <= expPrec op) (stringOfExpI lvl e2)
+stringOfExpI lvl op@(TApp e t) =
+    parensIf (expPrec e < expPrec op) (stringOfExpI lvl e) ++ " @" ++ stringOfTyp t
 stringOfExpI lvl op@(RProj e label) =
-    let sE = parensIf (expPrec e < expPrec op) (stringOfExpI lvl e)
-     in sE ++ "." ++ label
-
+    parensIf (expPrec e < expPrec op) (stringOfExpI lvl e) ++ "." ++ label
 stringOfExpI lvl op@(Anno e t) =
-    let sE = parensIf (expPrec e < expPrec op) (stringOfExpI lvl e)
-     in sE ++ " : " ++ stringOfTyp t
+    parensIf (expPrec e < expPrec op) (stringOfExpI lvl e) ++ " : " ++ stringOfTyp t
 
--- List expressions
-stringOfExpI _lvl (EList [])  = "List[]"
-stringOfExpI lvl (EList es)   = "List[" ++ stringOfList (stringOfExpI lvl) es ++ "]"
-stringOfExpI lvl (ETake n ls) =
-    "take(" ++ show n ++ ", " ++ stringOfExpI lvl ls ++ ")"
-stringOfExpI lvl (ELength ls) =
-    "length(" ++ stringOfExpI lvl ls ++ ")"
-
--- | A chain of environment entries. A @Unit@-rooted chain prints as a bracketed
---   list; a chain over a computed environment prints with the calculus' comma.
+-- | A literal chain prints bracketed; one over a computed environment uses the
+--   calculus' comma.
 stringOfEnvChain :: Int -> Exp -> String
 stringOfEnvChain lvl e =
   case envEntries e of
@@ -278,11 +226,10 @@ stringOfEnvChain lvl e =
       | isSmallEnv entries -> "[" ++ stringOfList stringOfEntry (reverse entries) ++ "]"
       | otherwise ->
           "[\n" ++ prettyEnvVertical (lvl + 1) (reverse entries) ++ indent lvl ++ "]"
-    Nothing ->
-      case e of
-        Merge d x  -> stringOfExpI lvl d ++ " ,, " ++ stringOfExpI lvl x
-        TMerge d t -> stringOfExpI lvl d ++ " ,, type " ++ stringOfTyp t
-        _          -> stringOfExpI lvl e
+    Nothing -> case e of
+      Merge d x  -> stringOfExpI lvl d ++ " ,, " ++ stringOfExpI lvl x
+      TMerge d t -> stringOfExpI lvl d ++ " ,, type " ++ stringOfTyp t
+      _          -> stringOfExpI lvl e
 
 -- | The environment of a box or closure: inline brackets when literal.
 showEnvLike :: Int -> Exp -> String
@@ -291,10 +238,9 @@ showEnvLike lvl d =
     Just entries -> "[" ++ stringOfList stringOfEntry (reverse entries) ++ "]"
     Nothing      -> parensIf True (stringOfExpI lvl d)
 
--- Heuristic: an env is "small" if it has <= 2 entries and no nested environment
+-- | At most two entries, none of them nested.
 isSmallEnv :: [Entry] -> Bool
-isSmallEnv entries =
-    length entries <= 2 && all isSimpleEntry entries
+isSmallEnv entries = length entries <= 2 && all isSimpleEntry entries
 
 isSimpleEntry :: Entry -> Bool
 isSimpleEntry (EntE e) = isSimpleExp e
@@ -309,34 +255,17 @@ isSimpleExp (RProj e _) = isSimpleExp e
 isSimpleExp (EList es)  = length es <= 3 && all isSimpleExp es
 isSimpleExp _           = False
 
--- | Inline rendering of a literal environment's entries (newest first, as stored).
-showEnvInline :: Exp -> String
-showEnvInline = showEnvLike 0
-
-stringOfBinOp :: BinOp -> String
-stringOfBinOp = stringOfBinOpI 0
-
 stringOfBinOpI :: Int -> BinOp -> String
-stringOfBinOpI lvl op@(Add e1 e2) =
-    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
-        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
-     in s1 ++ " + " ++ s2
-stringOfBinOpI lvl op@(Sub e1 e2) =
-    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
-        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
-     in s1 ++ " - " ++ s2
-stringOfBinOpI lvl op@(Mul e1 e2) =
-    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
-        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
-     in s1 ++ " * " ++ s2
-stringOfBinOpI lvl op@(EqEq e1 e2) =
-    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
-        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
-     in s1 ++ " == " ++ s2
-stringOfBinOpI lvl op@(LessThan e1 e2) =
-    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
-        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
-     in s1 ++ " < " ++ s2
+stringOfBinOpI lvl op = left ++ " " ++ sym ++ " " ++ right
+  where
+    (sym, e1, e2) = case op of
+      Add a b      -> ("+", a, b)
+      Sub a b      -> ("-", a, b)
+      Mul a b      -> ("*", a, b)
+      EqEq a b     -> ("==", a, b)
+      LessThan a b -> ("<", a, b)
+    left  = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
+    right = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
 
 stringOfLiteral :: Literal -> String
 stringOfLiteral (LitInt n)  = show n
@@ -365,21 +294,8 @@ expPrec (Lam _)      = 1
 expPrec (TLam _)     = 1
 
 binOpPrec :: BinOp -> Int
-binOpPrec (Mul _ _)  = 7
-binOpPrec (Add _ _)  = 6
-binOpPrec (Sub _ _)  = 6
-binOpPrec (EqEq _ _) = 5
+binOpPrec (Mul _ _)      = 7
+binOpPrec (Add _ _)      = 6
+binOpPrec (Sub _ _)      = 6
+binOpPrec (EqEq _ _)     = 5
 binOpPrec (LessThan _ _) = 5
-
-stringOfList :: (a -> String) -> [a] -> String
-stringOfList _ [] = ""
-stringOfList f [x] = f x
-stringOfList f (x:xs) = f x ++ ", " ++ stringOfList f xs
-
-stringOfMaybeTyp :: Maybe Typ -> String
-stringOfMaybeTyp Nothing = "None"
-stringOfMaybeTyp (Just t) = stringOfTyp t
-
-stringOfMaybeExp :: Maybe Exp -> String
-stringOfMaybeExp Nothing = "None"
-stringOfMaybeExp (Just e) = stringOfExp e

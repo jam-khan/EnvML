@@ -38,27 +38,9 @@ checkInCtx env expr typ = check (pEnv env) (pExp expr) (pTyp typ)
 isTypEq :: String -> String -> String -> String -> Bool
 isTypEq g1 a1 a2 g2 = teq (pEnv g1) (pTyp a1) (pTyp a2) (pEnv g2)
 
--- ═══════════════════════════════════════════════════════════════════
--- Eval tests
--- ═══════════════════════════════════════════════════════════════════
---
--- CoreFE parser syntax reference (from lexer):
---   Types:    Int, Bool, String  (capitalized keywords)
---   Vars:     x0, x1, x2, ...   (de Bruijn indices)
---   Lambda:   lam. body
---   TLambda:  Lam. body
---   App:      f arg              (juxtaposition, left-assoc)
---   TApp:     e @ T
---   Arith:    e1 - e2,  e1 ** e2  (** is multiply)
---   Eq:       e1 == e2
---   Record:   {l = e}
---   Proj:     e.l
---   Env:      [e1, e2, ...]  or  [tdef T, e1, ...]
---   Box:      [env] |> e
---   Closure:  <[env] | lam. body>
---   TClosure: <[env] | Lam. body>
---   Anno:     e : T
---   TyEnv:    [*, Int, eq Int]  (Kind, Type, TypeEq)
+-- Core syntax used by these tables: lam./Lam. binders, xN de Bruijn vars,
+-- e @T type application, ** multiply, [e1, tdef T] environments, [env] |> e
+-- boxes, <[env] | lam. e> closures, e : T annotations, [*, Int, eq Int] TyEnv.
 
 evalTests :: [(String, String, Maybe Exp)]
 evalTests =
@@ -67,101 +49,41 @@ evalTests =
     , "42"
     , Just (Lit (LitInt 42))
     )
-  , ( "bool literal true"
-    , "true"
-    , Just (Lit (LitBool True))
-    )
-  , ( "bool literal false"
-    , "false"
-    , Just (Lit (LitBool False))
-    )
-  , ( "string literal"
-    , "\"hello\""
-    , Just (Lit (LitStr "hello"))
-    )
+  , ("bool literal true", "true", Just (Lit (LitBool True)))
+  , ("bool literal false", "false", Just (Lit (LitBool False)))
+  , ("string literal", "\"hello\"", Just (Lit (LitStr "hello")))
 
   -- ── Arithmetic ────────────────────────────────────────────
-  , ( "subtraction"
-    , "5 - 3"
-    , Just (Lit (LitInt 2))
-    )
-  , ( "multiplication"
-    , "4 ** 2"
-    , Just (Lit (LitInt 8))
-    )
-  , ( "precedence: parens needed for grouping"
-    , "(10 - 3) ** 2"
-    , Just (Lit (LitInt 14))
-    )
+  , ("subtraction", "5 - 3", Just (Lit (LitInt 2)))
+  , ("multiplication", "4 ** 2", Just (Lit (LitInt 8)))
+  , ("precedence: parens needed for grouping", "(10 - 3) ** 2", Just (Lit (LitInt 14)))
 
   -- ── Boolean / Conditionals ────────────────────────────────
-  , ( "equality true"
-    , "1 == 1"
-    , Just (Lit (LitBool True))
-    )
-  , ( "equality false"
-    , "1 == 2"
-    , Just (Lit (LitBool False))
-    )
+  , ("equality true", "1 == 1", Just (Lit (LitBool True)))
+  , ("equality false", "1 == 2", Just (Lit (LitBool False)))
 
   -- ── Lambda and Application ────────────────────────────────
-  , ( "identity function"
-    , "(lam. x0) 5"
-    , Just (Lit (LitInt 5))
-    )
-  , ( "lambda with subtraction"
-    , "(lam. x0 - 1) 5"
-    , Just (Lit (LitInt 4))
-    )
-  , ( "K combinator: returns first arg"
-    , "((lam. lam. x1) 42) 99"
-    , Just (Lit (LitInt 42))
-    )
-  , ( "lambda applied to itself squared"
-    , "(lam. x0 ** x0) 3"
-    , Just (Lit (LitInt 9))
-    )
+  , ("identity function", "(lam. x0) 5", Just (Lit (LitInt 5)))
+  , ("lambda with subtraction", "(lam. x0 - 1) 5", Just (Lit (LitInt 4)))
+  , ("K combinator: returns first arg", "((lam. lam. x1) 42) 99", Just (Lit (LitInt 42)))
+  , ("lambda applied to itself squared", "(lam. x0 ** x0) 3", Just (Lit (LitInt 9)))
 
   -- ── Closures ──────────────────────────────────────────────
-  , ( "empty closure application"
-    , "<[] | lam. x0 - 1> 10"
-    , Just (Lit (LitInt 9))
-    )
-  , ( "closure captures value from env"
-    , "<[3] | lam. x0 ** x1> 10"
-    , Just (Lit (LitInt 30))
-    )
+  , ("empty closure application", "<[] | lam. x0 - 1> 10", Just (Lit (LitInt 9)))
+  , ("closure captures value from env", "<[3] | lam. x0 ** x1> 10", Just (Lit (LitInt 30)))
 
   -- ── Records ───────────────────────────────────────────────
-  , ( "record creation"
-    , "{x = 42}"
-    , Just (Rec "x" (Lit (LitInt 42)))
-    )
+  , ("record creation", "{x = 42}", Just (Rec "x" (Lit (LitInt 42))))
   -- Note: {x = 42}.x does NOT work because e.l requires e : Env.
   -- Must wrap in env: [{x = 42}].x
-  , ( "record projection via env"
-    , "[{x = 42}].x"
-    , Just (Lit (LitInt 42))
-    )
-  , ( "nested record projection"
-    , "[{a = [{b = 99}]}].a.b"
-    , Just (Lit (LitInt 99))
-    )
+  , ("record projection via env", "[{x = 42}].x", Just (Lit (LitInt 42)))
+  , ("nested record projection", "[{a = [{b = 99}]}].a.b", Just (Lit (LitInt 99)))
 
   -- ── Environments ──────────────────────────────────────────
-  , ( "empty env"
-    , "[]"
-    , Just Unit
-    )
-  , ( "single-element env"
-    , "[5]"
-    , Just (Merge Unit (Lit (LitInt 5)))
-    )
+  , ("empty env", "[]", Just Unit)
+  , ("single-element env", "[5]", Just (Merge Unit (Lit (LitInt 5))))
 
-  , ( "type entry is closed over the context"
-    , "[tdef Int]"
-    , Just (TMerge Unit (TyBoxT [] (TyLit TyInt)))
-    )
+  , ("type entry is closed over the context", "[tdef Int]", Just (TMerge Unit (TyBoxT [] (TyLit TyInt))))
   , ( "an already boxed type entry is kept (Step-tdef requires not box(A))"
     , "[tdef ([] |> Int)]"
     , Just (TMerge Unit (TyBoxT [] (TyLit TyInt)))
@@ -173,40 +95,19 @@ evalTests =
     )
 
   -- ── Box ───────────────────────────────────────────────────
-  , ( "box projects from env"
-    , "[{x = 10}] |> [x0].x"
-    , Just (Lit (LitInt 10))
-    )
-  , ( "box with function application"
-    , "[lam. x0 - 1, 10] |> (x1 x0)"
-    , Just (Lit (LitInt 9))
-    )
+  , ("box projects from env", "[{x = 10}] |> [x0].x", Just (Lit (LitInt 10)))
+  , ("box with function application", "[lam. x0 - 1, 10] |> (x1 x0)", Just (Lit (LitInt 9)))
 
   -- ── Type Abstraction / Application ────────────────────────
-  , ( "polymorphic identity at Int"
-    , "((Lam. lam. x0) @ Int) 42"
-    , Just (Lit (LitInt 42))
-    )
-  , ( "polymorphic identity at Bool"
-    , "((Lam. lam. x0) @ Bool) true"
-    , Just (Lit (LitBool True))
-    )
+  , ("polymorphic identity at Int", "((Lam. lam. x0) @ Int) 42", Just (Lit (LitInt 42)))
+  , ("polymorphic identity at Bool", "((Lam. lam. x0) @ Bool) true", Just (Lit (LitBool True)))
 
   -- ── Annotation (erased at eval) ───────────────────────────
-  , ( "annotation erased during eval"
-    , "42 : Int"
-    , Just (Lit (LitInt 42))
-    )
-  , ( "annotated lambda application"
-    , "((lam. x0) : Int -> Int) 7"
-    , Just (Lit (LitInt 7))
-    )
+  , ("annotation erased during eval", "42 : Int", Just (Lit (LitInt 42)))
+  , ("annotated lambda application", "((lam. x0) : Int -> Int) 7", Just (Lit (LitInt 7)))
 
   -- ── Higher-Order ──────────────────────────────────────────
-  , ( "apply function twice"
-    , "(lam. (x0) ((x0) 5)) (lam. x0 - 1)"
-    , Just (Lit (LitInt 3))
-    )
+  , ("apply function twice", "(lam. (x0) ((x0) 5)) (lam. x0 - 1)", Just (Lit (LitInt 3)))
   ]
 
 checkTests :: [(String, String, String, Bool)]
@@ -277,7 +178,6 @@ checkTests =
     , True
     )
   ]
-
 
 inferTests :: [(String, String, Typ)]
 inferTests =
@@ -362,321 +262,102 @@ checkCtxTests =
 
 typEqTests :: [(String, String, String, String, String, Bool)]
 typEqTests =
-  [ -- ═══════════════════════════════════════════════════════════
-    -- BASIC LITERAL EQUALITY
-    -- ═══════════════════════════════════════════════════════════
+  [ -- Basic literal equality
     ( "Int = Int"
     , "[]", "Int", "Int", "[]"
     , True
     )
-  , ( "Bool = Bool"
-    , "[]", "Bool", "Bool", "[]"
-    , True
-    )
-  , ( "String = String"
-    , "[]", "String", "String", "[]"
-    , True
-    )
-  , ( "Int /= Bool"
-    , "[]", "Int", "Bool", "[]"
-    , False
-    )
-  , ( "Int /= String"
-    , "[]", "Int", "String", "[]"
-    , False
-    )
-  , ( "Int /= Arrow"
-    , "[]", "Int", "Int -> Int", "[]"
-    , False
-    )
+  , ("Bool = Bool", "[]", "Bool", "Bool", "[]", True)
+  , ("String = String", "[]", "String", "String", "[]", True)
+  , ("Int /= Bool", "[]", "Int", "Bool", "[]", False)
+  , ("Int /= String", "[]", "Int", "String", "[]", False)
+  , ("Int /= Arrow", "[]", "Int", "Int -> Int", "[]", False)
 
-    -- ═══════════════════════════════════════════════════════════
-    -- TYPE VARIABLES (de Bruijn indices)
-    -- ═══════════════════════════════════════════════════════════
-  , ( "type var same index, same context"
-    , "[*]", "0", "0", "[*]"
-    , True
-    )
-  , ( "type var in larger context"
-    , "[*, *]", "0", "0", "[*, *]"
-    , True
-    )
-  , ( "type var index 1 in two-element context"
-    , "[*, *]", "1", "1", "[*, *]"
-    , True
-    )
-  , ( "type vars with different indices"
-    , "[*, *]", "0", "1", "[*, *]"
-    , False
-    )
-  , ( "Evar (Type) is skipped for inner index"
-    , "[*, Int]", "0", "0", "[*]"
-    , True
-    )
-  , ( "multiple Evars skipped"
-    , "[*, Int, Bool, Int]", "0", "0", "[*]"
-    , True
-    )
+    -- Type variables (de bruijn indices)
+  , ("type var same index, same context", "[*]", "0", "0", "[*]", True)
+  , ("type var in larger context", "[*, *]", "0", "0", "[*, *]", True)
+  , ("type var index 1 in two-element context", "[*, *]", "1", "1", "[*, *]", True)
+  , ("type vars with different indices", "[*, *]", "0", "1", "[*, *]", False)
+  , ("Evar (Type) is skipped for inner index", "[*, Int]", "0", "0", "[*]", True)
+  , ("multiple Evars skipped", "[*, Int, Bool, Int]", "0", "0", "[*]", True)
 
-    -- ═══════════════════════════════════════════════════════════
-    -- ARROW TYPES
-    -- ═══════════════════════════════════════════════════════════
-  , ( "Int -> Int = Int -> Int"
-    , "[]", "Int -> Int", "Int -> Int", "[]"
-    , True
-    )
-  , ( "arrow with type var"
-    , "[*]", "0 -> Int", "0 -> Int", "[*]"
-    , True
-    )
-  , ( "arrow domain mismatch"
-    , "[]", "Int -> Int", "Bool -> Int", "[]"
-    , False
-    )
-  , ( "arrow codomain mismatch"
-    , "[]", "Int -> Int", "Int -> Bool", "[]"
-    , False
-    )
-  , ( "arrow arity mismatch"
-    , "[]", "Int -> Int", "Int -> Int -> Int", "[]"
-    , False
-    )
-  , ( "nested arrows"
-    , "[]", "(Int -> Int) -> Int", "(Int -> Int) -> Int", "[]"
-    , True
-    )
-  , ( "curried function"
-    , "[]", "Int -> Int -> Int", "Int -> Int -> Int", "[]"
-    , True
-    )
+    -- Arrow types
+  , ("Int -> Int = Int -> Int", "[]", "Int -> Int", "Int -> Int", "[]", True)
+  , ("arrow with type var", "[*]", "0 -> Int", "0 -> Int", "[*]", True)
+  , ("arrow domain mismatch", "[]", "Int -> Int", "Bool -> Int", "[]", False)
+  , ("arrow codomain mismatch", "[]", "Int -> Int", "Int -> Bool", "[]", False)
+  , ("arrow arity mismatch", "[]", "Int -> Int", "Int -> Int -> Int", "[]", False)
+  , ("nested arrows", "[]", "(Int -> Int) -> Int", "(Int -> Int) -> Int", "[]", True)
+  , ("curried function", "[]", "Int -> Int -> Int", "Int -> Int -> Int", "[]", True)
 
-    -- ═══════════════════════════════════════════════════════════
-    -- FORALL TYPES
-    -- ═══════════════════════════════════════════════════════════
-  , ( "forall identity"
-    , "[]", "forall. 0", "forall. 0", "[]"
-    , True
-    )
-  , ( "forall arrow"
-    , "[]", "forall. 0 -> 0", "forall. 0 -> 0", "[]"
-    , True
-    )
-  , ( "forall extends context"
-    , "[*]", "forall. 1", "forall. 1", "[*]"
-    , True
-    )
-  , ( "nested forall"
-    , "[]", "forall. forall. 0 -> 1", "forall. forall. 0 -> 1", "[]"
-    , True
-    )
-  , ( "forall with concrete return"
-    , "[]", "forall. Int", "forall. Int", "[]"
-    , True
-    )
-  , ( "forall body mismatch"
-    , "[]", "forall. 0", "forall. Int", "[]"
-    , False
-    )
+    -- Forall types
+  , ("forall identity", "[]", "forall. 0", "forall. 0", "[]", True)
+  , ("forall arrow", "[]", "forall. 0 -> 0", "forall. 0 -> 0", "[]", True)
+  , ("forall extends context", "[*]", "forall. 1", "forall. 1", "[*]", True)
+  , ("nested forall", "[]", "forall. forall. 0 -> 1", "forall. forall. 0 -> 1", "[]", True)
+  , ("forall with concrete return", "[]", "forall. Int", "forall. Int", "[]", True)
+  , ("forall body mismatch", "[]", "forall. 0", "forall. Int", "[]", False)
 
-    -- ═══════════════════════════════════════════════════════════
-    -- TYPE EQUALITY (TypeEq / Eteq)
-    -- ═══════════════════════════════════════════════════════════
-  , ( "Eteq unfolds: 0 in [eq Int] = Int"
-    , "[eq Int]", "0", "Int", "[]"
-    , True
-    )
-  , ( "Eteq unfolds arrow type"
-    , "[eq Int -> Int]", "0", "Int -> Int", "[]"
-    , True
-    )
-  , ( "Eteq on right side"
-    , "[]", "Int", "0", "[eq Int]"
-    , True
-    )
-  , ( "Eteq both sides"
-    , "[eq Int]", "0", "0", "[eq Int]"
-    , True
-    )
-  , ( "nested Eteq unfolding"
-    , "[eq Int, eq 0]", "0", "Int", "[]"
-    , True
-    )
-  , ( "Eteq chain: 0 -> 1 -> Int"
-    , "[eq Int, eq 0]", "0", "1", "[eq Int, eq 0]"
-    , True
-    )
+    -- Type equality (typeeq / eteq)
+  , ("Eteq unfolds: 0 in [eq Int] = Int", "[eq Int]", "0", "Int", "[]", True)
+  , ("Eteq unfolds arrow type", "[eq Int -> Int]", "0", "Int -> Int", "[]", True)
+  , ("Eteq on right side", "[]", "Int", "0", "[eq Int]", True)
+  , ("Eteq both sides", "[eq Int]", "0", "0", "[eq Int]", True)
+  , ("nested Eteq unfolding", "[eq Int, eq 0]", "0", "Int", "[]", True)
+  , ("Eteq chain: 0 -> 1 -> Int", "[eq Int, eq 0]", "0", "1", "[eq Int, eq 0]", True)
 
-    -- ═══════════════════════════════════════════════════════════
-    -- SUBSTITUTION TYPES (SubstT / #[A]B)
-    -- ═══════════════════════════════════════════════════════════
-  , ( "subst basic: #[Int]0 = Int"
-    , "[]", "#[Int]0", "Int", "[]"
-    , True
-    )
-  , ( "subst on right: Int = #[Int]0"
-    , "[]", "Int", "#[Int]0", "[]"
-    , True
-    )
-  , ( "subst arrow: #[Int](0 -> 0) = Int -> Int"
-    , "[]", "#[Int](0 -> 0)", "Int -> Int", "[]"
-    , True
-    )
-  , ( "subst in function domain"
-    , "[]", "#[Int]0 -> Bool", "Int -> Bool", "[]"
-    , True
-    )
-  , ( "subst preserves outer var"
-    , "[]", "#[Int]0", "Int", "[]"
-    , True
-    )
-  , ( "subst in Eteq binding"
-    , "[eq #[Int]0]", "0", "Int", "[]"
-    , True
-    )
+    -- Substitution types (substt / #[a]b)
+  , ("subst basic: #[Int]0 = Int", "[]", "#[Int]0", "Int", "[]", True)
+  , ("subst on right: Int = #[Int]0", "[]", "Int", "#[Int]0", "[]", True)
+  , ("subst arrow: #[Int](0 -> 0) = Int -> Int", "[]", "#[Int](0 -> 0)", "Int -> Int", "[]", True)
+  , ("subst in function domain", "[]", "#[Int]0 -> Bool", "Int -> Bool", "[]", True)
+  , ("subst preserves outer var", "[]", "#[Int]0", "Int", "[]", True)
+  , ("subst in Eteq binding", "[eq #[Int]0]", "0", "Int", "[]", True)
 
-    -- ═══════════════════════════════════════════════════════════
-    -- BOX TYPES (BoxT / [env] |> A)
-    -- ═══════════════════════════════════════════════════════════
-  , ( "empty box: [] |> Int = Int"
-    , "[]", "[] |> Int", "Int", "[]"
-    , True
-    )
-  , ( "box with Eteq: [eq Int] |> 0 = Int"
-    , "[]", "[eq Int] |> 0", "Int", "[]"
-    , True
-    )
-  , ( "box on right"
-    , "[]", "Int", "[eq Int] |> 0", "[]"
-    , True
-    )
-  , ( "box multi-entry: [eq Int, eq 0] |> 0 = Int"
-    , "[]", "[eq Int, eq 0] |> 0", "Int", "[]"
-    , True
-    )
-  , ( "box multi-entry index 1"
-    , "[]", "[eq Int, eq 0] |> 1", "Int", "[]"
-    , True
-    )
-  , ( "box with arrow in Eteq"
-    , "[]", "[eq Int, eq (0 -> 0)] |> 0", "Int -> Int", "[]"
-    , True
-    )
+    -- Box types (boxt / [env] |> a)
+  , ("empty box: [] |> Int = Int", "[]", "[] |> Int", "Int", "[]", True)
+  , ("box with Eteq: [eq Int] |> 0 = Int", "[]", "[eq Int] |> 0", "Int", "[]", True)
+  , ("box on right", "[]", "Int", "[eq Int] |> 0", "[]", True)
+  , ("box multi-entry: [eq Int, eq 0] |> 0 = Int", "[]", "[eq Int, eq 0] |> 0", "Int", "[]", True)
+  , ("box multi-entry index 1", "[]", "[eq Int, eq 0] |> 1", "Int", "[]", True)
+  , ("box with arrow in Eteq", "[]", "[eq Int, eq (0 -> 0)] |> 0", "Int -> Int", "[]", True)
   , ( "box complex: [eq Int, eq (Int -> Int)] |> 0 -> 1"
     , "[]", "[eq Int, eq (Int -> Int)] |> 0 -> 1", "(Int -> Int) -> Int", "[]"
     , True
     )
-  , ( "box triple Eteq"
-    , "[]", "[eq Int, eq 0, eq 1] |> 0", "Int", "[]"
-    , True
-    )
+  , ("box triple Eteq", "[]", "[eq Int, eq 0, eq 1] |> 0", "Int", "[]", True)
 
-    -- ═══════════════════════════════════════════════════════════
-    -- BOX WITH NON-CONCRETE ENV (should fail)
-    -- ═══════════════════════════════════════════════════════════
-  , ( "box with Kind fails"
-    , "[]", "[*] |> 0", "0", "[*]"
-    , False
-    )
-  , ( "box body may leave an abstract entry unused (rigid, Wft-box)"
-    , "[]", "[*, eq Int] |> 0", "Int", "[]"
-    , True
-    )
-  , ( "box body may skip over an abstract entry (rigid, Wft-box)"
-    , "[]", "[eq Int, *] |> 1", "Int", "[]"
-    , True
-    )
+    -- Box with non-concrete env (should fail)
+  , ("box with Kind fails", "[]", "[*] |> 0", "0", "[*]", False)
+  , ("box body may leave an abstract entry unused (rigid, Wft-box)", "[]", "[*, eq Int] |> 0", "Int", "[]", True)
+  , ("box body may skip over an abstract entry (rigid, Wft-box)", "[]", "[eq Int, *] |> 1", "Int", "[]", True)
 
-    -- ═══════════════════════════════════════════════════════════
-    -- RECORD TYPES
-    -- ═══════════════════════════════════════════════════════════
-  , ( "record same label and type"
-    , "[]", "{x : Int}", "{x : Int}", "[]"
-    , True
-    )
-  , ( "record different label"
-    , "[]", "{x : Int}", "{y : Int}", "[]"
-    , False
-    )
-  , ( "record different type"
-    , "[]", "{x : Int}", "{x : Bool}", "[]"
-    , False
-    )
-  , ( "record with type var"
-    , "[*]", "{val : 0}", "{val : 0}", "[*]"
-    , True
-    )
-  , ( "record with arrow type"
-    , "[]", "{f : Int -> Int}", "{f : Int -> Int}", "[]"
-    , True
-    )
+    -- Record types
+  , ("record same label and type", "[]", "{x : Int}", "{x : Int}", "[]", True)
+  , ("record different label", "[]", "{x : Int}", "{y : Int}", "[]", False)
+  , ("record different type", "[]", "{x : Int}", "{x : Bool}", "[]", False)
+  , ("record with type var", "[*]", "{val : 0}", "{val : 0}", "[*]", True)
+  , ("record with arrow type", "[]", "{f : Int -> Int}", "{f : Int -> Int}", "[]", True)
 
-    -- ═══════════════════════════════════════════════════════════
-    -- ENVIRONMENT TYPES (TyEnvt / Env[...])
-    -- ═══════════════════════════════════════════════════════════
-  , ( "empty env type"
-    , "[]", "Env[]", "Env[]", "[]"
-    , True
-    )
-  , ( "env with Kind"
-    , "[]", "Env[*]", "Env[*]", "[]"
-    , True
-    )
-  , ( "env with Type"
-    , "[]", "Env[Int]", "Env[Int]", "[]"
-    , True
-    )
-  , ( "env with Kind and Type (the entry sees the earlier binder)"
-    , "[]", "Env[*, 0]", "Env[*, 0]", "[]"
-    , True
-    )
-  , ( "env entry cannot refer to a later binder"
-    , "[]", "Env[0, *]", "Env[0, *]", "[]"
-    , False
-    )
-  , ( "env with multiple entries"
-    , "[]", "Env[Int, Bool]", "Env[Int, Bool]", "[]"
-    , True
-    )
-  , ( "env order matters"
-    , "[]", "Env[Int, Bool]", "Env[Bool, Int]", "[]"
-    , False
-    )
-  , ( "env with record"
-    , "[]", "Env[{x : Int}]", "Env[{x : Int}]", "[]"
-    , True
-    )
+    -- Environment types (tyenvt / env[...])
+  , ("empty env type", "[]", "Env[]", "Env[]", "[]", True)
+  , ("env with Kind", "[]", "Env[*]", "Env[*]", "[]", True)
+  , ("env with Type", "[]", "Env[Int]", "Env[Int]", "[]", True)
+  , ("env with Kind and Type (the entry sees the earlier binder)", "[]", "Env[*, 0]", "Env[*, 0]", "[]", True)
+  , ("env entry cannot refer to a later binder", "[]", "Env[0, *]", "Env[0, *]", "[]", False)
+  , ("env with multiple entries", "[]", "Env[Int, Bool]", "Env[Int, Bool]", "[]", True)
+  , ("env order matters", "[]", "Env[Int, Bool]", "Env[Bool, Int]", "[]", False)
+  , ("env with record", "[]", "Env[{x : Int}]", "Env[{x : Int}]", "[]", True)
 
-    -- ═══════════════════════════════════════════════════════════
-    -- COMPLEX / COMBINED CASES
-    -- ═══════════════════════════════════════════════════════════
-  , ( "complex module-like type"
-    , "[]"
-    , "Env[eq Int, {x : 0}]"
-    , "Env[eq Int, {x : 0}]"
-    , "[]"
-    , True
-    )
-  , ( "functor-like type"
-    , "[]"
-    , "forall. Env[{x : 0}] -> Env[{y : 0}]"
-    , "forall. Env[{x : 0}] -> Env[{y : 0}]"
-    , "[]"
-    , True
-    )
-  , ( "positional Teq-tvar: same index, abstract on both sides"
-    , "[*, eq Int]", "1", "1", "[*, *]"
-    , True
-    )
-  , ( "box in subst"
-    , "[]", "[eq ([] |> Int)] |> 0", "Int", "[]"
-    , True
-    )
+    -- Complex / combined cases
+  , ("complex module-like type", "[]", "Env[eq Int, {x : 0}]", "Env[eq Int, {x : 0}]", "[]", True)
+  , ("functor-like type", "[]", "forall. Env[{x : 0}] -> Env[{y : 0}]", "forall. Env[{x : 0}] -> Env[{y : 0}]", "[]", True)
+  , ("positional Teq-tvar: same index, abstract on both sides", "[*, eq Int]", "1", "1", "[*, *]", True)
+  , ("box in subst", "[]", "[eq ([] |> Int)] |> 0", "Int", "[]", True)
   ]
 
--- ═══════════════════════════════════════════════════════════════════
 -- Type equivalence: positional variables, padded manifest rules, rigid boxes
 -- (Teq.v: eq_tvar, eq_manil/eq_manir, eq_boxl/eq_boxr)
--- ═══════════════════════════════════════════════════════════════════
 teqRuleTests :: [(String, String, String, String, String, Bool)]
 teqRuleTests =
   [ ( "different indices are different abstract variables"
@@ -701,9 +382,7 @@ teqRuleTests =
     , "[]", "3", "3", "[]", False )
   ]
 
--- ═══════════════════════════════════════════════════════════════════
--- Well-formedness (Teq.v: wft / rigid / check)
--- ═══════════════════════════════════════════════════════════════════
+-- Well-formedness (teq.v: wft / rigid / check)
 wftTests :: [(String, String, String, Bool)]
 wftTests =
   [ ("Int is well-formed", "[]", "Int", True)
@@ -740,9 +419,7 @@ checkAbsTests =
   , ("out of range", "[*]", 1, False)
   ]
 
--- ═══════════════════════════════════════════════════════════════════
 -- Typing premises added with the mechanization (wft in t_tapp / lt_const)
--- ═══════════════════════════════════════════════════════════════════
 inferFailTests :: [(String, String)]
 inferFailTests =
   [ ("type application at an ill-formed type", "((Lam. lam. x0) : forall. 0 -> 0) @ 5")
@@ -763,7 +440,6 @@ inferOkTests =
     , "[tdef Int] |> 5"
     , TyBoxT [TypeEq (TyLit TyInt)] (TyLit TyInt))
   ]
-
 
 spec :: Spec
 spec = do

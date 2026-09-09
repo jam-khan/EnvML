@@ -61,9 +61,7 @@ data Typ
   | TyList   Typ            -- [A]
   deriving (Eq, Show)
 
---------------------------------------------------------------------------------
 -- Pretty Printing
---------------------------------------------------------------------------------
 
 class Pretty a where
   pretty :: a -> String
@@ -179,7 +177,6 @@ prettyLit :: Nameless.Literal -> String
 prettyLit (Nameless.LitInt n) = show n
 prettyLit (Nameless.LitBool b) = if b then "true" else "false"
 prettyLit (Nameless.LitStr s) = "\"" ++ s ++ "\""
-
 
 parenIf :: Bool -> String -> String
 parenIf True s = "(" ++ s ++ ")"

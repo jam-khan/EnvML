@@ -1,18 +1,11 @@
 {-# LANGUAGE InstanceSigs #-}
+-- | Readable output for the playground, at all three AST levels: EnvML source,
+--   named CoreFE, and nameless CoreFE.
 module PrettyWeb where
 
 import qualified EnvML.Syntax as EnvML
 import qualified CoreFE.Named as Named
 import qualified CoreFE.Syntax as CoreFE
-
---------------------------------------------------------------------------------
--- User-Friendly Pretty Printing for the Playground
---
--- This module provides clean, readable output for all three AST levels:
--- 1. EnvML Source AST
--- 2. CoreFE Named AST
--- 3. CoreFE Nameless (De Bruijn) AST
---------------------------------------------------------------------------------
 
 parenIf :: Bool -> String -> String
 parenIf True s = "(" ++ s ++ ")"
@@ -26,9 +19,7 @@ intercalate sep (x:xs) = x ++ sep ++ intercalate sep xs
 indent :: Int -> String
 indent n = replicate (n * 2) ' '
 
---------------------------------------------------------------------------------
 -- EnvML Source AST - User Display
---------------------------------------------------------------------------------
 
 prettyEnvMLModule :: EnvML.Module -> String
 prettyEnvMLModule (EnvML.Struct structs) =
@@ -77,9 +68,7 @@ prettyEnvMLExpShort (EnvML.Anno e t) = "(" ++ prettyEnvMLExpShort e ++ " : " ++ 
 prettyEnvMLExpShort (EnvML.Mod m) = prettyEnvMLModuleShort m
 prettyEnvMLExpShort _ = "..."
 
---------------------------------------------------------------------------------
 -- CoreFE Named AST - User Display
---------------------------------------------------------------------------------
 
 prettyNamedModule :: Named.Exp -> String
 prettyNamedModule (Named.FEnv env) =
@@ -117,11 +106,13 @@ prettyNamedExpShort (Named.Anno e _) = prettyNamedExpShort e
 prettyNamedExpShort (Named.EList es) = foldr (\e acc -> acc ++ prettyNamedExpShort e ++ ",") "" es
 prettyNamedExpShort (Named.ETake i e) = "take(" ++ show i ++ "," ++ prettyNamedExpShort e ++ ")"
 prettyNamedExpShort (Named.ELength e) = "length(" ++ prettyNamedExpShort e ++ ")"
-prettyNamedExpShort (Named.BinOp (Named.Add e1 e2))      = prettyNamedExpShort e1 ++ " + "  ++ prettyNamedExpShort e2
-prettyNamedExpShort (Named.BinOp (Named.Sub e1 e2))      = prettyNamedExpShort e1 ++ " - "  ++ prettyNamedExpShort e2
-prettyNamedExpShort (Named.BinOp (Named.Mul e1 e2))      = prettyNamedExpShort e1 ++ " * "  ++ prettyNamedExpShort e2
-prettyNamedExpShort (Named.BinOp (Named.EqEq e1 e2))     = prettyNamedExpShort e1 ++ " == " ++ prettyNamedExpShort e2
-prettyNamedExpShort (Named.BinOp (Named.LessThan e1 e2)) = prettyNamedExpShort e1 ++ " < "  ++ prettyNamedExpShort e2
+prettyNamedExpShort (Named.BinOp op) = case op of
+    Named.Add a b      -> bin "+" a b
+    Named.Sub a b      -> bin "-" a b
+    Named.Mul a b      -> bin "*" a b
+    Named.EqEq a b     -> bin "==" a b
+    Named.LessThan a b -> bin "<" a b
+  where bin sym a b = prettyNamedExpShort a ++ " " ++ sym ++ " " ++ prettyNamedExpShort b
 
 
 prettyNamedEnvShort :: Named.Env -> String
@@ -134,11 +125,9 @@ prettyNamedEnvShort env
     shortEntry (Named.ModE n _) = n
     shortEntry (Named.TypE n _) = "type " ++ n
 
---------------------------------------------------------------------------------
 -- CoreFE Nameless (De Bruijn) AST - User Display
---------------------------------------------------------------------------------
 
--- | A top-level program is a sandboxed environment; show its entries one per line.
+-- | A top-level program is a sandboxed environment: one entry per line.
 prettyDeBruijnModule :: CoreFE.Exp -> String
 prettyDeBruijnModule (CoreFE.Box CoreFE.Unit (CoreFE.Anno e _)) = prettyDeBruijnModule e
 prettyDeBruijnModule (CoreFE.Box CoreFE.Unit e) = prettyDeBruijnModule e
@@ -184,13 +173,19 @@ prettyDeBruijnExpShort (CoreFE.ELength e) = "length(" ++ prettyDeBruijnExpShort 
 
 
 prettyDeBruijnBinOpShort :: CoreFE.BinOp -> String
-prettyDeBruijnBinOpShort (CoreFE.Add e1 e2) = prettyDeBruijnExpShort e1 ++ " + " ++ prettyDeBruijnExpShort e2
-prettyDeBruijnBinOpShort (CoreFE.Sub e1 e2) = prettyDeBruijnExpShort e1 ++ " - " ++ prettyDeBruijnExpShort e2
-prettyDeBruijnBinOpShort (CoreFE.Mul e1 e2) = prettyDeBruijnExpShort e1 ++ " * " ++ prettyDeBruijnExpShort e2
-prettyDeBruijnBinOpShort (CoreFE.EqEq e1 e2) = prettyDeBruijnExpShort e1 ++ " == " ++ prettyDeBruijnExpShort e2
-prettyDeBruijnBinOpShort (CoreFE.LessThan e1 e2) = prettyDeBruijnExpShort e1 ++ " < " ++ prettyDeBruijnExpShort e2
+prettyDeBruijnBinOpShort = coreBinOp prettyDeBruijnExpShort
 
--- | An environment chain, abbreviated. Entries are shown oldest first.
+-- | Render a binary operator with the given expression printer.
+coreBinOp :: (CoreFE.Exp -> String) -> CoreFE.BinOp -> String
+coreBinOp f op = case op of
+    CoreFE.Add a b      -> bin "+" a b
+    CoreFE.Sub a b      -> bin "-" a b
+    CoreFE.Mul a b      -> bin "*" a b
+    CoreFE.EqEq a b     -> bin "==" a b
+    CoreFE.LessThan a b -> bin "<" a b
+  where bin sym a b = f a ++ " " ++ sym ++ " " ++ f b
+
+-- | An environment chain, abbreviated, oldest entry first.
 prettyDeBruijnEnvShort :: CoreFE.Exp -> String
 prettyDeBruijnEnvShort e =
   case CoreFE.envEntries e of
@@ -234,13 +229,9 @@ prettyDeBruijnExp (CoreFE.ELength e) = "length(" ++ prettyDeBruijnExp e ++ ")"
 
 
 prettyDeBruijnBinOp :: CoreFE.BinOp -> String
-prettyDeBruijnBinOp (CoreFE.Add e1 e2) = prettyDeBruijnExp e1 ++ " + " ++ prettyDeBruijnExp e2
-prettyDeBruijnBinOp (CoreFE.Sub e1 e2) = prettyDeBruijnExp e1 ++ " - " ++ prettyDeBruijnExp e2
-prettyDeBruijnBinOp (CoreFE.Mul e1 e2) = prettyDeBruijnExp e1 ++ " * " ++ prettyDeBruijnExp e2
-prettyDeBruijnBinOp (CoreFE.EqEq e1 e2) = prettyDeBruijnExp e1 ++ " == " ++ prettyDeBruijnExp e2
-prettyDeBruijnBinOp (CoreFE.LessThan e1 e2) = prettyDeBruijnExp e1 ++ " < " ++ prettyDeBruijnExp e2
+prettyDeBruijnBinOp = coreBinOp prettyDeBruijnExp
 
--- | An environment: bracketed entries when literal, the calculus' comma otherwise.
+-- | Bracketed when literal, otherwise the calculus' comma.
 prettyDeBruijnEnvLike :: CoreFE.Exp -> String
 prettyDeBruijnEnvLike e =
   case CoreFE.envEntries e of
